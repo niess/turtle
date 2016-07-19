@@ -33,22 +33,22 @@ struct topo_map {
 	/* Chained list pointers. */
 	struct topo_map * prev;
 	struct topo_map * next;
-	
+
 	/* Status. */
 	int tick;
 	int booking;
-	
+
 	/* Map identifiers. */
 	char * path;
 	struct transform_data * transform;
-	
+
 	/* Map data. */
 	int nx, ny;
 	double x0, y0;
 	double dx, dy;
 	double zmin, zmax;
 	double * z;
-	
+
 	char data[]; /* Placeholder for dynamic data. */
 };
 
@@ -64,7 +64,7 @@ static struct topo_map * load_png(const char* path,
 	const struct topo_box * box);
 static int dump_png(const struct topo_map * map, const char * path,
 	int bit_depth);
-	
+
 /* Coordinates transform. */
 static int transform_initialise(struct transform_data * transform,
 	const struct topo_box * box);
@@ -87,7 +87,7 @@ static int n_maps = 0;
 
 /* Initialise the topographer interface. */
 int topo_initialise(void)
-{	
+{
 	return Geotiff16_Initialise();
 }
 
@@ -105,10 +105,10 @@ void topo_finalise(void)
 	}
 	first_map = last_map = NULL;
 	n_maps = 0;
-	
+
 	/* Clear geotiff-16 data. */
 	Geotiff16_Finalise();
-	
+
 	/* Clear remanent XML paser data. */
 	xmlCleanupParser();
 }
@@ -121,7 +121,7 @@ void topo_destroy(struct topo_map ** map)
 	struct topo_map * next = (*map)->next, * prev = (*map)->prev;
 	free(*map);
 	*map = NULL;
-	
+
 	/* Update the chained list. */
 	if (prev != NULL) prev->next = next;
 	else first_map = next;
@@ -135,15 +135,15 @@ struct topo_map * topo_create(const char * path, const int nx, const int ny)
 {
 	struct topo_map * map = map_create(path, NULL, nx, ny, 0);
 	if (map == NULL) return NULL;
-	
+
 	map->nx = nx;
-	map->ny = ny; 
+	map->ny = ny;
 	map->x0 = 0.;
 	map->y0 = 0.;
 	map->dx = 1.;
 	map->dy = 1.;
 	memset(map->z, 0x0, nx*ny*sizeof(double));
-	
+
 	map_link(map, 0);
 	return map;
 }
@@ -152,12 +152,12 @@ struct topo_map * topo_create(const char * path, const int nx, const int ny)
 struct topo_map * topo_load(const char * path, const struct topo_box * box)
 {
 	struct topo_map * map = NULL;
-	
+
 	/* Load the map data. */
 	const char * basename = strrchr(path, '/');
 	if (basename == NULL) basename = path;
 	else basename++;
-	
+
 	if (strcmp(basename, "ASTER-GDEM2") == 0) {
 		/* We have ASTER-GDEM2 data. */
 		map = load_gdem2(path, box);
@@ -168,18 +168,18 @@ struct topo_map * topo_load(const char * path, const struct topo_box * box)
 		char* ext = strrchr(basename, '.');
 		if (ext == NULL) goto error;
 		ext++;
-		
+
 		if (strcmp(ext, "png") == 0) {
 			map = load_png(path, box);
 			if (map == NULL) goto error;
 		}
 		else goto error;
 	}
-	
+
 	/* Link the map and return. */
 	map_link(map, 1);
 	return map;
-	
+
 error:
 	free(map);
 	return NULL;
@@ -218,7 +218,7 @@ struct topo_map * topo_get(const char * path, const struct topo_box * box)
 		if (same_box) break;
 		map = map->prev;
 	}
-	
+
 	return map;
 }
 
@@ -229,7 +229,7 @@ struct topo_map * topo_unused(void)
 	while(map != NULL) {
 		if (map->booking == 0) break;
 		map = map->next;
-	}	
+	}
 	return map;
 }
 
@@ -246,7 +246,7 @@ int topo_checkout(struct topo_map * map)
 	if (map->booking <= 0) return -1;
 	map->tick = time(NULL);
 	map->booking--;
-	
+
 	/* Move the map to the end of the chained list. */
 	struct topo_map * next = map->next;
 	if (next != NULL) {
@@ -269,14 +269,14 @@ double topo_elevation(const struct topo_map * map, double x, double y)
 	double hy = (y-map->y0)/map->dy;
 	int ix = (int)hx;
 	int iy = (int)hy;
-    
+
 	if (ix >= map->nx-1 || ix < 0 || iy >= map->ny-1 || iy < 0)
 		return -DBL_MAX;
 	hx -= ix;
 	hy -= iy;
- 
+
  	const int nx = map->nx;
-	const double* z = map->z; 
+	const double* z = map->z;
 	return z[iy*nx+ix]*(1.-hx)*(1.-hy)+z[(iy+1)*nx+ix]*(1.-hx)*hy+
 		z[iy*nx+ix+1]*hx*(1.-hy)+z[(iy+1)*nx+ix+1]*hx*hy;
 }
@@ -318,7 +318,7 @@ static struct topo_map * map_create(const char * path, const struct
 		sizeof(struct topo_map)+n_path+n_transform+
 		nx*ny*sizeof(double));
 	if (map == NULL) return NULL;
-		
+
 	/* Fill the identifiers. */
 	char * p = map->data;
 	map->path = p;
@@ -330,7 +330,7 @@ static struct topo_map * map_create(const char * path, const struct
 		memcpy(map->transform, transform, n_transform);
 	}
 	map->z = (double *)(p);
-	
+
 	return map;
 }
 
@@ -355,11 +355,11 @@ static void map_link(struct topo_map * map, int compute_scale)
 		map->zmin = -DBL_MAX;
 		map->zmax = DBL_MAX;
 	}
-	
+
 	/* Fill the status. */
 	map->tick = (int)time(NULL);
 	map->booking = 0;
-	
+
 	/* Link the map. */
 	map->prev = last_map;
 	if (last_map != NULL) last_map->next = map;
@@ -371,11 +371,11 @@ static void map_link(struct topo_map * map, int compute_scale)
 struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 {
 	if (box == NULL) return NULL;
-	
+
 	/* Compute the local to geograhic coordinates transform. */
 	struct transform_data transform;
 	if (transform_initialise(&transform, box) != 0) return NULL;
-		
+
 	/* Get the data bounding box in geographic coordinates. */
 	double Dl, DL;
 	if (transform_to_geo(box->half_x, box->half_y, &transform, &Dl, &DL)
@@ -386,10 +386,10 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 	/* Initialise the local map. */
 	int nx = 2*((int)(Dl/GDEM2_pixelscale)+1)+1;
 	int ny = 2*((int)(DL/GDEM2_pixelscale)+1)+1;
-	
+
 	struct topo_map * map = map_create(path, &transform, nx, ny, 32);
-	if (map == NULL) return NULL;	
-		
+	if (map == NULL) return NULL;
+
 	/* Copy the elevation data */
 	const double l0 = box->x0-((nx-1)/2)*GDEM2_pixelscale;
 	const double L0 = box->y0-((ny-1)/2)*GDEM2_pixelscale;
@@ -397,7 +397,7 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 	const int L0_tile  = (int)L0;
 	const int l0_index = (int)((l0-l0_tile)/GDEM2_pixelscale);
 	const int L0_index = (int)((L0-L0_tile)/GDEM2_pixelscale);
-		
+
 	int ix = 0, iy = 0;
 	int l_tile=l0_tile, L_tile=L0_tile, l_index=l0_index, L_index=L0_index;
 	const int n_path = strlen(path);
@@ -410,20 +410,19 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 			free(map);
 			return NULL;
 		}
-			
+
 		char cl, cL;
 		cl = (l_tile >= 0) ? 'E' : 'W';
 		cL = (L_tile >= 0) ? 'N' : 'S';
 		sprintf(map->path+n_path,
-			"/%c%02d%c%03d/ASTGTM2_%c%02d%c%03d_dem.tif",
-			cL, absL, cl, absl, cL, absL, cl, absl);
-			
+			"/ASTGTM2_%c%02d%c%03d_dem.tif", cL, absL, cl, absl);
+
 		Geotiff16Type_Map* geotiff = Geotiff16_NewMap(map->path);
 		if (geotiff == NULL) {
 			free(map);
 			return NULL;
 		}
-			
+
 		/* Copy the relevant tile's data. */
 		int jx = (l_index+nx-1-ix);
 		if (jx >= 3600) jx = 3599;
@@ -431,12 +430,12 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 		if (jy >= 3600) jy = 3599;
 		const int nl = jx-l_index+1;
 		const int nL = jy-L_index+1;
-		
-		int ky = L_index;		
+
+		int ky = L_index;
 		for (;ky <= jy; ky++) {
 			int16_t* z_src = geotiff->elevation+(ky+1)*3601+
 				l_index+1;
-			double* z_dst = map->z+(ky-L_index)*nx+ix;
+			double* z_dst = map->z+(ky-L_index+iy)*nx+ix;
 			int kx = 0;
 			for (; kx < nl; kx++) {
 				*z_dst = (double)(*z_src);
@@ -445,10 +444,10 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 			}
 		}
 		Geotiff16_DeleteMap(geotiff);
-			
+
 		/* Update the indices */
 		iy += nL;
-		
+
 		if (iy == ny) {
 			ix += nl;
 			if (ix < nx) {
@@ -465,7 +464,7 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 		}
 	}
 	*(map->path+n_path) = '\0';
-		
+
 	/* Fill the local map settings. */
 	const double longitude = l0_tile+(l0_index+0.5)*GDEM2_pixelscale;
 	const double latitude = L0_tile+(L0_index+0.5)*GDEM2_pixelscale;
@@ -475,7 +474,7 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 	map->ny = ny;
 	map->dx = GDEM2_pixelscale/map->transform->dldx;
 	map->dy = GDEM2_pixelscale/map->transform->dLdy;
-	
+
 	return map;
 }
 
@@ -491,7 +490,7 @@ struct topo_map * load_png(const char* path, const struct topo_box * box)
 	/* Open the file and check the format. */
 	fid = fopen(path, "rb");
 	if (fid == NULL) goto error;
-	
+
 	char header[8];
 	fread(header, 1, 8, fid);
 	if (png_sig_cmp((png_bytep)header, 0, 8) != 0) goto error;
@@ -505,7 +504,7 @@ struct topo_map * load_png(const char* path, const struct topo_box * box)
 	if (setjmp(png_jmpbuf(png_ptr))) goto error;
 	png_init_io(png_ptr, fid);
 	png_set_sig_bytes(png_ptr, 8);
-	
+
 	/* Read the header. */
 	png_read_info(png_ptr, info_ptr);
 	if (png_get_color_type(png_ptr, info_ptr) != PNG_COLOR_TYPE_GRAY)
@@ -515,7 +514,7 @@ struct topo_map * load_png(const char* path, const struct topo_box * box)
 	nx = png_get_image_width(png_ptr, info_ptr);
 	ny = png_get_image_height(png_ptr, info_ptr);
 	png_read_update_info(png_ptr, info_ptr);
-	
+
 	/* Parse the XML meta data. */
 	double x0 = 0., y0 = 0., z0 = 0., dx = 1., dy = 1., dz = 1.;
 	png_textp text_ptr;
@@ -530,7 +529,7 @@ struct topo_map * load_png(const char* path, const struct topo_box * box)
 			const char* text = p->text;
 			unsigned int length = p->text_length;
 			p++;
-			
+
 			xmlDocPtr doc = NULL;
 			doc = xmlReadMemory(text, length, "noname.xml", NULL,
 				XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
@@ -539,7 +538,7 @@ struct topo_map * load_png(const char* path, const struct topo_box * box)
 			if (root == NULL) goto xml_end;
 			if (strcmp((const char *)root->name, "topography")
 				!= 0) goto xml_end;
-			
+
 			xmlNode * node;
 			for (node = root->children; node != NULL;
 				node = node->next) if ((node->type ==
@@ -565,7 +564,7 @@ struct topo_map * load_png(const char* path, const struct topo_box * box)
 						attribute = &dz;
 				}
 				if (attribute == NULL) continue;
-					
+
 				xmlNode * subnode;
 				for (subnode = node->children; subnode != NULL;
 					subnode=subnode->next) if (subnode->type
@@ -589,7 +588,7 @@ xml_end:
 		if (row_pointers[i] == NULL) goto error;
 	}
 	png_read_image(png_ptr, row_pointers);
-	
+
 	/* Compute the bounding box, if requested. */
 	int nx0, ny0, dnx, dny;
 	if (box == NULL) {
@@ -605,7 +604,7 @@ xml_end:
 		const double xhigh = box->x0+box->half_x;
 		const double ylow = box->y0-box->half_y;
 		const double yhigh = box->y0+box->half_y;
-		
+
 		if (xlow <= x0) nx0 = 0;
 		else nx0 = (int)((xlow-x0)/dx);
 		if (nx0 >= nx) goto error;
@@ -613,7 +612,7 @@ xml_end:
 		if (dnx > nx) dnx = nx;
 		else if (dnx <= nx0) goto error;
 		dnx -= nx0;
-		
+
 		if (ylow <= y0) ny0 = 0;
 		else ny0 = (int)((ylow-y0)/dy);
 		if (ny0 >= ny) goto error;
@@ -622,11 +621,11 @@ xml_end:
 		else if (dny <= ny0) goto error;
 		dny -= ny0;
 	}
-	
+
 	/* Allocate the map and copy the data. */
 	map = map_create(path, NULL, nx, ny, 0);
 	if (map == NULL) goto error;
-	
+
 	double * z = map->z;
 	for (i = ny-ny0-1; i >= ny-ny0-dny; i--) {
 		png_bytep ptr = row_pointers[i]+nx0*(bit_depth/8);
@@ -644,7 +643,7 @@ xml_end:
 			}
 		}
 	}
-	
+
 	map->nx = dnx;
 	map->ny = dny;
 	map->x0 = x0+nx0*dx;
@@ -656,7 +655,7 @@ xml_end:
 error:
 	free(map);
 	map = NULL;
-	
+
 exit:
 	if (fid != NULL) fclose(fid);
 	if (row_pointers != NULL) {
@@ -667,7 +666,7 @@ exit:
 	png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
 	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
 	png_destroy_read_struct(pp_p, pp_i, NULL);
-	
+
 	return map;
 }
 
@@ -679,10 +678,10 @@ int dump_png(const struct topo_map * map, const char * path, int bit_depth)
 	png_bytep * row_pointers = NULL;
 	png_structp png_ptr = NULL;
 	png_infop info_ptr = NULL;
-	
+
 	/* Check the bit depth. */
 	if ((bit_depth != 8) && (bit_depth != 16)) goto error;
-	
+
 	/* Compute the z-binning. */
 	const int nx = map->nx, ny = map->ny;
 	double z0 = map->zmin, z1 = map->zmax;
@@ -700,7 +699,7 @@ int dump_png(const struct topo_map * map, const char * path, int bit_depth)
 	}
 	const int bins = (bit_depth == 8 ? 255 : 65535);
 	const double dz = (z1-z0)/bins;
-	
+
 	/* Initialise the file and the PNG pointers. */
 	fid = fopen(path, "wb+");
 	if (fid == NULL) goto error;
@@ -709,10 +708,10 @@ int dump_png(const struct topo_map * map, const char * path, int bit_depth)
 		NULL);
 	if (png_ptr == NULL) goto error;
 	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL) goto error;	
+	if (info_ptr == NULL) goto error;
 	if (setjmp(png_jmpbuf(png_ptr))) goto error;
 	png_init_io(png_ptr, fid);
-	
+
 	/* Write the header. */
 	png_set_IHDR(
 		png_ptr, info_ptr, nx, ny, bit_depth, PNG_COLOR_TYPE_GRAY,
@@ -776,7 +775,7 @@ exit:
 	png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
 	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
 	png_destroy_write_struct(pp_p, pp_i);
-		
+
 	return rc;
 }
 
@@ -786,14 +785,14 @@ int transform_initialise(struct transform_data * transform,
 {
 	if ((fabs(box->y0) > 90.) || (fabs(box->x0) > 180.))
 		goto error;
-	
+
 	const double deg = M_PI/180.;
 	const double latitude = box->y0*deg;
 	const double a = a_WGS84*cos(latitude);
 	const double b = b_WGS84*sin(latitude);
 	const double dxdl = a*deg;
 	const double dydL = sqrt(a*a+b*b)*deg;
-		
+
 	if ((dxdl <= 0.) || (dydL <= 0.)) goto error;
 
 	memcpy(&(transform->box), box, sizeof(*box));
@@ -804,7 +803,7 @@ error:
 	transform->dldx = transform->dLdy = 0.;
 	transform->box.x0 = transform->box.y0 = 0.;
 	transform->box.half_x = transform->box.half_y = 0.;
-	
+
 	return -1;
 }
 
@@ -814,7 +813,7 @@ int transform_to_geo(double x, double y, const struct transform_data *
 {
 	const double dldx = transform->dldx;
 	const double dLdy = transform->dLdy;
-	
+
 	if ((dldx <= 0.) || (dLdy <= 0.)) {
 		*longitude = 0.;
 		*latitude = 0.;
@@ -833,7 +832,7 @@ int transform_to_local(double longitude, double latitude, const struct
 {
 	const double dldx = transform->dldx;
 	const double dLdy = transform->dLdy;
-	
+
 	if ((dldx <= 0.) || (dLdy <= 0.)) goto error;
 	else if ((fabs(latitude) > 90.) || (fabs(longitude) > 180.)) goto error;
 	else {
@@ -841,7 +840,7 @@ int transform_to_local(double longitude, double latitude, const struct
 		*y = (latitude-transform->box.y0)/dLdy;
 	}
 	return 0;
-	
+
 error:
 	*x = 0.;
 	*y = 0.;
