@@ -497,7 +497,7 @@ struct turtle_map * load_png(const char* path, const struct turtle_box * box)
 	if (fid == NULL) goto error;
 
 	char header[8];
-	fread(header, 1, 8, fid);
+	if (fread(header, 1, 8, fid) != 8) goto error;
 	if (png_sig_cmp((png_bytep)header, 0, 8) != 0) goto error;
 
 	/* initialize libpng containers. */
