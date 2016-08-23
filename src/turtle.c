@@ -1,5 +1,5 @@
 /*
- *	Topographic elevation provider
+ *	Topographic Utilities for Rendering The eLEvation (TURTLE).
  */
 
 #include <float.h>
@@ -13,7 +13,7 @@
 #include <libxml/tree.h>
 #include <png.h>
 
-#include "topo.h"
+#include "turtle.h"
 #include "geotiff16.h"
 
 #ifndef M_PI
@@ -23,16 +23,16 @@
 
 /* Parameters of a frame transform. */
 struct transform_data {
-	struct topo_box box;
+	struct turtle_box box;
 	double dldx;
 	double dLdy;
 };
 
 /* Container for a local elevation map. */
-struct topo_map {
+struct turtle_map {
 	/* Chained list pointers. */
-	struct topo_map * prev;
-	struct topo_map * next;
+	struct turtle_map * prev;
+	struct turtle_map * next;
 
 	/* Status. */
 	int tick;
@@ -53,21 +53,21 @@ struct topo_map {
 };
 
 /* Generic map allocation and initialisation. */
-static struct topo_map * map_create(const char * path, const struct
+static struct turtle_map * map_create(const char * path, const struct
 	transform_data * transform, int nx, int ny, int n_extra);
-static void map_link(struct topo_map * map, int compute_scale);
+static void map_link(struct turtle_map * map, int compute_scale);
 
 /* Low level data loaders/dumpers. */
-static struct topo_map * load_gdem2(const char* path,
-	const struct topo_box * box);
-static struct topo_map * load_png(const char* path,
-	const struct topo_box * box);
-static int dump_png(const struct topo_map * map, const char * path,
+static struct turtle_map * load_gdem2(const char* path,
+	const struct turtle_box * box);
+static struct turtle_map * load_png(const char* path,
+	const struct turtle_box * box);
+static int dump_png(const struct turtle_map * map, const char * path,
 	int bit_depth);
 
 /* Coordinates transform. */
 static int transform_initialise(struct transform_data * transform,
-	const struct topo_box * box);
+	const struct turtle_box * box);
 static int transform_to_geo(double x, double y, const struct transform_data *
 	transform, double * longitude, double * latitude);
 static int transform_to_local(double longitude, double latitude,
@@ -81,12 +81,12 @@ static const double b_WGS84 = 6356752.314;
 static const double GDEM2_pixelscale = 1./3600.;
 
 /* Entry for local topographic maps. */
-static struct topo_map * first_map = NULL;
-static struct topo_map * last_map = NULL;
+static struct turtle_map * first_map = NULL;
+static struct turtle_map * last_map = NULL;
 static int n_maps = 0;
 
 /* Initialise the topographer interface. */
-int topo_initialise(void)
+int turtle_initialise(void)
 {
 	return Geotiff16_Initialise();
 }
@@ -94,12 +94,12 @@ int topo_initialise(void)
 /* Clear the topographer interface. BEWARE: due to libxml2 this function must
  * be called only once.
  */
-void topo_finalise(void)
+void turtle_finalise(void)
 {
 	/* Clear maps. */
-	struct topo_map * map = first_map;
+	struct turtle_map * map = first_map;
 	while(map != NULL) {
-		struct topo_map * next = map->next;
+		struct turtle_map * next = map->next;
 		free(map);
 		map = next;
 	}
@@ -114,11 +114,11 @@ void topo_finalise(void)
 }
 
 /* Release the map memory and update the chained list. */
-void topo_destroy(struct topo_map ** map)
+void turtle_destroy(struct turtle_map ** map)
 {
 	/* Release the memory. */
 	if ((map == NULL) || (*map == NULL)) return;
-	struct topo_map * next = (*map)->next, * prev = (*map)->prev;
+	struct turtle_map * next = (*map)->next, * prev = (*map)->prev;
 	free(*map);
 	*map = NULL;
 
@@ -131,9 +131,9 @@ void topo_destroy(struct topo_map ** map)
 }
 
 /* Create a blank map. */
-struct topo_map * topo_create(const char * path, const int nx, const int ny)
+struct turtle_map * turtle_create(const char * path, const int nx, const int ny)
 {
-	struct topo_map * map = map_create(path, NULL, nx, ny, 0);
+	struct turtle_map * map = map_create(path, NULL, nx, ny, 0);
 	if (map == NULL) return NULL;
 
 	map->nx = nx;
@@ -149,9 +149,9 @@ struct topo_map * topo_create(const char * path, const int nx, const int ny)
 }
 
 /* Load a map from a data file. */
-struct topo_map * topo_load(const char * path, const struct topo_box * box)
+struct turtle_map * turtle_load(const char * path, const struct turtle_box * box)
 {
-	struct topo_map * map = NULL;
+	struct turtle_map * map = NULL;
 
 	/* Load the map data. */
 	const char * basename = strrchr(path, '/');
@@ -186,7 +186,7 @@ error:
 }
 
 /* Save the map to disk. */
-int topo_dump(const struct topo_map * map, const char * path, int bit_depth)
+int turtle_dump(const struct turtle_map * map, const char * path, int bit_depth)
 {
 	/* Get the file extension */
 	char* ext = strrchr(path, '.');
@@ -200,12 +200,12 @@ int topo_dump(const struct topo_map * map, const char * path, int bit_depth)
 /* Get an existing map by a linear search. Returns NULL if the map wasn't
  * found.
  */
-struct topo_map * topo_get(const char * path, const struct topo_box * box)
+struct turtle_map * turtle_get(const char * path, const struct turtle_box * box)
 {
 	/* Search the map. */
-	struct topo_map * map = last_map;
+	struct turtle_map * map = last_map;
 	while(map != NULL) {
-		const struct topo_box * m_box = (map->transform == NULL) ?
+		const struct turtle_box * m_box = (map->transform == NULL) ?
 			NULL : &(map->transform->box);
 		int same_box = 0;
 		if ((box != NULL) && (m_box != NULL))
@@ -223,9 +223,9 @@ struct topo_map * topo_get(const char * path, const struct topo_box * box)
 }
 
 /* Get the oldest unused map. */
-struct topo_map * topo_unused(void)
+struct turtle_map * turtle_unused(void)
 {
-	struct topo_map * map = first_map;
+	struct turtle_map * map = first_map;
 	while(map != NULL) {
 		if (map->booking == 0) break;
 		map = map->next;
@@ -234,13 +234,13 @@ struct topo_map * topo_unused(void)
 }
 
 /* Book an existing map. */
-void topo_book(struct topo_map * map)
+void turtle_book(struct turtle_map * map)
 {
 	map->booking++;
 }
 
 /* Checkout from a map booking. Tick time is updated. */
-int topo_checkout(struct topo_map * map)
+int turtle_checkout(struct turtle_map * map)
 {
 	/* Update and checkout. */
 	if (map->booking <= 0) return -1;
@@ -248,9 +248,9 @@ int topo_checkout(struct topo_map * map)
 	map->booking--;
 
 	/* Move the map to the end of the chained list. */
-	struct topo_map * next = map->next;
+	struct turtle_map * next = map->next;
 	if (next != NULL) {
-		struct topo_map * prev = map->prev;
+		struct turtle_map * prev = map->prev;
 		next->prev = prev;
 		if (prev != NULL) prev->next = next;
 		else first_map = next;
@@ -263,7 +263,7 @@ int topo_checkout(struct topo_map * map)
 }
 
 /* Interpolate the elevation at a given location. */
-double topo_elevation(const struct topo_map * map, double x, double y)
+double turtle_elevation(const struct turtle_map * map, double x, double y)
 {
 	double hx = (x-map->x0)/map->dx;
 	double hy = (y-map->y0)/map->dy;
@@ -282,7 +282,7 @@ double topo_elevation(const struct topo_map * map, double x, double y)
 }
 
 /* Get the geographic coordinates at a given map location. */
-int topo_geoposition(const struct topo_map * map, double x, double y,
+int turtle_geoposition(const struct turtle_map * map, double x, double y,
 	double * longitude, double * latitude)
 {
 	if (map->transform == NULL) return -1;
@@ -290,7 +290,7 @@ int topo_geoposition(const struct topo_map * map, double x, double y,
 }
 
 /* Get the local map coordinates for a given geo-location. */
-int topo_locals(const struct topo_map * map, double longitude,
+int turtle_locals(const struct turtle_map * map, double longitude,
 	double latitude, double * x, double * y)
 {
 	if (map->transform == NULL) return -1;
@@ -298,7 +298,7 @@ int topo_locals(const struct topo_map * map, double longitude,
 }
 
 /* Get some basic information on a map filled in a bounding box. */
-void topo_info(const struct topo_map * map, struct topo_box * box)
+void turtle_info(const struct turtle_map * map, struct turtle_box * box)
 {
 	box->half_x = 0.5*(map->nx-1)*map->dx;
 	box->half_y = 0.5*(map->ny-1)*map->dy;
@@ -306,7 +306,7 @@ void topo_info(const struct topo_map * map, struct topo_box * box)
 	box->y0 = map->y0+box->half_y;
 }
 
-static struct topo_map * map_create(const char * path, const struct
+static struct turtle_map * map_create(const char * path, const struct
 	transform_data * transform, int nx, int ny, int n_extra)
 {
 	/* Allocate the map memory. */
@@ -314,8 +314,8 @@ static struct topo_map * map_create(const char * path, const struct
 	if ((n_path % sizeof(double)) != 0) n_path++;
 	n_path *= sizeof(double);
 	const int n_transform = (transform == NULL) ? 0 : sizeof(*transform);
-	struct topo_map * map = (struct topo_map *)malloc(
-		sizeof(struct topo_map)+n_path+n_transform+
+	struct turtle_map * map = (struct turtle_map *)malloc(
+		sizeof(struct turtle_map)+n_path+n_transform+
 		nx*ny*sizeof(double));
 	if (map == NULL) return NULL;
 
@@ -334,7 +334,7 @@ static struct topo_map * map_create(const char * path, const struct
 	return map;
 }
 
-static void map_link(struct topo_map * map, int compute_scale)
+static void map_link(struct turtle_map * map, int compute_scale)
 {
 	/* Fill the map statistics. */
 	if (compute_scale) {
@@ -368,7 +368,7 @@ static void map_link(struct topo_map * map, int compute_scale)
 	map->next = NULL;
 }
 
-struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
+struct turtle_map * load_gdem2(const char* path, const struct turtle_box * box)
 {
 	if (box == NULL) return NULL;
 
@@ -387,7 +387,7 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 	int nx = 2*((int)(Dl/GDEM2_pixelscale)+1)+1;
 	int ny = 2*((int)(DL/GDEM2_pixelscale)+1)+1;
 
-	struct topo_map * map = map_create(path, &transform, nx, ny, 32);
+	struct turtle_map * map = map_create(path, &transform, nx, ny, 32);
 	if (map == NULL) return NULL;
 
 	/* Copy the elevation data */
@@ -478,9 +478,9 @@ struct topo_map * load_gdem2(const char* path, const struct topo_box * box)
 	return map;
 }
 
-struct topo_map * load_png(const char* path, const struct topo_box * box)
+struct turtle_map * load_png(const char* path, const struct turtle_box * box)
 {
-	struct topo_map * map = NULL;
+	struct turtle_map * map = NULL;
 	FILE * fid = NULL;
 	png_bytep * row_pointers = NULL;
 	png_structp png_ptr = NULL;
@@ -671,7 +671,7 @@ exit:
 }
 
 /* Dump a map in png format. */
-int dump_png(const struct topo_map * map, const char * path, int bit_depth)
+int dump_png(const struct turtle_map * map, const char * path, int bit_depth)
 {
 	int rc = 0;
 	FILE* fid = NULL;
@@ -781,7 +781,7 @@ exit:
 
 /* Set the transform between local and geographic coordinates. */
 int transform_initialise(struct transform_data * transform,
-	const struct topo_box *  box)
+	const struct turtle_box *  box)
 {
 	if ((fabs(box->y0) > 90.) || (fabs(box->x0) > 180.))
 		goto error;
