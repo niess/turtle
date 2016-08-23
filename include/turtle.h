@@ -1,5 +1,5 @@
 /*
- * Topographic elevation provider.
+ * Topographic Utilities for Rendering The eLEvation (TURTLE).
  */
 
 #ifndef TURTLE_H
@@ -36,7 +36,8 @@ int turtle_geoposition(const struct turtle_map * map, double x, double y,
 	double * longitude, double * latitude);
 int turtle_locals(const struct turtle_map * map, double longitude,
 	double latitude, double * x, double * y);
-void turtle_info(const struct turtle_map * map, struct turtle_box * box);
+void turtle_info(const struct turtle_map * map, struct turtle_box * box,
+	double * zmin, double * zmax);
 
 #ifdef __cplusplus
 }

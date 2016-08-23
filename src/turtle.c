@@ -1,5 +1,5 @@
 /*
- *	Topographic Utilities for Rendering The eLEvation (TURTLE).
+ * Topographic Utilities for Rendering The eLEvation (TURTLE).
  */
 
 #include <float.h>
@@ -297,13 +297,18 @@ int turtle_locals(const struct turtle_map * map, double longitude,
 	return transform_to_local(longitude, latitude, map->transform, x, y);
 }
 
-/* Get some basic information on a map filled in a bounding box. */
-void turtle_info(const struct turtle_map * map, struct turtle_box * box)
+/* Get some basic information on a map. */
+void turtle_info(const struct turtle_map * map, struct turtle_box * box,
+	double * zmin, double * zmax)
 {
-	box->half_x = 0.5*(map->nx-1)*map->dx;
-	box->half_y = 0.5*(map->ny-1)*map->dy;
-	box->x0 = map->x0+box->half_x;
-	box->y0 = map->y0+box->half_y;
+	if (box != NULL) {
+		box->half_x = 0.5*(map->nx-1)*map->dx;
+		box->half_y = 0.5*(map->ny-1)*map->dy;
+		box->x0 = map->x0+box->half_x;
+		box->y0 = map->y0+box->half_y;
+	}
+	if (zmin != NULL) *zmin = map->zmin;
+	if (zmax != NULL) *zmax = map->zmax;
 }
 
 static struct turtle_map * map_create(const char * path, const struct
