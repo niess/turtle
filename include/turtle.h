@@ -8,7 +8,26 @@
 extern "C" {
 #endif
 
-/* Bounding box of a map. */
+/* Return codes */
+enum turtle_return {
+	TURTLE_RETURN_SUCCESS = 0,
+	TURTLE_RETURN_BAD_EXTENSION,
+	TURTLE_RETURN_BAD_FORMAT,
+	TURTLE_RETURN_BAD_PATH,
+	TURTLE_RETURN_BAD_PROJECTION,
+	TURTLE_RETURN_BAD_XML,
+	TURTLE_RETURN_DOMAIN_ERROR,
+	TURTLE_RETURN_GEOTIFF_ERROR,
+	TURTLE_RETURN_MEMORY_ERROR,
+	N_TURTLE_RETURNS
+};
+
+/* Opaque structures. */
+struct turtle_map;
+struct turtle_datum;
+struct turtle_client;
+
+/* Bounding box for a projection map. */
 struct turtle_box {
 	double x0; /* Origin X coordinate or longitude. */
 	double y0; /* Origin Y coordinate or latitude. */
@@ -16,28 +35,52 @@ struct turtle_box {
 	double half_y;
 };
 
-int turtle_initialise(void);
+/* User supplied callbacks for locking or unlocking critical sections for
+ * multi-threaded applications.
+ */
+typedef void (* turtle_datum_cb)(void); 
+
+/* General library routines. */
+enum turtle_return turtle_initialise(void);
 void turtle_finalise(void);
+const char * turtle_strerror(enum turtle_return rc);
 
-/* Routines for handling maps. */
-struct turtle_map * turtle_create(const char * name, const int nx, const int ny);
-struct turtle_map * turtle_load(const char * path, const struct turtle_box * box);
-int turtle_dump(const struct turtle_map * map, const char * path, int bit_depth);
-void turtle_destroy(struct turtle_map ** map);
+/* Routines for handling projection maps. */
+enum turtle_return turtle_map_load(const char * path,
+	const struct turtle_box * box, struct turtle_map ** map);
+void turtle_map_destroy(struct turtle_map ** map);
+enum turtle_return turtle_map_dump(const struct turtle_map * map,
+	const char * path);
+enum turtle_return turtle_map_elevation(const struct turtle_map * map,
+	double x, double y, double * z);
+enum turtle_return turtle_map_geodetic(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude);
+enum turtle_return turtle_map_projected(const struct turtle_map * map,
+	double latitude, double longitude, double * x, double * y);
+void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
+	double * zmin, double * zmax, const char ** projection);
+	
+/* Routines for managing a geodetic datum. */
+struct turtle_datum * turtle_datum_create(const char * path,
+	int stack_size, turtle_datum_cb lock, turtle_datum_cb release);
+void turtle_datum_destroy(struct turtle_datum ** datum);
+struct turtle_map * turtle_datum_project(struct turtle_datum * datum,
+	const char * projection, const struct turtle_box * box);
+void turtle_datum_prune(struct turtle_datum * datum, double timeout);
+double turtle_datum_elevation(const struct turtle_datum * datum,
+	double latitude, double longitude);
+int turtle_datum_ecef(const struct turtle_datum * datum,
+	double latitude, double longitude, double position[3]);
 
-struct turtle_map * turtle_get(const char * path, const struct turtle_box * box);
-struct turtle_map * turtle_unused(void);
-
-void turtle_book(struct turtle_map * map);
-int turtle_checkout(struct turtle_map * map);
-
-double turtle_elevation(const struct turtle_map * map, double x, double y);
-int turtle_geoposition(const struct turtle_map * map, double x, double y,
-	double * longitude, double * latitude);
-int turtle_locals(const struct turtle_map * map, double longitude,
-	double latitude, double * x, double * y);
-void turtle_info(const struct turtle_map * map, struct turtle_box * box,
-	double * zmin, double * zmax);
+/* Routines for accessing a datum using a thread-safe client. */
+struct turtle_client * turtle_client_create(struct turtle_datum * datum);
+void turtle_client_destroy(struct turtle_client ** client);
+struct turtle_map * turtle_client_project(struct turtle_client * client,
+	const char * projection, const struct turtle_box * box);
+double turtle_client_elevation(const struct turtle_client * client,
+	double latitude, double longitude);
+int turtle_client_ecef(const struct turtle_client * client,
+	double latitude, double longitude, double position[3]);
 
 #ifdef __cplusplus
 }

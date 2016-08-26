@@ -21,57 +21,46 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-/* Parameters of a frame transform. */
-struct transform_data {
-	struct turtle_box box;
-	double dldx;
-	double dLdy;
+enum projection_type {
+	PROJECTION_NONE = -1,
+	PROJECTION_LAMBERT93,
+	PROJECTION_UTM,
+	N_PROJECTIONS
 };
 
-/* Container for a local elevation map. */
+typedef int (* map_locator)(struct turtle_map * map, double x, double y,
+	double * latitude, double * longitude);
+
+/* Container for a projection map. */
 struct turtle_map {
-	/* Chained list pointers. */
-	struct turtle_map * prev;
-	struct turtle_map * next;
-
-	/* Status. */
-	int tick;
-	int booking;
-
-	/* Map identifiers. */
-	char * path;
-	struct transform_data * transform;
-
 	/* Map data. */
+	int bit_depth;
 	int nx, ny;
-	double x0, y0;
-	double dx, dy;
-	double zmin, zmax;
-	double * z;
+	double x0, y0, z0;
+	double dx, dy, dz;
+	void * z;
+	
+	/* Projection. */
+	enum projection_type projection;
+	void * projection_data;
 
 	char data[]; /* Placeholder for dynamic data. */
 };
 
 /* Generic map allocation and initialisation. */
-static struct turtle_map * map_create(const char * path, const struct
-	transform_data * transform, int nx, int ny, int n_extra);
-static void map_link(struct turtle_map * map, int compute_scale);
+static struct turtle_map * map_create(int nx, int ny, int bit_depth,
+	enum projection_type projection);
 
 /* Low level data loaders/dumpers. */
-static struct turtle_map * load_gdem2(const char* path,
-	const struct turtle_box * box);
-static struct turtle_map * load_png(const char* path,
-	const struct turtle_box * box);
-static int dump_png(const struct turtle_map * map, const char * path,
-	int bit_depth);
-
-/* Coordinates transform. */
-static int transform_initialise(struct transform_data * transform,
-	const struct turtle_box * box);
-static int transform_to_geo(double x, double y, const struct transform_data *
-	transform, double * longitude, double * latitude);
-static int transform_to_local(double longitude, double latitude,
-	const struct transform_data * transform, double * x, double * y);
+static struct turtle_map * map_load_gdem2(const char * datum_path,
+	const char * projection, const struct turtle_box * box);
+static enum turtle_return map_load_png(const char * path,
+	const struct turtle_box * box, struct turtle_map ** map);
+static enum turtle_return map_dump_png(const struct turtle_map * map,
+	const char * path);
+	
+/* Routines for map projections. */
+enum projection_type projection_index(const char * name);
 
 /* WGS84 reference ellipsoid. */
 static const double a_WGS84 = 6378137.000;
@@ -80,32 +69,18 @@ static const double b_WGS84 = 6356752.314;
 /* Hardcoded ASTER-GDEM2 settings. */
 static const double GDEM2_pixelscale = 1./3600.;
 
-/* Entry for local topographic maps. */
-static struct turtle_map * first_map = NULL;
-static struct turtle_map * last_map = NULL;
-static int n_maps = 0;
-
-/* Initialise the topographer interface. */
-int turtle_initialise(void)
+/* Initialise the TURTLE interface. */
+enum turtle_return turtle_initialise(void)
 {
-	return Geotiff16_Initialise();
+	return (Geotiff16_Initialise() == 0) ? TURTLE_RETURN_SUCCESS :
+		TURTLE_RETURN_GEOTIFF_ERROR;
 }
 
-/* Clear the topographer interface. BEWARE: due to libxml2 this function must
+/* Clear the TURTLE interface. BEWARE: due to libxml2 this function must
  * be called only once.
  */
 void turtle_finalise(void)
 {
-	/* Clear maps. */
-	struct turtle_map * map = first_map;
-	while(map != NULL) {
-		struct turtle_map * next = map->next;
-		free(map);
-		map = next;
-	}
-	first_map = last_map = NULL;
-	n_maps = 0;
-
 	/* Clear geotiff-16 data. */
 	Geotiff16_Finalise();
 
@@ -113,188 +88,96 @@ void turtle_finalise(void)
 	xmlCleanupParser();
 }
 
-/* Release the map memory and update the chained list. */
-void turtle_destroy(struct turtle_map ** map)
+const char * turtle_strerror(enum turtle_return rc)
+{
+	static const char * msg[N_TURTLE_RETURNS] = {
+		"Operation succeeded",
+		"Bad file extension",
+		"Bad file format",
+		"No such file or directory",
+		"Unknown projection",
+		"Bad XML header",
+		"Value is out of bound",
+		"Couldn't initialise geotiff",
+		"Not enough memory"
+	};
+	
+	if ((rc < 0) || (rc >= N_TURTLE_RETURNS)) return NULL;
+	else return msg[rc];
+}
+
+/* Release the map memory. */
+void turtle_map_destroy(struct turtle_map ** map)
 {
 	/* Release the memory. */
 	if ((map == NULL) || (*map == NULL)) return;
-	struct turtle_map * next = (*map)->next, * prev = (*map)->prev;
 	free(*map);
 	*map = NULL;
-
-	/* Update the chained list. */
-	if (prev != NULL) prev->next = next;
-	else first_map = next;
-	if (next != NULL) next->prev = prev;
-	else last_map = prev;
-	n_maps--;
 }
 
-/* Create a blank map. */
-struct turtle_map * turtle_create(const char * path, const int nx, const int ny)
+/* Get the file extension in a path. */
+const char * path_extension(const char * path)
 {
-	struct turtle_map * map = map_create(path, NULL, nx, ny, 0);
-	if (map == NULL) return NULL;
-
-	map->nx = nx;
-	map->ny = ny;
-	map->x0 = 0.;
-	map->y0 = 0.;
-	map->dx = 1.;
-	map->dy = 1.;
-	memset(map->z, 0x0, nx*ny*sizeof(double));
-
-	map_link(map, 0);
-	return map;
+	const char * ext = strrchr(path, '.');
+	if (ext != NULL) ext++;
+	return ext;
 }
 
 /* Load a map from a data file. */
-struct turtle_map * turtle_load(const char * path, const struct turtle_box * box)
+enum turtle_return turtle_map_load(const char * path,
+	const struct turtle_box * box, struct turtle_map ** map)
 {
-	struct turtle_map * map = NULL;
+	/* Check the file extension. */
+	const char * ext = path_extension(path);
+	if (ext == NULL) return TURTLE_RETURN_BAD_EXTENSION;
 
-	/* Load the map data. */
-	const char * basename = strrchr(path, '/');
-	if (basename == NULL) basename = path;
-	else basename++;
-
-	if (strcmp(basename, "ASTER-GDEM2") == 0) {
-		/* We have ASTER-GDEM2 data. */
-		map = load_gdem2(path, box);
-		if (map == NULL) goto error;
-	}
-	else {
-		/* Get the file extension. */
-		char* ext = strrchr(basename, '.');
-		if (ext == NULL) goto error;
-		ext++;
-
-		if (strcmp(ext, "png") == 0) {
-			map = load_png(path, box);
-			if (map == NULL) goto error;
-		}
-		else goto error;
-	}
-
-	/* Link the map and return. */
-	map_link(map, 1);
-	return map;
-
-error:
-	free(map);
-	return NULL;
+	if (strcmp(ext, "png") == 0)
+		return map_load_png(path, box, map);
+	else
+		return TURTLE_RETURN_BAD_EXTENSION;
 }
 
 /* Save the map to disk. */
-int turtle_dump(const struct turtle_map * map, const char * path, int bit_depth)
+enum turtle_return turtle_map_dump(const struct turtle_map * map,
+	const char * path)
 {
-	/* Get the file extension */
-	char* ext = strrchr(path, '.');
-	if (ext == NULL) return -1;
-	ext++;
+	/* Check the file extension. */
+	const char * ext = path_extension(path);
+	if (ext == NULL) return TURTLE_RETURN_BAD_EXTENSION;
 
-	if (strcmp(ext, "png") == 0) return dump_png(map, path, bit_depth);
-	else return -1;
-}
-
-/* Get an existing map by a linear search. Returns NULL if the map wasn't
- * found.
- */
-struct turtle_map * turtle_get(const char * path, const struct turtle_box * box)
-{
-	/* Search the map. */
-	struct turtle_map * map = last_map;
-	while(map != NULL) {
-		const struct turtle_box * m_box = (map->transform == NULL) ?
-			NULL : &(map->transform->box);
-		int same_box = 0;
-		if ((box != NULL) && (m_box != NULL))
-			same_box = (box->half_x != m_box->half_x) &&
-				(box->half_y != m_box->half_y) &&
-				(box->x0 != m_box->x0) &&
-				(box->y0 != m_box->y0);
-		else
-			same_box = (box == NULL) && (m_box == NULL);
-		if (same_box) break;
-		map = map->prev;
-	}
-
-	return map;
-}
-
-/* Get the oldest unused map. */
-struct turtle_map * turtle_unused(void)
-{
-	struct turtle_map * map = first_map;
-	while(map != NULL) {
-		if (map->booking == 0) break;
-		map = map->next;
-	}
-	return map;
-}
-
-/* Book an existing map. */
-void turtle_book(struct turtle_map * map)
-{
-	map->booking++;
-}
-
-/* Checkout from a map booking. Tick time is updated. */
-int turtle_checkout(struct turtle_map * map)
-{
-	/* Update and checkout. */
-	if (map->booking <= 0) return -1;
-	map->tick = time(NULL);
-	map->booking--;
-
-	/* Move the map to the end of the chained list. */
-	struct turtle_map * next = map->next;
-	if (next != NULL) {
-		struct turtle_map * prev = map->prev;
-		next->prev = prev;
-		if (prev != NULL) prev->next = next;
-		else first_map = next;
-		last_map->next = map;
-		map->prev = last_map;
-		last_map = map;
-		map->next = NULL;
-	}
-	return 0;
+	if (strcmp(ext, "png") == 0)
+		return map_dump_png(map, path);
+	else
+		return TURTLE_RETURN_BAD_EXTENSION;
 }
 
 /* Interpolate the elevation at a given location. */
-double turtle_elevation(const struct turtle_map * map, double x, double y)
+enum turtle_return turtle_map_elevation(const struct turtle_map * map,
+	double x, double y, double * z)
 {
 	double hx = (x-map->x0)/map->dx;
 	double hy = (y-map->y0)/map->dy;
 	int ix = (int)hx;
 	int iy = (int)hy;
 
-	if (ix >= map->nx-1 || ix < 0 || iy >= map->ny-1 || iy < 0)
-		return -DBL_MAX;
+	if (ix >= map->nx-1 || hx < 0 || iy >= map->ny-1 || hy < 0)
+		return TURTLE_RETURN_DOMAIN_ERROR;
 	hx -= ix;
 	hy -= iy;
 
  	const int nx = map->nx;
-	const double* z = map->z;
-	return z[iy*nx+ix]*(1.-hx)*(1.-hy)+z[(iy+1)*nx+ix]*(1.-hx)*hy+
-		z[iy*nx+ix+1]*hx*(1.-hy)+z[(iy+1)*nx+ix+1]*hx*hy;
-}
-
-/* Get the geographic coordinates at a given map location. */
-int turtle_geoposition(const struct turtle_map * map, double x, double y,
-	double * longitude, double * latitude)
-{
-	if (map->transform == NULL) return -1;
-	return transform_to_geo(x, y, map->transform, longitude, latitude);
-}
-
-/* Get the local map coordinates for a given geo-location. */
-int turtle_locals(const struct turtle_map * map, double longitude,
-	double latitude, double * x, double * y)
-{
-	if (map->transform == NULL) return -1;
-	return transform_to_local(longitude, latitude, map->transform, x, y);
+ 	if (map->bit_depth == 8) {
+		const unsigned char * zm = map->z;
+		*z = zm[iy*nx+ix]*(1.-hx)*(1.-hy)+zm[(iy+1)*nx+ix]*(1.-hx)*hy+
+			zm[iy*nx+ix+1]*hx*(1.-hy)+zm[(iy+1)*nx+ix+1]*hx*hy;
+	}
+	else {
+		const uint16_t * zm = map->z;
+		*z = zm[iy*nx+ix]*(1.-hx)*(1.-hy)+zm[(iy+1)*nx+ix]*(1.-hx)*hy+
+			zm[iy*nx+ix+1]*hx*(1.-hy)+zm[(iy+1)*nx+ix+1]*hx*hy;
+	}
+	*z = (*z)*map->dz+map->z0;
+	return TURTLE_RETURN_SUCCESS;
 }
 
 /* Get some basic information on a map. */
@@ -307,70 +190,390 @@ void turtle_info(const struct turtle_map * map, struct turtle_box * box,
 		box->x0 = map->x0+box->half_x;
 		box->y0 = map->y0+box->half_y;
 	}
-	if (zmin != NULL) *zmin = map->zmin;
-	if (zmax != NULL) *zmax = map->zmax;
+	if (zmin != NULL) *zmin = map->z0;
+	if (zmax != NULL) *zmax = map->z0+pow(2, map->bit_depth)*map->dz;
 }
 
-static struct turtle_map * map_create(const char * path, const struct
-	transform_data * transform, int nx, int ny, int n_extra)
+static struct turtle_map * map_create(int nx, int ny, int bit_depth,
+	enum projection_type projection)
 {
 	/* Allocate the map memory. */
-	int n_path = (strlen(path)+1+n_extra)/sizeof(double);
-	if ((n_path % sizeof(double)) != 0) n_path++;
-	n_path *= sizeof(double);
-	const int n_transform = (transform == NULL) ? 0 : sizeof(*transform);
-	struct turtle_map * map = (struct turtle_map *)malloc(
-		sizeof(struct turtle_map)+n_path+n_transform+
-		nx*ny*sizeof(double));
+	int datum_size;
+	if (bit_depth == 8) datum_size = sizeof(unsigned char);
+	else datum_size = sizeof(uint16_t);
+	struct turtle_map * map = malloc(sizeof(*map)+nx*ny*datum_size);
 	if (map == NULL) return NULL;
 
 	/* Fill the identifiers. */
+	map->nx = nx;
+	map->ny = ny;
+	map->bit_depth = bit_depth;
+	map->projection = projection;
 	char * p = map->data;
-	map->path = p;
-	p += n_path;
-	strcpy(map->path, path);
-	if (n_transform) {
-		map->transform = (struct transform_data *)p;
-		p += n_transform;
-		memcpy(map->transform, transform, n_transform);
-	}
-	map->z = (double *)(p);
+	map->z = (void *)(p);
+	map->projection_data = NULL;
 
 	return map;
 }
 
-static void map_link(struct turtle_map * map, int compute_scale)
+enum projection_type projection_index(const char * name)
 {
-	/* Fill the map statistics. */
-	if (compute_scale) {
-		double * z = map->z;
-		double zmin = *z, zmax = *z;
-		z++;
-		int i = 1, n = map->nx*map->ny;
-		for (; i < n; i++) {
-			double zi = *z;
-			if (zi < zmin) zmin = zi;
-			else if (zi > zmax) zmax = zi;
-			z++;
+	static const char * names[N_PROJECTIONS] = {
+		"Lambert93",
+		"UTM"
+	};
+	
+	int i;
+	for (i = 0; i < N_PROJECTIONS; i++)
+		if (strcmp(name, names[i]) == 0) return i;
+	return PROJECTION_NONE;
+}
+
+const char * get_node_content(xmlNode * node)
+{
+	xmlNode * subnode;
+	for (subnode = node->children; subnode != NULL;
+		subnode=subnode->next) if (subnode->type == XML_TEXT_NODE) {
+		return (const char *)subnode->content;
+	}
+	return NULL;
+}
+
+enum turtle_return map_load_png(const char* path, const struct turtle_box * box,
+	struct turtle_map ** map)
+{
+	FILE * fid = NULL;
+	png_bytep * row_pointers = NULL;
+	png_structp png_ptr = NULL;
+	png_infop info_ptr = NULL;
+	int nx = 0, ny = 0;
+	enum projection_type projection = PROJECTION_NONE;
+	*map = NULL;
+	int rc;
+
+	/* Open the file and check the format. */
+	fid = fopen(path, "rb");
+	if (fid == NULL) {
+		rc = TURTLE_RETURN_BAD_PATH;
+		goto error;
+	}
+
+	char header[8];
+	rc = TURTLE_RETURN_BAD_FORMAT;
+	if (fread(header, 1, 8, fid) != 8) goto error;
+	if (png_sig_cmp((png_bytep)header, 0, 8) != 0) goto error;
+
+	/* initialize libpng containers. */
+	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL,
+		NULL);
+	if (png_ptr == NULL) goto error;
+	info_ptr = png_create_info_struct(png_ptr);
+	if (info_ptr == NULL) goto error;
+	if (setjmp(png_jmpbuf(png_ptr))) goto error;
+	png_init_io(png_ptr, fid);
+	png_set_sig_bytes(png_ptr, 8);
+
+	/* Read the header. */
+	png_read_info(png_ptr, info_ptr);
+	if (png_get_color_type(png_ptr, info_ptr) != PNG_COLOR_TYPE_GRAY)
+		goto error;
+	png_byte bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+	if ((bit_depth != 8) && (bit_depth != 16)) goto error;
+	nx = png_get_image_width(png_ptr, info_ptr);
+	ny = png_get_image_height(png_ptr, info_ptr);
+	png_read_update_info(png_ptr, info_ptr);
+
+	/* Parse the XML meta data. */
+	rc = TURTLE_RETURN_BAD_XML;
+	double x0 = 0., y0 = 0., z0 = 0., dx = 1., dy = 1., dz = 1.;
+	png_textp text_ptr;
+	int num_text;
+	unsigned n_chunks = png_get_text(png_ptr, info_ptr, &text_ptr,
+		&num_text);
+	if (n_chunks > 0) {
+		int i = 0;
+		png_text* p = text_ptr;
+		for(; i < num_text; i++) {
+			const char* key = p->key;
+			const char* text = p->text;
+			unsigned int length = p->text_length;
+			p++;
+
+			xmlDocPtr doc = NULL;
+			doc = xmlReadMemory(text, length, "noname.xml", NULL,
+				XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
+			if (doc == NULL) goto xml_end;
+			xmlNode * root = xmlDocGetRootElement(doc);
+			if (root == NULL) goto xml_end;
+			if (strcmp((const char *)root->name, "topography")
+				!= 0) goto xml_end;
+
+			xmlNode * node;
+			for (node = root->children; node != NULL;
+				node = node->next) if ((node->type ==
+				XML_ELEMENT_NODE) && (node->name != NULL) &&
+				(node->children != NULL)) {
+				const char * name = (const char *)node->name;
+				if (strcmp(name, "projection") == 0) {
+					const char * content =
+						get_node_content(node);
+					if (content == NULL) goto error;
+					projection = projection_index(content);
+					if (projection == PROJECTION_NONE) {
+						rc = TURTLE_RETURN_BAD_PROJECTION;
+						goto error;
+					}
+					
+				}
+				double * attribute = NULL;
+				if (strlen((const char *)name) != 2) continue;
+				if (name[1] == '0') {
+					if (name[0] == 'x')
+						attribute = &x0;
+					else if (name[0] == 'y')
+						attribute = &y0;
+					else if (name[0] == 'z')
+						attribute = &z0;
+				}
+				else if (name[0] == 'd') {
+					if (name[1] == 'x')
+						attribute = &dx;
+					else if (name[1] == 'y')
+						attribute = &dy;
+					else if (name[1] == 'z')
+						attribute = &dz;
+				}
+				if (attribute == NULL) continue;
+
+				const char * content = get_node_content(node);
+				if (content == NULL) goto error;
+				sscanf(content, "%lf", attribute);
+			}
+xml_end:
+			if (doc != NULL) xmlFreeDoc(doc);
 		}
-		map->zmin = zmin;
-		map->zmax = zmax;
+	}
+
+	/* Load the data. */
+	rc = TURTLE_RETURN_MEMORY_ERROR;
+	row_pointers = calloc(ny, sizeof(png_bytep));
+	if (row_pointers == NULL) goto error;
+	int i = 0;
+	for (; i < ny; i++) {
+		row_pointers[i] = malloc(png_get_rowbytes(png_ptr, info_ptr));
+		if (row_pointers[i] == NULL) goto error;
+	}
+	png_read_image(png_ptr, row_pointers);
+
+	/* Compute the bounding box, if requested. */
+	int nx0, ny0, dnx, dny;
+	if (box == NULL) {
+		/* No bounding box, let's use the full map. */
+		nx0 = 0;
+		ny0 = 0;
+		dnx = nx;
+		dny = ny;
 	}
 	else {
-		map->zmin = -DBL_MAX;
-		map->zmax = DBL_MAX;
+		/* Clip the bounding box to the full map. */
+		const double xlow = box->x0-box->half_x;
+		const double xhigh = box->x0+box->half_x;
+		const double ylow = box->y0-box->half_y;
+		const double yhigh = box->y0+box->half_y;
+
+		rc = TURTLE_RETURN_DOMAIN_ERROR;
+		if (xlow <= x0) nx0 = 0;
+		else nx0 = (int)((xlow-x0)/dx);
+		if (nx0 >= nx) goto error;
+		dnx = (int)((xhigh-x0)/dx)+1;
+		if (dnx > nx) dnx = nx;
+		else if (dnx <= nx0) goto error;
+		dnx -= nx0;
+
+		if (ylow <= y0) ny0 = 0;
+		else ny0 = (int)((ylow-y0)/dy);
+		if (ny0 >= ny) goto error;
+		dny = (int)((yhigh-y0)/dy)+1;
+		if (dny > ny) dny = ny;
+		else if (dny <= ny0) goto error;
+		dny -= ny0;
 	}
 
-	/* Fill the status. */
-	map->tick = (int)time(NULL);
-	map->booking = 0;
+	/* Allocate the map and copy the data. */
+	*map = map_create(nx, ny, bit_depth, projection);
+	if (*map == NULL) {
+		rc = TURTLE_RETURN_MEMORY_ERROR;
+		goto error;
+	}
 
-	/* Link the map. */
-	map->prev = last_map;
-	if (last_map != NULL) last_map->next = map;
-	else first_map = map;
-	last_map = map;
-	map->next = NULL;
+	unsigned char * z8 = (*map)->z;
+	uint16_t * z16 = (*map)->z;
+	for (i = ny-ny0-1; i >= ny-ny0-dny; i--) {
+		png_bytep ptr = row_pointers[i]+nx0*(bit_depth/8);
+		int j = 0;
+		for (; j < dnx; j++) {
+			if (bit_depth == 8) {
+				*z8 = (unsigned char)*ptr;
+				z8++;
+				ptr += 1;
+			}
+			else {
+				*z16 = (uint16_t)ntohs(*((uint16_t *)ptr));
+				z16++;
+				ptr += 2;
+			}
+		}
+	}
+
+	(*map)->nx = dnx;
+	(*map)->ny = dny;
+	(*map)->x0 = x0+nx0*dx;
+	(*map)->y0 = y0+ny0*dy;
+	(*map)->z0 = z0;
+	(*map)->dx = dx;
+	(*map)->dy = dy;
+	(*map)->dz = dz;
+
+	goto exit;
+error:
+	free(*map);
+	*map = NULL;
+
+exit:
+	if (fid != NULL) fclose(fid);
+	if (row_pointers != NULL) {
+		int i;
+		for (i = 0; i < ny; i++) free(row_pointers[i]);
+		free(row_pointers);
+	}
+	png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
+	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
+	png_destroy_read_struct(pp_p, pp_i, NULL);
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Dump a map in png format. */
+enum turtle_return map_dump_png(const struct turtle_map * map,
+	const char * path)
+{
+	FILE* fid = NULL;
+	png_bytep * row_pointers = NULL;
+	png_structp png_ptr = NULL;
+	png_infop info_ptr = NULL;
+	enum turtle_return rc;
+
+	/* Check the bit depth. */
+	rc = TURTLE_RETURN_BAD_FORMAT;
+	if ((map->bit_depth != 8) && (map->bit_depth != 16)) goto exit;
+
+	/* Initialise the file and the PNG pointers. */
+	rc = TURTLE_RETURN_BAD_PATH;
+	fid = fopen(path, "wb+");
+	if (fid == NULL) goto exit;
+
+	rc = TURTLE_RETURN_MEMORY_ERROR;
+	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL,
+		NULL);
+	if (png_ptr == NULL) goto exit;
+	info_ptr = png_create_info_struct(png_ptr);
+	if (info_ptr == NULL) goto exit;
+	if (setjmp(png_jmpbuf(png_ptr))) goto exit;
+	png_init_io(png_ptr, fid);
+
+	/* Write the header. */
+	const int nx = map->nx, ny = map->ny;
+	png_set_IHDR(
+		png_ptr, info_ptr, nx, ny, map->bit_depth, PNG_COLOR_TYPE_GRAY,
+		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
+		PNG_FILTER_TYPE_BASE
+	);
+	char header[1024];
+	sprintf(header, "<topography><x0>%.3lf</x0><y0>%.3lf</y0>"
+		"<z0>%.3lf</z0><dx>%.3lf</dx><dy>%.3lf</dy>"
+		"<dz>%.5e</dz></topography>",
+		map->x0, map->y0, map->z0, map->dx, map->dy, map->dz);
+	png_text text[] = {{PNG_TEXT_COMPRESSION_NONE, "Comment", header,
+		strlen(header)}};
+	png_set_text(png_ptr, info_ptr, text, sizeof(text)/sizeof(text[0]));
+	png_write_info(png_ptr, info_ptr);
+
+	/* Write the data */
+	row_pointers = (png_bytep*)calloc(ny, sizeof(png_bytep));
+	if (row_pointers == NULL) goto exit;
+	int i = 0;
+	for (; i < ny; i++) {
+		row_pointers[i] = (png_byte *)malloc((map->bit_depth/8)*nx*
+			sizeof(char));
+		if (row_pointers[i] == NULL) goto exit;
+		if (map->bit_depth == 8) {
+			unsigned char * ptr = (unsigned char*)row_pointers[i];
+			const unsigned char * z = (const unsigned char *)
+				(map->z)+(ny-i-1)*nx;
+			int j = 0;
+			for (; j < nx; j++) {
+				*ptr = *z;
+				z++;
+				ptr++;
+			}
+		}
+		else
+		{
+			uint16_t * ptr = (uint16_t*)row_pointers[i];
+			const uint16_t * z = (const uint16_t  *)(map->z)+
+				(ny-i-1)*nx;
+			int j = 0;
+			for (; j < nx; j++) {
+				*ptr = (uint16_t)htons(*z);
+				z++;
+				ptr++;
+			}
+		}
+	}
+	png_write_image(png_ptr, row_pointers);
+	png_write_end(png_ptr, NULL);
+	rc = TURTLE_RETURN_SUCCESS;
+	
+exit:
+	if (fid != NULL)
+		fclose(fid);
+	if (row_pointers != NULL) {
+		int i;
+		for (i = 0; i < ny; i++) free(row_pointers[i]);
+		free(row_pointers);
+	}
+	png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
+	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
+	png_destroy_write_struct(pp_p, pp_i);
+
+	return rc;
+}
+
+#if(0)
+/* Create a new datum. */
+struct turtle_datum * turtle_datum_create(const char * path,
+	int stack_size, turtle_datum_cb lock, turtle_datum_cb release)
+{
+	/* Load the map data. */
+	const char * basename = strrchr(path, '/');
+	if (basename == NULL) basename = path;
+	else basename++;
+
+	if (strcmp(basename, "ASTER-GDEM2") == 0) {
+		/* We have ASTER-GDEM2 data. */
+		return NULL; /* TODO */
+	}
+	else {
+		/* Other datums are not yet supported ... */
+		return NULL;
+	}
+}
+
+/* Create a projection map from a datum. */
+struct turtle_map * turtle_datum_project(struct turtle_datum * datum,
+	const char * projection, const struct turtle_box * box)
+{
+	/* return load_gdem2(path, box); */
 }
 
 struct turtle_map * load_gdem2(const char* path, const struct turtle_box * box)
@@ -482,372 +685,4 @@ struct turtle_map * load_gdem2(const char* path, const struct turtle_box * box)
 
 	return map;
 }
-
-struct turtle_map * load_png(const char* path, const struct turtle_box * box)
-{
-	struct turtle_map * map = NULL;
-	FILE * fid = NULL;
-	png_bytep * row_pointers = NULL;
-	png_structp png_ptr = NULL;
-	png_infop info_ptr = NULL;
-	int nx = 0, ny = 0;
-
-	/* Open the file and check the format. */
-	fid = fopen(path, "rb");
-	if (fid == NULL) goto error;
-
-	char header[8];
-	if (fread(header, 1, 8, fid) != 8) goto error;
-	if (png_sig_cmp((png_bytep)header, 0, 8) != 0) goto error;
-
-	/* initialize libpng containers. */
-	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL,
-		NULL);
-	if (png_ptr == NULL) goto error;
-	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL) goto error;
-	if (setjmp(png_jmpbuf(png_ptr))) goto error;
-	png_init_io(png_ptr, fid);
-	png_set_sig_bytes(png_ptr, 8);
-
-	/* Read the header. */
-	png_read_info(png_ptr, info_ptr);
-	if (png_get_color_type(png_ptr, info_ptr) != PNG_COLOR_TYPE_GRAY)
-		goto error;
-	png_byte bit_depth = png_get_bit_depth(png_ptr, info_ptr);
-	if ((bit_depth != 8) && (bit_depth != 16)) goto error;
-	nx = png_get_image_width(png_ptr, info_ptr);
-	ny = png_get_image_height(png_ptr, info_ptr);
-	png_read_update_info(png_ptr, info_ptr);
-
-	/* Parse the XML meta data. */
-	double x0 = 0., y0 = 0., z0 = 0., dx = 1., dy = 1., dz = 1.;
-	png_textp text_ptr;
-	int num_text;
-	unsigned n_chunks = png_get_text(png_ptr, info_ptr, &text_ptr,
-		&num_text);
-	if (n_chunks > 0) {
-		int i = 0;
-		png_text* p = text_ptr;
-		for(; i < num_text; i++) {
-			const char* key = p->key;
-			const char* text = p->text;
-			unsigned int length = p->text_length;
-			p++;
-
-			xmlDocPtr doc = NULL;
-			doc = xmlReadMemory(text, length, "noname.xml", NULL,
-				XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
-			if (doc == NULL) goto xml_end;
-			xmlNode * root = xmlDocGetRootElement(doc);
-			if (root == NULL) goto xml_end;
-			if (strcmp((const char *)root->name, "topography")
-				!= 0) goto xml_end;
-
-			xmlNode * node;
-			for (node = root->children; node != NULL;
-				node = node->next) if ((node->type ==
-				XML_ELEMENT_NODE) && (node->name != NULL) &&
-				(node->children != NULL)) {
-				const xmlChar* name = node->name;
-				double* attribute = NULL;
-				if (strlen((const char *)name) != 2) continue;
-				if (name[1] == '0') {
-					if (name[0] == 'x')
-						attribute = &x0;
-					else if (name[0] == 'y')
-						attribute = &y0;
-					else if (name[0] == 'z')
-						attribute = &z0;
-				}
-				else if (name[0] == 'd') {
-					if (name[1] == 'x')
-						attribute = &dx;
-					else if (name[1] == 'y')
-						attribute = &dy;
-					else if (name[1] == 'z')
-						attribute = &dz;
-				}
-				if (attribute == NULL) continue;
-
-				xmlNode * subnode;
-				for (subnode = node->children; subnode != NULL;
-					subnode=subnode->next) if (subnode->type
-					== XML_TEXT_NODE) {
-					sscanf((const char *)subnode->content,
-						"%lf", attribute);
-					break;
-				}
-			}
-xml_end:
-			if (doc != NULL) xmlFreeDoc(doc);
-		}
-	}
-
-	/* Load the data. */
-	row_pointers = calloc(ny, sizeof(png_bytep));
-	if (row_pointers == NULL) goto error;
-	int i = 0;
-	for (; i < ny; i++) {
-		row_pointers[i] = malloc(png_get_rowbytes(png_ptr, info_ptr));
-		if (row_pointers[i] == NULL) goto error;
-	}
-	png_read_image(png_ptr, row_pointers);
-
-	/* Compute the bounding box, if requested. */
-	int nx0, ny0, dnx, dny;
-	if (box == NULL) {
-		/* No bounding box, let's use the full map. */
-		nx0 = 0;
-		ny0 = 0;
-		dnx = nx;
-		dny = ny;
-	}
-	else {
-		/* Clip the bounding box to the full map. */
-		const double xlow = box->x0-box->half_x;
-		const double xhigh = box->x0+box->half_x;
-		const double ylow = box->y0-box->half_y;
-		const double yhigh = box->y0+box->half_y;
-
-		if (xlow <= x0) nx0 = 0;
-		else nx0 = (int)((xlow-x0)/dx);
-		if (nx0 >= nx) goto error;
-		dnx = (int)((xhigh-x0)/dx)+1;
-		if (dnx > nx) dnx = nx;
-		else if (dnx <= nx0) goto error;
-		dnx -= nx0;
-
-		if (ylow <= y0) ny0 = 0;
-		else ny0 = (int)((ylow-y0)/dy);
-		if (ny0 >= ny) goto error;
-		dny = (int)((yhigh-y0)/dy)+1;
-		if (dny > ny) dny = ny;
-		else if (dny <= ny0) goto error;
-		dny -= ny0;
-	}
-
-	/* Allocate the map and copy the data. */
-	map = map_create(path, NULL, nx, ny, 0);
-	if (map == NULL) goto error;
-
-	double * z = map->z;
-	for (i = ny-ny0-1; i >= ny-ny0-dny; i--) {
-		png_bytep ptr = row_pointers[i]+nx0*(bit_depth/8);
-		int j = 0;
-		for (; j < dnx; j++) {
-			if (bit_depth == 8) {
-				*z = ((double)*ptr)*dz+z0;
-				z++;
-				ptr += 1;
-			}
-			else {
-				*z = ((double)ntohs(*((uint16_t*)ptr)))*dz+z0;
-				z++;
-				ptr += 2;
-			}
-		}
-	}
-
-	map->nx = dnx;
-	map->ny = dny;
-	map->x0 = x0+nx0*dx;
-	map->y0 = y0+ny0*dy;
-	map->dx = dx;
-	map->dy = dy;
-
-	goto exit;
-error:
-	free(map);
-	map = NULL;
-
-exit:
-	if (fid != NULL) fclose(fid);
-	if (row_pointers != NULL) {
-		int i;
-		for (i = 0; i < ny; i++) free(row_pointers[i]);
-		free(row_pointers);
-	}
-	png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
-	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
-	png_destroy_read_struct(pp_p, pp_i, NULL);
-
-	return map;
-}
-
-/* Dump a map in png format. */
-int dump_png(const struct turtle_map * map, const char * path, int bit_depth)
-{
-	int rc = 0;
-	FILE* fid = NULL;
-	png_bytep * row_pointers = NULL;
-	png_structp png_ptr = NULL;
-	png_infop info_ptr = NULL;
-
-	/* Check the bit depth. */
-	if ((bit_depth != 8) && (bit_depth != 16)) goto error;
-
-	/* Compute the z-binning. */
-	const int nx = map->nx, ny = map->ny;
-	double z0 = map->zmin, z1 = map->zmax;
-	if ((z0 == -DBL_MAX) || (z1 == DBL_MAX)) {
-		const double* z = map->z;
-		z0 = z1 = *z;
-		z++;
-		int i = 1, n = nx*ny;
-		for (; i < n; i++) {
-			double zi = *z;
-			if (zi > z1) z1 = zi;
-			else if (zi < z0) z0 = zi;
-			z++;
-		}
-	}
-	const int bins = (bit_depth == 8 ? 255 : 65535);
-	const double dz = (z1-z0)/bins;
-
-	/* Initialise the file and the PNG pointers. */
-	fid = fopen(path, "wb+");
-	if (fid == NULL) goto error;
-
-	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL,
-		NULL);
-	if (png_ptr == NULL) goto error;
-	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL) goto error;
-	if (setjmp(png_jmpbuf(png_ptr))) goto error;
-	png_init_io(png_ptr, fid);
-
-	/* Write the header. */
-	png_set_IHDR(
-		png_ptr, info_ptr, nx, ny, bit_depth, PNG_COLOR_TYPE_GRAY,
-		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
-		PNG_FILTER_TYPE_BASE
-	);
-	char header[1024];
-	sprintf(header, "<topography><x0>%.3lf</x0><y0>%.3lf</y0>"
-		"<z0>%.3lf</z0><dx>%.3lf</dx><dy>%.3lf</dy>"
-		"<dz>%.5e</dz></topography>",
-		map->x0, map->y0, z0, map->dx, map->dy, dz);
-	png_text text[] = {{PNG_TEXT_COMPRESSION_NONE, "Comment", header,
-		strlen(header)}};
-	png_set_text(png_ptr, info_ptr, text, sizeof(text)/sizeof(text[0]));
-	png_write_info(png_ptr, info_ptr);
-
-	/* Write the data */
-	row_pointers = (png_bytep*)calloc(ny, sizeof(png_bytep));
-	if (row_pointers == NULL) goto error;
-	int i = 0;
-	for (; i < ny; i++) {
-		row_pointers[i] = (png_byte *)malloc((bit_depth/8)*nx*
-			sizeof(char));
-		if (row_pointers[i] == NULL) goto error;
-		const double * z = map->z+(ny-i-1)*nx;
-		if (bit_depth == 8) {
-			unsigned char* ptr = (unsigned char*)row_pointers[i];
-			int j = 0;
-			for (; j < nx; j++) {
-				*ptr = (unsigned char)((*z-z0)/dz);
-				z++;
-				ptr++;
-			}
-		}
-		else
-		{
-			uint16_t* ptr = (uint16_t*)row_pointers[i];
-			int j = 0;
-			for (; j < nx; j++) {
-				*ptr = htons((uint16_t)((*z-z0)/dz));
-				z++;
-				ptr++;
-			}
-		}
-	}
-	png_write_image(png_ptr, row_pointers);
-	png_write_end(png_ptr, NULL);
-
-	goto exit;
-error:
-	rc = -1;
-
-exit:
-	if (fid != NULL)
-		fclose(fid);
-	if (row_pointers != NULL) {
-		int i;
-		for (i = 0; i < ny; i++) free(row_pointers[i]);
-		free(row_pointers);
-	}
-	png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
-	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
-	png_destroy_write_struct(pp_p, pp_i);
-
-	return rc;
-}
-
-/* Set the transform between local and geographic coordinates. */
-int transform_initialise(struct transform_data * transform,
-	const struct turtle_box *  box)
-{
-	if ((fabs(box->y0) > 90.) || (fabs(box->x0) > 180.))
-		goto error;
-
-	const double deg = M_PI/180.;
-	const double latitude = box->y0*deg;
-	const double a = a_WGS84*cos(latitude);
-	const double b = b_WGS84*sin(latitude);
-	const double dxdl = a*deg;
-	const double dydL = sqrt(a*a+b*b)*deg;
-
-	if ((dxdl <= 0.) || (dydL <= 0.)) goto error;
-
-	memcpy(&(transform->box), box, sizeof(*box));
-	transform->dldx = 1./dxdl;
-	transform->dLdy = 1./dydL;
-	return 0;
-error:
-	transform->dldx = transform->dLdy = 0.;
-	transform->box.x0 = transform->box.y0 = 0.;
-	transform->box.half_x = transform->box.half_y = 0.;
-
-	return -1;
-}
-
-/* Convert local coordinates to geographic ones. */
-int transform_to_geo(double x, double y, const struct transform_data *
-	transform, double * longitude, double * latitude)
-{
-	const double dldx = transform->dldx;
-	const double dLdy = transform->dLdy;
-
-	if ((dldx <= 0.) || (dLdy <= 0.)) {
-		*longitude = 0.;
-		*latitude = 0.;
-		return -1;
-	}
-	else {
-		*longitude = x*dldx+transform->box.x0;
-		*latitude = y*dLdy+transform->box.y0;
-		return 0;
-	}
-}
-
-/* Convert geographic coordinates to local ones. */
-int transform_to_local(double longitude, double latitude, const struct
-	transform_data * transform, double * x, double * y)
-{
-	const double dldx = transform->dldx;
-	const double dLdy = transform->dLdy;
-
-	if ((dldx <= 0.) || (dLdy <= 0.)) goto error;
-	else if ((fabs(latitude) > 90.) || (fabs(longitude) > 180.)) goto error;
-	else {
-		*x = (longitude-transform->box.x0)/dldx;
-		*y = (latitude-transform->box.y0)/dLdy;
-	}
-	return 0;
-
-error:
-	*x = 0.;
-	*y = 0.;
-	return -1;
-}
+#endif
