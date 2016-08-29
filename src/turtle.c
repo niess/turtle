@@ -23,13 +23,22 @@
 
 enum projection_type {
 	PROJECTION_NONE = -1,
-	PROJECTION_LAMBERT93,
+	PROJECTION_LAMBERT,
 	PROJECTION_UTM,
 	N_PROJECTIONS
 };
 
 typedef int (* map_locator)(struct turtle_map * map, double x, double y,
 	double * latitude, double * longitude);
+
+/* Data storage for projection settings. */
+union projection_settings {
+	struct {
+		double longitude_0;
+		int hemisphere;
+	} utm;
+	int lambert_tag;
+};
 
 /* Container for a projection map. */
 struct turtle_map {
@@ -39,10 +48,10 @@ struct turtle_map {
 	double x0, y0, z0;
 	double dx, dy, dz;
 	void * z;
-	
+
 	/* Projection. */
 	enum projection_type projection;
-	void * projection_data;
+	union projection_settings settings;
 
 	char data[]; /* Placeholder for dynamic data. */
 };
@@ -58,13 +67,19 @@ static enum turtle_return map_load_png(const char * path,
 	const struct turtle_box * box, struct turtle_map ** map);
 static enum turtle_return map_dump_png(const struct turtle_map * map,
 	const char * path);
-	
-/* Routines for map projections. */
-enum projection_type projection_index(const char * name);
 
-/* WGS84 reference ellipsoid. */
-static const double a_WGS84 = 6378137.000;
-static const double b_WGS84 = 6356752.314;
+/* Routines for map projections. */
+static enum turtle_return projection_parse(const char * name,
+	enum projection_type * projection,
+	union projection_settings * settings);
+static enum turtle_return project_lambert(const struct turtle_map * map,
+	double latitude, double longitude, double * x, double * y);
+static enum turtle_return unproject_lambert(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude);
+static enum turtle_return project_utm(const struct turtle_map * map,
+	double latitude, double longitude, double * x, double * y);
+static enum turtle_return unproject_utm(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude);
 
 /* Hardcoded ASTER-GDEM2 settings. */
 static const double GDEM2_pixelscale = 1./3600.;
@@ -72,6 +87,10 @@ static const double GDEM2_pixelscale = 1./3600.;
 /* Initialise the TURTLE interface. */
 enum turtle_return turtle_initialise(void)
 {
+	/* Initialise the libxml2 parser. */
+	xmlInitParser();
+
+	/* Initialise GEOTIFF-16. */
 	return (Geotiff16_Initialise() == 0) ? TURTLE_RETURN_SUCCESS :
 		TURTLE_RETURN_GEOTIFF_ERROR;
 }
@@ -81,7 +100,7 @@ enum turtle_return turtle_initialise(void)
  */
 void turtle_finalise(void)
 {
-	/* Clear geotiff-16 data. */
+	/* Clear GEOTIFF-16 data. */
 	Geotiff16_Finalise();
 
 	/* Clear remanent XML paser data. */
@@ -92,6 +111,7 @@ const char * turtle_strerror(enum turtle_return rc)
 {
 	static const char * msg[N_TURTLE_RETURNS] = {
 		"Operation succeeded",
+		"Bad address",
 		"Bad file extension",
 		"Bad file format",
 		"No such file or directory",
@@ -101,7 +121,7 @@ const char * turtle_strerror(enum turtle_return rc)
 		"Couldn't initialise geotiff",
 		"Not enough memory"
 	};
-	
+
 	if ((rc < 0) || (rc >= N_TURTLE_RETURNS)) return NULL;
 	else return msg[rc];
 }
@@ -109,7 +129,6 @@ const char * turtle_strerror(enum turtle_return rc)
 /* Release the map memory. */
 void turtle_map_destroy(struct turtle_map ** map)
 {
-	/* Release the memory. */
 	if ((map == NULL) || (*map == NULL)) return;
 	free(*map);
 	*map = NULL;
@@ -180,9 +199,44 @@ enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 	return TURTLE_RETURN_SUCCESS;
 }
 
+/* Project geodetic coordinates on the map. */
+enum turtle_return turtle_map_project(const struct turtle_map * map,
+	double latitude, double longitude, double * x, double * y)
+{
+	*x = 0.;
+	*y = 0.;
+
+	if (map == NULL)
+		return TURTLE_RETURN_BAD_ADDRESS;
+	else if (map->projection == PROJECTION_NONE)
+		return TURTLE_RETURN_BAD_PROJECTION;
+	else if (map->projection == PROJECTION_LAMBERT)
+		return project_lambert(map, latitude, longitude, x, y);
+	else
+		return project_utm(map, latitude, longitude, x, y);
+}
+
+/* Unproject map coordinates to geodetic ones. */
+enum turtle_return turtle_map_unproject(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude)
+{
+	*latitude = 0.;
+	*longitude = 0.;
+
+	if (map == NULL)
+		return TURTLE_RETURN_BAD_ADDRESS;
+	else if (map->projection == PROJECTION_NONE)
+		return TURTLE_RETURN_BAD_PROJECTION;
+	else if (map->projection == PROJECTION_LAMBERT)
+		return unproject_lambert(map, x, y, latitude, longitude);
+	else
+		return unproject_utm(map, x, y, latitude, longitude);
+}
+
 /* Get some basic information on a map. */
-void turtle_info(const struct turtle_map * map, struct turtle_box * box,
-	double * zmin, double * zmax)
+enum turtle_return turtle_map_info(const struct turtle_map * map,
+	struct turtle_box * box, double * zmin, double * zmax,
+	char ** projection)
 {
 	if (box != NULL) {
 		box->half_x = 0.5*(map->nx-1)*map->dx;
@@ -192,6 +246,53 @@ void turtle_info(const struct turtle_map * map, struct turtle_box * box,
 	}
 	if (zmin != NULL) *zmin = map->z0;
 	if (zmax != NULL) *zmax = map->z0+pow(2, map->bit_depth)*map->dz;
+
+	if (projection == NULL) return TURTLE_RETURN_SUCCESS;
+
+	*projection = NULL;
+	if (map->projection == PROJECTION_NONE) return TURTLE_RETURN_SUCCESS;
+
+	enum turtle_return rc = TURTLE_RETURN_MEMORY_ERROR;
+	int size, nw = 0;
+	for (size = 128;; size += 128) {
+		char * tmp = realloc(*projection, size);
+		if (tmp == NULL) goto error;
+		*projection = tmp;
+
+		if (map->projection == PROJECTION_LAMBERT) {
+			const char * tag[6] = {"I", "II", "IIe", "III", "IV",
+				"93"};
+			nw = snprintf(*projection, size, "Lambert %s",
+				tag[map->settings.lambert_tag]);
+			if (nw < size) break;
+		}
+		else if (map->projection == PROJECTION_UTM) {
+			char hemisphere = (map->settings.utm.hemisphere > 0) ?
+				'N' : 'S';
+			double tmp = map->settings.utm.longitude_0/6.+183.;
+			int zone = (int)tmp;
+			if (fabs(tmp-zone) <= FLT_EPSILON)
+				nw = snprintf(*projection, size, "UTM %d%c",
+					zone, hemisphere);
+			else
+				nw = snprintf(*projection, size, "UTM %.12lg%c",
+					zone, hemisphere);
+			if (nw < size) break;
+		}
+		else {
+			rc = TURTLE_RETURN_BAD_PROJECTION;
+			goto error;
+		}
+	}
+
+	nw++;
+	if (nw < size) *projection = realloc(*projection, nw);
+	return TURTLE_RETURN_SUCCESS;
+
+error:
+	free(*projection);
+	*projection = NULL;
+	return rc;
 }
 
 static struct turtle_map * map_create(int nx, int ny, int bit_depth,
@@ -211,22 +312,81 @@ static struct turtle_map * map_create(int nx, int ny, int bit_depth,
 	map->projection = projection;
 	char * p = map->data;
 	map->z = (void *)(p);
-	map->projection_data = NULL;
 
 	return map;
 }
 
-enum projection_type projection_index(const char * name)
+
+int locate_word(const char ** str)
 {
-	static const char * names[N_PROJECTIONS] = {
-		"Lambert93",
-		"UTM"
-	};
-	
-	int i;
-	for (i = 0; i < N_PROJECTIONS; i++)
-		if (strcmp(name, names[i]) == 0) return i;
-	return PROJECTION_NONE;
+	const char * p = *str;
+	while (*p == ' ') p++;
+	*str = p;
+	int n = 0;
+	while ((*p != ' ') && (*p != '\0')) { p++; n++; }
+	return n;
+}
+
+enum turtle_return projection_parse(const char * name,
+	enum projection_type * projection, union projection_settings * settings)
+{
+	*projection = PROJECTION_NONE;
+	if (name == NULL) return TURTLE_RETURN_BAD_PROJECTION;
+
+	/* Locate the 1st word. */
+	const char * p = name;
+	int n = locate_word(&p);
+
+	if (n == 0) {
+		/* No projection has been defined. */
+		return TURTLE_RETURN_SUCCESS;
+	}
+	else if (strncmp(p, "Lambert", n) == 0) {
+		/* This is a Lambert projection. Let's parse the parameters
+		 * set.
+		 */
+		*projection = PROJECTION_LAMBERT;
+		p += n;
+		n = locate_word(&p);
+		const char * tag[6] = {"I", "II", "IIe", "III", "IV", "93"};
+		int i;
+		for (i = 0; i < 6; i++) {
+			if (strncmp(p, tag[i], n) == 0) {
+				settings->lambert_tag = i;
+				return TURTLE_RETURN_SUCCESS;
+			}
+
+		}
+	}
+	else if (strncmp(p, "UTM", n) == 0) {
+		/* This is a UTM projection. Let's parse the parameters
+		 * set.
+		 */
+		*projection = PROJECTION_UTM;
+		p += n;
+		int zone;
+		char hemisphere;
+		if (sscanf(p, "%d%c", &zone, &hemisphere) != 2)
+			return TURTLE_RETURN_BAD_PROJECTION;
+		if (hemisphere == '.') {
+			double longitude_0;
+			if (sscanf(p, "%lf%c", &longitude_0,
+				&hemisphere) != 2)
+				return TURTLE_RETURN_BAD_PROJECTION;
+			settings->utm.longitude_0 = longitude_0;
+		}
+		else
+			settings->utm.longitude_0 = 6.*zone-183.;
+		if (hemisphere == 'N')
+			settings->utm.hemisphere = 1;
+		else if (hemisphere == 'S')
+			settings->utm.hemisphere = -1;
+		else
+			return TURTLE_RETURN_BAD_PROJECTION;
+		return TURTLE_RETURN_SUCCESS;
+	}
+
+	return TURTLE_RETURN_BAD_PROJECTION;
 }
 
 const char * get_node_content(xmlNode * node)
@@ -248,6 +408,7 @@ enum turtle_return map_load_png(const char* path, const struct turtle_box * box,
 	png_infop info_ptr = NULL;
 	int nx = 0, ny = 0;
 	enum projection_type projection = PROJECTION_NONE;
+	union projection_settings settings;
 	*map = NULL;
 	int rc;
 
@@ -317,13 +478,11 @@ enum turtle_return map_load_png(const char* path, const struct turtle_box * box,
 				if (strcmp(name, "projection") == 0) {
 					const char * content =
 						get_node_content(node);
-					if (content == NULL) goto error;
-					projection = projection_index(content);
-					if (projection == PROJECTION_NONE) {
-						rc = TURTLE_RETURN_BAD_PROJECTION;
+					if ((rc = projection_parse(content,
+						&projection, &settings)) !=
+						TURTLE_RETURN_SUCCESS)
 						goto error;
-					}
-					
+
 				}
 				double * attribute = NULL;
 				if (strlen((const char *)name) != 2) continue;
@@ -433,6 +592,8 @@ xml_end:
 	(*map)->dx = dx;
 	(*map)->dy = dy;
 	(*map)->dz = dz;
+	(*map)->projection = projection;
+	memcpy(&((*map)->settings), &settings, sizeof(settings));
 
 	goto exit;
 error:
@@ -533,7 +694,7 @@ enum turtle_return map_dump_png(const struct turtle_map * map,
 	png_write_image(png_ptr, row_pointers);
 	png_write_end(png_ptr, NULL);
 	rc = TURTLE_RETURN_SUCCESS;
-	
+
 exit:
 	if (fid != NULL)
 		fclose(fid);
@@ -547,6 +708,234 @@ exit:
 	png_destroy_write_struct(pp_p, pp_i);
 
 	return rc;
+}
+
+/* Compute the isometric latitude for Lambert projections.
+ *
+ * Source:
+ * 	ALG0001 from http://geodesie.ign.fr/contenu/fichiers/documentation/
+ * 	algorithmes/notice/NTG_71.pdf.
+ */
+double lambert_latitude_to_iso(double latitude, double e)
+{
+	const double phi = latitude*M_PI/180.;
+	const double s = sin(phi);
+	return log(tan(0.25*M_PI+0.5*phi)*pow((1.-e*s)/(1.+e*s), 0.5*e));
+}
+
+/* Compute the geographic latitude from the isometric one for Lambert
+ * projections.
+ *
+ * Source:
+ * 	ALG0001 from http://geodesie.ign.fr/contenu/fichiers/documentation/
+ * 	algorithmes/notice/NTG_71.pdf.
+ */
+double lambert_iso_to_latitude(double L, double e)
+{
+	const double epsilon = FLT_EPSILON;
+
+	const double eL = exp(L);
+	double phi0 = 2.*atan(eL)-0.5*M_PI;
+	for (;;) {
+		const double s = sin(phi0);
+		double phi1 = 2.*atan(pow((1.+e*s)/(1.-e*s), 0.5*e)*eL)
+			-0.5*M_PI;
+		if (fabs(phi1-phi0) <= epsilon) return phi1/M_PI*180.;
+		phi0 = phi1;
+	}
+}
+
+/* Parameters for a Lambert projection. */
+struct lambert_parameters {
+	double e;
+	double n;
+	double c;
+	double lambda_c;
+	double xs;
+	double ys;
+};
+
+/* Compute the projected coordinates for Lambert projections.
+ *
+ * Source:
+ * 	ALG0003 from http://geodesie.ign.fr/contenu/fichiers/documentation/
+ * 	algorithmes/notice/NTG_71.pdf.
+ */
+void lambert_ll_to_xy(double latitude, double longitude,
+	struct lambert_parameters * parameters, double * x, double * y)
+{
+	const double L = lambert_latitude_to_iso(latitude, parameters->e);
+	const double cenL = parameters->c*exp(-parameters->n*L);
+	const double lambda = longitude/180.*M_PI;
+	const double theta = parameters->n*(lambda-parameters->lambda_c);
+	*x = parameters->xs+cenL*sin(theta);
+	*y = parameters->ys-cenL*cos(theta);
+}
+
+/* Compute the geodetic coordinates from the projected ones for a Lambert
+ * projection.
+ *
+ * Source:
+ * 	ALG0004 from http://geodesie.ign.fr/contenu/fichiers/documentation/
+ * 	algorithmes/notice/NTG_71.pdf.
+ */
+void lambert_xy_to_ll(double x, double y,
+	struct lambert_parameters * parameters, double * latitude,
+	double * longitude)
+{
+	const double dx = x-parameters->xs;
+	const double dy = y-parameters->ys;
+	const double R = sqrt(dx*dx+dy*dy);
+	const double gamma = atan2(dx, -dy);
+	*longitude = (parameters->lambda_c+gamma/parameters->n)*180./M_PI;
+	const double L = -log(R/parameters->c)/parameters->n;
+	*latitude = lambert_iso_to_latitude(L, parameters->e);
+}
+
+/* Get the parameters for a specific Lambert projection.
+ * Beware: there is no bound check.
+ *
+ * Source:
+ * 	http://geodesie.ign.fr/contenu/fichiers/documentation/
+ * 	algorithmes/notice/NTG_71.pdf.
+ * 	http://geodesie.ign.fr/contenu/fichiers/documentation/
+ * 	rgf93/Lambert-93.pdf (for Lambert 93/RGF93).
+ */
+struct lambert_parameters * lambert_get_parameters(int tag)
+{
+	static struct lambert_parameters parameters[6] = {
+		{0.08248325676, 0.7604059656, 11603796.98, 0.04079234433,
+			600000.0, 5657616.674},
+		{0.08248325676, 0.7289686274, 11745793.39, 0.04079234433,
+			600000.0, 6199695.768},
+		{0.08248325676, 0.7289686274, 11745793.39, 0.04079234433,
+			600000.0, 8199695.768},
+		{0.08248325676, 0.6959127966, 11947992.52, 0.04079234433,
+			600000.0, 6791905.085},
+		{0.08248325676, 0.6712679322, 12136281.99, 0.04079234433,
+			234.358, 7239161.542},
+		/* Lambert 93/RGF93 have been recomputed from specs. NTG_71
+		 * values do not conform to RGF93. */
+		{0.08181919112, 0.7253743710, 11755528.70, 0.05235987756,
+			700000.0, 12657560.145}
+	};
+
+	return parameters+tag;
+}
+
+/* Encapsulation of Lambert projections. */
+enum turtle_return project_lambert(const struct turtle_map * map,
+	double latitude, double longitude, double * x, double * y)
+{
+	struct lambert_parameters * parameters = lambert_get_parameters(
+		map->settings.lambert_tag);
+	lambert_ll_to_xy(latitude, longitude, parameters, x, y);
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Encapsulation of inverse Lambert projections.  */
+enum turtle_return unproject_lambert(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude)
+{
+	struct lambert_parameters * parameters = lambert_get_parameters(
+		map->settings.lambert_tag);
+	lambert_xy_to_ll(x, y, parameters, latitude, longitude);
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Compute the projected coordinates for UTM projections.
+ *
+ * Source:
+ * 	Wikipedia https://en.wikipedia.org/wiki/
+ * 	Universal_Transverse_Mercator_coordinate_system.
+ */
+void utm_ll_to_xy(double latitude, double longitude, double longitude_0,
+	int hemisphere, double * x, double * y)
+{
+	const double a = 6378.137E+03;
+	const double f = 1./298.257223563;
+	const double E0 = 5E+05;
+	const double N0 = (hemisphere > 0) ? 0. : 1E+07;
+	const double k0 = 0.9996;
+
+	const double n = f/(2.-f);
+	const double A = a/(1.+n)*(1.+n*n*(0.25+0.0625*n*n));
+	const double alpha[3] = {n*(0.5+n*(-2./3.+5./16.*n)),
+		n*n*(13./48.-3./5.*n), 61./240.*n*n*n};
+
+	const double c = 2.*sqrt(n)/(1.+n);
+	const double s = sin(latitude*M_PI/180.);
+	const double t = sinh(atanh(s)-c*atanh(c*s));
+	const double dl = (longitude-longitude_0)*M_PI/180.;
+	const double zeta = atan2(t, cos(dl));
+	const double eta = atanh(sin(dl)/sqrt(1.+t*t));
+
+	double xs = 0., ys = 0.;
+	int i;
+	for (i = 0; i < 3; i++) {
+		xs += alpha[i]*cos(2.*(i+1)*zeta)*sinh(2.*(i+1)*eta);
+		ys += alpha[i]*sin(2.*(i+1)*zeta)*cosh(2.*(i+1)*eta);
+	}
+	*x = E0+k0*A*(eta+xs);
+	*y = N0+k0*A*(zeta+ys);
+}
+
+/* Compute the geodetic coordinates from the projected ones for a UTM
+ * projection.
+ *
+ * Source:
+ * 	Wikipedia https://en.wikipedia.org/wiki/
+ * 	Universal_Transverse_Mercator_coordinate_system.
+ */
+void utm_xy_to_ll(double x, double y, double longitude_0, int hemisphere,
+	double * latitude, double * longitude)
+{
+	const double a = 6378.137E+03;
+	const double f = 1./298.257223563;
+	const double E0 = 5E+05;
+	const double N0 = (hemisphere > 0) ? 0. : 1E+07;
+	const double k0 = 0.9996;
+
+	const double n = f/(2.-f);
+	const double A = a/(1.+n)*(1.+n*n*(0.25+0.0625*n*n));
+	const double beta[3] = {n*(0.5+n*(-2./3.+37./96.*n)),
+		n*n*(1./48.+1./15.*n), 17./480.*n*n*n
+	};
+	const double delta[3] = {n*(2.+n*(-2./3.-2.*n)),
+		n*n*(7./3.-8./5.*n), 56./15.*n*n*n
+	};
+
+	const double zeta0 = (y-N0)/(k0*A);
+	const double eta0 = (x-E0)/(k0*A);
+	double zeta = zeta0, eta = eta0;
+	int i;
+	for (i = 0; i < 3; i++) {
+		zeta -= beta[i]*sin(2.*(i+1)*zeta0)*cosh(2.*(i+1)*eta0);
+		eta -= beta[i]*cos(2.*(i+1)*zeta0)*sinh(2.*(i+1)*eta0);
+	}
+	const double chi = asin(sin(zeta)/cosh(eta));
+	double s = 0.;
+	for (i = 0; i < 3; i++) s += delta[i]*sin(2.*(i+1)*chi);
+	*latitude = (chi+s)*180./M_PI;
+	*longitude = longitude_0+atan2(sinh(eta), cos(zeta))*180./M_PI;
+}
+
+/* Encapsulation of UTM projections. */
+enum turtle_return project_utm(const struct turtle_map * map,
+	double latitude, double longitude, double * x, double * y)
+{
+	utm_ll_to_xy(latitude, longitude, map->settings.utm.longitude_0,
+		map->settings.utm.hemisphere, x, y);
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Encapsulation of inverse UTM projections.  */
+enum turtle_return unproject_utm(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude)
+{
+	utm_xy_to_ll(x, y, map->settings.utm.longitude_0,
+		map->settings.utm.hemisphere, latitude, longitude);
+	return TURTLE_RETURN_SUCCESS;
 }
 
 #if(0)

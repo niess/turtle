@@ -11,6 +11,7 @@ extern "C" {
 /* Return codes */
 enum turtle_return {
 	TURTLE_RETURN_SUCCESS = 0,
+	TURTLE_RETURN_BAD_ADDRESS,
 	TURTLE_RETURN_BAD_EXTENSION,
 	TURTLE_RETURN_BAD_FORMAT,
 	TURTLE_RETURN_BAD_PATH,
@@ -38,7 +39,7 @@ struct turtle_box {
 /* User supplied callbacks for locking or unlocking critical sections for
  * multi-threaded applications.
  */
-typedef void (* turtle_datum_cb)(void); 
+typedef void (* turtle_datum_cb)(void);
 
 /* General library routines. */
 enum turtle_return turtle_initialise(void);
@@ -53,13 +54,14 @@ enum turtle_return turtle_map_dump(const struct turtle_map * map,
 	const char * path);
 enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 	double x, double y, double * z);
-enum turtle_return turtle_map_geodetic(const struct turtle_map * map,
-	double x, double y, double * latitude, double * longitude);
-enum turtle_return turtle_map_projected(const struct turtle_map * map,
+enum turtle_return turtle_map_project(const struct turtle_map * map,
 	double latitude, double longitude, double * x, double * y);
-void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
-	double * zmin, double * zmax, const char ** projection);
-	
+enum turtle_return turtle_map_unproject(const struct turtle_map * map,
+	double x, double y, double * latitude, double * longitude);
+enum turtle_return  turtle_map_info(const struct turtle_map * map,
+	struct turtle_box * box, double * zmin, double * zmax,
+	char ** projection);
+
 /* Routines for managing a geodetic datum. */
 struct turtle_datum * turtle_datum_create(const char * path,
 	int stack_size, turtle_datum_cb lock, turtle_datum_cb release);
