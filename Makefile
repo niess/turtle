@@ -2,7 +2,7 @@ PACKAGES := libpng12 libxml-2.0
 CFLAGS := -O2 -std=c99 -pedantic -fPIC $(shell pkg-config --cflags $(PACKAGES))
 LIBS := -lm -ltiff $(shell pkg-config --libs $(PACKAGES))
 INC := -Iinclude
-OBJS := turtle.o geotiff16.o
+OBJS := turtle.o turtle_projection.o turtle_map.o geotiff16.o
 
 .PHONY: example lib clean
 

@@ -24,6 +24,7 @@ enum turtle_return {
 };
 
 /* Opaque structures. */
+struct turtle_projection;
 struct turtle_map;
 struct turtle_datum;
 struct turtle_client;
@@ -46,6 +47,21 @@ enum turtle_return turtle_initialise(void);
 void turtle_finalise(void);
 const char * turtle_strerror(enum turtle_return rc);
 
+/* Routines for handling geographic projections. */
+enum turtle_return turtle_projection_create(const char * name,
+	struct turtle_projection ** projection);
+void turtle_projection_destroy(struct turtle_projection ** projection);
+enum turtle_return turtle_projection_configure(const char * name,
+	struct turtle_projection * projection);
+enum turtle_return turtle_projection_info(
+	const struct turtle_projection * projection, char ** name);
+enum turtle_return turtle_projection_project(
+	const struct turtle_projection * projection, double latitude,
+	double longitude, double * x, double * y);
+enum turtle_return turtle_projection_unproject(
+	const struct turtle_projection * projection,
+	double x, double y, double * latitude, double * longitude);
+
 /* Routines for handling projection maps. */
 enum turtle_return turtle_map_load(const char * path,
 	const struct turtle_box * box, struct turtle_map ** map);
@@ -54,13 +70,10 @@ enum turtle_return turtle_map_dump(const struct turtle_map * map,
 	const char * path);
 enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 	double x, double y, double * z);
-enum turtle_return turtle_map_project(const struct turtle_map * map,
-	double latitude, double longitude, double * x, double * y);
-enum turtle_return turtle_map_unproject(const struct turtle_map * map,
-	double x, double y, double * latitude, double * longitude);
-enum turtle_return  turtle_map_info(const struct turtle_map * map,
-	struct turtle_box * box, double * zmin, double * zmax,
-	char ** projection);
+const struct turtle_projection * turtle_map_projection(
+	const struct turtle_map * map);
+enum turtle_return turtle_map_info(const struct turtle_map * map,
+	struct turtle_box * box, double * zmin, double * zmax);
 
 /* Routines for managing a geodetic datum. */
 struct turtle_datum * turtle_datum_create(const char * path,
