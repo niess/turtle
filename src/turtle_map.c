@@ -103,6 +103,7 @@ enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 const struct turtle_projection * turtle_map_projection(
 	const struct turtle_map * map)
 {
+	if (map == NULL) return NULL;
 	return &map->projection;
 }
 
@@ -343,6 +344,7 @@ xml_end:
 		}
 	}
 
+	rc = TURTLE_RETURN_SUCCESS;
 	goto exit;
 error:
 	free(*map);
@@ -359,7 +361,7 @@ exit:
 	png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
 	png_destroy_read_struct(pp_p, pp_i, NULL);
 
-	return TURTLE_RETURN_SUCCESS;
+	return rc;
 }
 
 /* Dump a map in png format. */
@@ -397,17 +399,25 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
 		PNG_FILTER_TYPE_BASE
 	);
-	char header[1024];
+	const char * tmp;
+	char * projection_tag;
+	const struct turtle_projection * projection = turtle_map_projection(map);
+	turtle_projection_info(projection, &projection_tag);
+	if (projection_tag == NULL)
+		tmp = "";
+	else
+		tmp = projection_tag;
+	char header[2048];
 	sprintf(header, "<topography><x0>%.3lf</x0><y0>%.3lf</y0>"
 		"<z0>%.3lf</z0><dx>%.3lf</dx><dy>%.3lf</dy>"
-		"<dz>%.5e</dz></topography>",
-		map->x0, map->y0, map->z0, map->dx, map->dy, map->dz);
+		"<dz>%.5e</dz><projection>%s</projection></topography>",
+		map->x0, map->y0, map->z0, map->dx, map->dy, map->dz,
+		tmp);
+	free(projection_tag);
 	png_text text[] = {{PNG_TEXT_COMPRESSION_NONE, "Comment", header,
 		strlen(header)}};
 	png_set_text(png_ptr, info_ptr, text, sizeof(text)/sizeof(text[0]));
 	png_write_info(png_ptr, info_ptr);
-
-	/* TODO: write the projection tag. */
 
 	/* Write the data */
 	row_pointers = (png_bytep*)calloc(ny, sizeof(png_bytep));

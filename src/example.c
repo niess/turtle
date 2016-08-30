@@ -57,6 +57,9 @@ int main()
 		&latitude, &longitude)) != TURTLE_RETURN_SUCCESS) RAISE_ERROR;
 	fprintf(stdout, "geodetic (UTM): %.8lg, %.8lg\n", latitude, longitude);
 
+	if ((rc = turtle_map_dump(map, "test.png")) != TURTLE_RETURN_SUCCESS)
+		RAISE_ERROR;
+
 	rc = TURTLE_RETURN_SUCCESS;
 	goto clean_and_exit;
 
