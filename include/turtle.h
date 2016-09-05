@@ -68,13 +68,13 @@ void turtle_map_destroy(struct turtle_map ** map);
 enum turtle_return turtle_map_dump(const struct turtle_map * map,
 	const char * path);
 enum turtle_return turtle_map_elevation(const struct turtle_map * map,
-	double x, double y, double * z);
+	double x, double y, double * elevation);
 const struct turtle_projection * turtle_map_projection(
 	const struct turtle_map * map);
 enum turtle_return turtle_map_info(const struct turtle_map * map,
 	struct turtle_box * box, double * zmin, double * zmax);
 
-/* Routines for managing a geodetic datum. */
+/* Routines for handling a geodetic datum. */
 enum turtle_return turtle_datum_create(const char * path, int stack_size,
 	turtle_datum_cb * lock, turtle_datum_cb * unlock,
 	struct turtle_datum ** datum);
@@ -82,11 +82,14 @@ void turtle_datum_destroy(struct turtle_datum ** datum);
 enum turtle_return turtle_datum_project(struct turtle_datum * datum,
 	struct turtle_projection * projection, const struct turtle_box * box,
 	struct turtle_map ** map);
-void turtle_datum_prune(struct turtle_datum * datum, double timeout);
+void turtle_datum_clear(struct turtle_datum * datum);
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
-	double latitude, double longitude, double * z);
+	double latitude, double longitude, double * elevation);
 enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
-	double latitude, double longitude, double position[3]);
+	double latitude, double longitude, double elevation, double ecef[3]);
+enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
+	double ecef[3], double * latitude, double * longitude,
+	double * elevation);
 
 /* Routines for accessing a datum using a thread-safe client. */
 enum turtle_return turtle_client_create(struct turtle_datum * datum,
@@ -96,9 +99,7 @@ enum turtle_return turtle_client_project(struct turtle_client * client,
 	const char * projection, const struct turtle_box * box,
 	struct turtle_map ** map);
 enum turtle_return turtle_client_elevation(const struct turtle_client * client,
-	double latitude, double longitude, double * z);
-enum turtle_return turtle_client_ecef(const struct turtle_client * client,
-	double latitude, double longitude, double position[3]);
+	double latitude, double longitude, double * elevation);
 
 #ifdef __cplusplus
 }

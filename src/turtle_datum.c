@@ -2,6 +2,7 @@
  * Topographic Utilities for Rendering The eLEvation (TURTLE).
  */
 
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -9,6 +10,11 @@
 #include "turtle_map.h"
 #include "turtle_datum.h"
 #include "geotiff16.h"
+
+#ifndef M_PI
+/* Define pi, if unknown. */
+#define M_PI 3.14159265358979323846
+#endif
 
 /* Load functions for tiles. */
 enum turtle_return datum_load_tile(struct turtle_datum * datum, int latitude,
@@ -77,7 +83,7 @@ void turtle_datum_destroy(struct turtle_datum ** datum)
 
 /* Get the datum elevation at the given geodetic coordinates. */
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
-	double latitude, double longitude, double * z)
+	double latitude, double longitude, double * elevation)
 {
 	/* Get the proper tile. */
 	double hx, hy;
@@ -145,8 +151,93 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 	int ix1 = (ix >= nx-1) ? nx-1 : ix+1;
 	int iy1 = (iy >= ny-1) ? ny-1 : iy+1;
  	const int16_t * zm = datum->stack->z;
-	*z = zm[iy*nx+ix]*(1.-hx)*(1.-hy)+zm[iy1*nx+ix]*(1.-hx)*hy+
+	*elevation = zm[iy*nx+ix]*(1.-hx)*(1.-hy)+zm[iy1*nx+ix]*(1.-hx)*hy+
 		zm[iy*nx+ix1]*hx*(1.-hy)+zm[iy1*nx+ix1]*hx*hy;
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Get the parameters of the reference ellipsoid. */
+enum turtle_return get_ellipsoid(enum datum_format format, double * a,
+	double * e)
+{
+	static const double A[N_DATUM_FORMATS] = {6378137.0};
+	static const double E[N_DATUM_FORMATS] = {0.081819190842622};
+
+	if ((format < 0) || (format >= N_DATUM_FORMATS))
+		return TURTLE_RETURN_BAD_FORMAT;
+
+	*a = A[format];
+	*e = E[format];
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Compute ECEF coordinates from latitude and longitude. */
+enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
+	double latitude, double longitude, double elevation, double ecef[3])
+{
+	/* Get the parameters of the reference ellipsoid. */
+	double a, e;
+	enum turtle_return rc = get_ellipsoid(datum->format, &a, &e);
+	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+
+	/* Compute the Cartesian coordinates. */
+	const double s = sin(latitude*M_PI/180.);
+	const double c = cos(latitude*M_PI/180.);
+	const double R = a/sqrt(1.-e*e*s*s);
+
+	ecef[0] = (R+elevation)*c*cos(longitude*M_PI/180.);
+	ecef[1] = (R+elevation)*c*sin(longitude*M_PI/180.);
+	ecef[2] = (R*(1.-e*e)+elevation)*s;
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Compute the geodetic coordinates from the ECEF ones.
+ *
+ * Reference: B. R. Bowring's 1985 algorithm (single iteration).
+ */
+enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
+	double ecef[3], double * latitude, double * longitude,
+	double * elevation)
+{
+	/* Get the parameters of the reference ellipsoid. */
+	double a, e;
+	enum turtle_return rc = get_ellipsoid(datum->format, &a, &e);
+	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	const double b2 = a*a*(1.-e*e);
+	const double b = sqrt(b2);
+	const double eb2 = e*e*a*a/b2;
+
+	/* Compute the geodetic coordinates. */
+	if ((ecef[0] == 0.) && (ecef[1] == 0.)) {
+		*latitude = (ecef[2] >= 0.) ? 90. : -90.;
+		*longitude = 0.0;
+		*elevation = fabs(ecef[2])-b;
+		return TURTLE_RETURN_SUCCESS;
+	}
+
+	*longitude = atan2(ecef[1], ecef[0])*180./M_PI;
+
+	const double p2 = ecef[0]*ecef[0]+ecef[1]*ecef[1];
+	const double p = sqrt(p2);
+	if (ecef[2] == 0.) {
+		*latitude = 0.;
+		*elevation = p-a;
+		return TURTLE_RETURN_SUCCESS;
+	}
+
+	const double r = sqrt(p2+ecef[2]*ecef[2]);
+	const double tu = b*ecef[2]*(1.+eb2*b/r)/(a*p);
+	const double tu2 = tu*tu;
+	const double cu = 1./sqrt(1.+tu2);
+	const double su = cu*tu;
+	const double tp = (ecef[2]+eb2*b*su*su*su)/(p-e*e*a*cu*cu*cu);
+	*latitude = atan(tp)*180./M_PI;
+	const double cp = 1./sqrt(1.0+tp*tp);
+	const double sp = cp*tp;
+	*elevation = p*cp+ecef[2]*sp-a*sqrt(1.-e*e*sp*sp);
+
 	return TURTLE_RETURN_SUCCESS;
 }
 

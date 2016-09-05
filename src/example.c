@@ -67,9 +67,20 @@ int main()
 		!= TURTLE_RETURN_SUCCESS) RAISE_ERROR;
 	fprintf(stdout, "elevation: %.3lf\n", z);
 
+	/* Check the ECEF transforms. */
+	double ecef[3];
+	if ((rc = turtle_datum_ecef(datum, latitude, longitude, z, ecef))
+		!= TURTLE_RETURN_SUCCESS) RAISE_ERROR;
+	fprintf(stdout, "ECEF: (%.5lE, %.5lE, %.5lE)\n", ecef[0], ecef[1],
+		ecef[2]);
+
+	if ((rc = turtle_datum_geodetic(datum, ecef, &latitude, &longitude,
+		&z)) != TURTLE_RETURN_SUCCESS) RAISE_ERROR;
+	fprintf(stdout, "Geodetic: (%.8lg, %.8lg, %.3lf)\n", latitude,
+		longitude, z);
+
 	rc = TURTLE_RETURN_SUCCESS;
 	goto clean_and_exit;
-
 error:
 	fprintf(stderr, "error in %s:%d. %s.\n", __FILE__, line,
 		turtle_strerror(rc));
