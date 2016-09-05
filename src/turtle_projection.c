@@ -3,8 +3,9 @@
  */
 
 #include <float.h>
-#include <malloc.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "turtle.h"
@@ -164,7 +165,8 @@ enum turtle_return turtle_projection_info(
 					zone, hemisphere);
 			else
 				nw = snprintf(*name, size, "UTM %.12lg%c",
-					zone, hemisphere);
+					projection->settings.utm.longitude_0,
+					hemisphere);
 			if (nw < size) break;
 		}
 		else {

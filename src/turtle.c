@@ -8,14 +8,13 @@
 #include "geotiff16.h"
 
 /* Initialise the TURTLE interface. */
-enum turtle_return turtle_initialise(void)
+void turtle_initialise(void)
 {
 	/* Initialise the libxml2 parser. */
 	xmlInitParser();
 
-	/* Initialise GEOTIFF-16. */
-	return (Geotiff16_Initialise() == 0) ? TURTLE_RETURN_SUCCESS :
-		TURTLE_RETURN_GEOTIFF_ERROR;
+	/* Register the geotiff16 tags. */
+	geotiff16_register();
 }
 
 /* Clear the TURTLE interface. BEWARE: due to libxml2 this function must
@@ -23,9 +22,6 @@ enum turtle_return turtle_initialise(void)
  */
 void turtle_finalise(void)
 {
-	/* Clear GEOTIFF-16 data. */
-	Geotiff16_Finalise();
-
 	/* Clear remanent XML paser data. */
 	xmlCleanupParser();
 }
@@ -42,7 +38,6 @@ const char * turtle_strerror(enum turtle_return rc)
 		"Unknown projection",
 		"Bad XML header",
 		"Value is out of bound",
-		"Couldn't initialise geotiff",
 		"Not enough memory"
 	};
 

@@ -1,18 +1,24 @@
+/*
+ * Basic interface to geotiff files providing a reader for 16b data.
+ */
 #ifndef GEOTIFF16_H
 #define GEOTIFF16_H
 
 #include <stdint.h>
+#include <tiffio.h>
 
-typedef struct {
-	uint32_t width;
-	uint32_t height;
-	int16_t elevation[]; /* Placeholder for data */
-} Geotiff16Type_Map;
+/* Data for reading a geotiff 16b file. */
+struct geotiff16_reader {
+	uint32_t width, height;
+	TIFF * tiff;
+};
 
-int Geotiff16_Initialise();
-void Geotiff16_Finalise();
+/* Register the geotiff tags to libtiff. */
+void geotiff16_register();
 
-Geotiff16Type_Map* Geotiff16_NewMap(const char* path);
-void Geotiff16_DeleteMap(Geotiff16Type_Map* map);
+/* Manage a geotiff 16b file reader. */
+int geotiff16_open(const char* path, struct geotiff16_reader * reader);
+void geotiff16_close(struct geotiff16_reader * reader);
+int geotiff16_readinto(struct geotiff16_reader * reader, int16_t * buffer);
 
 #endif

@@ -3,8 +3,8 @@
  */
 
 #include <float.h>
-#include <malloc.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <arpa/inet.h>
