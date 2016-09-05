@@ -27,6 +27,36 @@ static enum turtle_return map_load_png(const char * path,
 static enum turtle_return map_dump_png(const struct turtle_map * map,
 	const char * path);
 
+/* Create a handle to a new empty map. */
+enum turtle_return turtle_map_create(const char * projection,
+	const struct turtle_box * box, int nx, int ny, double zmin,
+	double zmax, int bit_depth, struct turtle_map ** map)
+{
+	*map = NULL;
+
+	/* Check the input arguments. */
+	if ((nx <= 0) || (ny <= 0) || (zmin > zmax) || ((bit_depth != 8) &&
+		(bit_depth != 16))) return TURTLE_RETURN_DOMAIN_ERROR;
+
+	struct turtle_projection proj;
+	enum turtle_return rc = turtle_projection_configure(projection, &proj);
+	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+
+	/*  Allocate the memory for the new map and initialise it. */
+	*map = map_create(nx, ny, bit_depth, &proj);
+	if (*map == NULL) return TURTLE_RETURN_MEMORY_ERROR;
+
+	(*map)->x0 = box->x0-fabs(box->half_x);
+	(*map)->y0 = box->y0-fabs(box->half_y);
+	(*map)->z0 = zmin;
+	(*map)->dx = (nx > 1) ? 2.*fabs(box->half_x)/(nx-1) : 0.;
+	(*map)->dy = (ny > 1) ? 2.*fabs(box->half_y)/(ny-1) : 0.;
+	(*map)->dz = (zmax-zmin)/(pow(2., bit_depth)-1);
+	memset((*map)->z, 0x0, (bit_depth/8)*nx*ny);
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
 /* Release the map memory. */
 void turtle_map_destroy(struct turtle_map ** map)
 {
@@ -69,6 +99,61 @@ enum turtle_return turtle_map_dump(const struct turtle_map * map,
 		return map_dump_png(map, path);
 	else
 		return TURTLE_RETURN_BAD_EXTENSION;
+}
+
+/* Fill in a map node with an elevation value. */
+enum turtle_return turtle_map_fill(struct turtle_map * map, int ix, int iy,
+	double elevation)
+{
+	if (map == NULL)
+		return TURTLE_RETURN_MEMORY_ERROR;
+	else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny))
+		return TURTLE_RETURN_DOMAIN_ERROR;
+
+	if ((map->dz <= 0.) && (elevation != map->z0))
+		return TURTLE_RETURN_DOMAIN_ERROR;
+	const int iz = (int)((elevation-map->z0)/map->dz+0.5-FLT_EPSILON);
+	const int nz = (map->bit_depth == 8) ? 256 : 65536;
+	if ((iz < 0) || (iz >= nz))
+		return TURTLE_RETURN_DOMAIN_ERROR;
+
+	if (map->bit_depth == 8) {
+		unsigned char * z = (unsigned char *)map->z;
+		z[iy*map->nx+ix] = (unsigned char)iz;
+	}
+	else {
+		uint16_t * z = (uint16_t *)map->z;
+		z[iy*map->nx+ix] = (uint16_t)iz;
+	}
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Get the properties of a map node. */
+enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
+	int iy, double * x, double * y, double * elevation)
+{
+	if (map == NULL)
+		return TURTLE_RETURN_MEMORY_ERROR;
+	else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny))
+		return TURTLE_RETURN_DOMAIN_ERROR;
+
+	if (x != NULL)
+		*x = map->x0+ix*map->dx;
+	if (y != NULL)
+		*y = map->y0+iy*map->dy;
+	if (elevation != NULL) {
+		if (map->bit_depth == 8) {
+			unsigned char * z = (unsigned char *)map->z;
+			*elevation = map->z0+map->dz*z[iy*map->nx+ix];
+		}
+		else {
+			uint16_t * z = (uint16_t *)map->z;
+			*elevation = map->z0+map->dz*z[iy*map->nx+ix];
+		}
+	}
+
+	return TURTLE_RETURN_SUCCESS;
 }
 
 /* Interpolate the elevation at a given location. */
@@ -118,7 +203,7 @@ enum turtle_return turtle_map_info(const struct turtle_map * map,
 		box->y0 = map->y0+box->half_y;
 	}
 	if (zmin != NULL) *zmin = map->z0;
-	if (zmax != NULL) *zmax = map->z0+pow(2, map->bit_depth)*map->dz;
+	if (zmax != NULL) *zmax = map->z0+(pow(2, map->bit_depth)-1)*map->dz;
 
 	return TURTLE_RETURN_SUCCESS;
 }

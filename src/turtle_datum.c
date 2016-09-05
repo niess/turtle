@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 #include "turtle.h"
-#include "turtle_map.h"
 #include "turtle_datum.h"
 #include "geotiff16.h"
 

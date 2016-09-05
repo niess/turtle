@@ -62,11 +62,18 @@ enum turtle_return turtle_projection_unproject(
 	double x, double y, double * latitude, double * longitude);
 
 /* Routines for handling projection maps. */
+enum turtle_return turtle_map_create(const char * projection,
+	const struct turtle_box * box, int nx, int ny, double zmin,
+	double zmax, int bit_depth, struct turtle_map ** map);
+void turtle_map_destroy(struct turtle_map ** map);
 enum turtle_return turtle_map_load(const char * path,
 	const struct turtle_box * box, struct turtle_map ** map);
-void turtle_map_destroy(struct turtle_map ** map);
 enum turtle_return turtle_map_dump(const struct turtle_map * map,
 	const char * path);
+enum turtle_return turtle_map_fill(struct turtle_map * map, int ix, int iy,
+	double elevation);
+enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
+	int iy, double * x, double * y, double * elevation);
 enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 	double x, double y, double * elevation);
 const struct turtle_projection * turtle_map_projection(
@@ -79,9 +86,6 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 	turtle_datum_cb * lock, turtle_datum_cb * unlock,
 	struct turtle_datum ** datum);
 void turtle_datum_destroy(struct turtle_datum ** datum);
-enum turtle_return turtle_datum_project(struct turtle_datum * datum,
-	struct turtle_projection * projection, const struct turtle_box * box,
-	struct turtle_map ** map);
 void turtle_datum_clear(struct turtle_datum * datum);
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 	double latitude, double longitude, double * elevation);
@@ -95,9 +99,6 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
 enum turtle_return turtle_client_create(struct turtle_datum * datum,
 	struct turtle_client ** client);
 void turtle_client_destroy(struct turtle_client ** client);
-enum turtle_return turtle_client_project(struct turtle_client * client,
-	const char * projection, const struct turtle_box * box,
-	struct turtle_map ** map);
 enum turtle_return turtle_client_elevation(const struct turtle_client * client,
 	double latitude, double longitude, double * elevation);
 

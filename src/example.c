@@ -22,7 +22,6 @@ int main()
 	/* Check the RGF93 map. */
 	if ((rc = turtle_map_load("../turtle-data/LIDAR/pdd-2.5m-16b.png",
 		NULL, &map)) != TURTLE_RETURN_SUCCESS) RAISE_ERROR;
-
 	const struct turtle_projection * projection =
 		turtle_map_projection(map);
 	char * projection_tag;
