@@ -10,17 +10,17 @@ lib: lib/libturtle.so
 	@rm -f *.o
 
 clean:
-	@rm -rf example example-pthread lib *.o
+	@rm -rf example-* lib *.o
 
 lib/libturtle.so: $(OBJS)
 	@mkdir -p lib
 	@gcc -o $@ $(CFLAGS) -shared $(INC) $(OBJS) $(LIBS)
 
-example: src/example.c
-	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -lturtle
-
-example-pthread: src/example-pthread.c
+example-pthread: examples/example-pthread.c
 	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -lturtle -lpthread
+
+example-%: examples/example-%.c
+	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -lturtle
 
 %.o: src/%.c include/%.h
 	@gcc $(CFLAGS) $(INC) -o $@ -c $<
