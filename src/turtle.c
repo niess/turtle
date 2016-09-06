@@ -38,7 +38,10 @@ const char * turtle_strerror(enum turtle_return rc)
 		"Unknown projection",
 		"Bad XML header",
 		"Value is out of bound",
-		"Not enough memory"
+		"An internal error occured",
+		"Couldn't lock",
+		"Not enough memory",
+		"Couldn't unlock"
 	};
 
 	if ((rc < 0) || (rc >= N_TURTLE_RETURNS)) return NULL;

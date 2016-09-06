@@ -15,9 +15,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-/* Load functions for tiles. */
-enum turtle_return datum_load_tile(struct turtle_datum * datum, int latitude,
-	int longitude);
+/* Low level load function(s) for tiles. */
 static enum turtle_return load_gdem2(const char * path,
 	struct datum_tile ** tile);
 
@@ -27,6 +25,11 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 	struct turtle_datum ** datum)
 {
 	*datum = NULL;
+
+	/* Check the lock and unlock consistency. */
+	if (((lock == NULL) && (unlock != NULL)) ||
+		((unlock == NULL) && (lock != NULL)))
+		return TURTLE_RETURN_BAD_ADDRESS;
 
 	/* Check the data format. */
 	enum datum_format format = DATUM_FORMAT_NONE;
@@ -67,17 +70,42 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 }
 
 /* Destroy a datum and all its loaded tiles. */
-void turtle_datum_destroy(struct turtle_datum ** datum)
+enum turtle_return turtle_datum_destroy(struct turtle_datum ** datum)
 {
-	if ((datum == NULL) || (*datum == NULL)) return;
-	struct datum_tile * tile = (*datum)->stack;
-	while (tile != NULL) {
-		struct datum_tile * prev = tile->prev;
-		free(tile);
-		tile = prev;
-	}
+	if ((datum == NULL) || (*datum == NULL))
+		return TURTLE_RETURN_SUCCESS;
+
+	/* Clean the stack. */
+	enum turtle_return rc = turtle_datum_clear(*datum);
+	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	if ((*datum)->stack_size > 0)
+		return TURTLE_RETURN_MEMORY_ERROR;
+
+	/* Delete the datum and return. */
 	free(*datum);
 	*datum = NULL;
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
+/* Clear the datum's stack from unused tiles. */
+enum turtle_return turtle_datum_clear(struct turtle_datum * datum)
+{
+	if ((datum->lock != NULL) && (datum->lock() != 0))
+		return TURTLE_RETURN_LOCK_ERROR;
+
+	struct datum_tile * tile = datum->stack;
+	while (tile != NULL) {
+		struct datum_tile * current = tile;
+		tile = tile->prev;
+		if (current->clients == 0)
+			datum_tile_destroy(datum, current);
+	}
+
+	if ((datum->unlock != NULL) && (datum->unlock() != 0))
+		return TURTLE_RETURN_UNLOCK_ERROR;
+	else
+		return TURTLE_RETURN_SUCCESS;
 }
 
 /* Get the datum elevation at the given geodetic coordinates. */
@@ -108,15 +136,7 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 					 * Move the valid tile to the top
 					 * of the stack.
 					 */
-					struct datum_tile * prev =
-						tile->prev;
-					tile->next->prev = prev;
-					if (prev != NULL) prev->next =
-						tile->next;
-					stack->next = tile;
-					tile->prev = stack;
-					tile->next = NULL;
-					datum->stack = tile;
+					datum_tile_touch(datum, tile);
 					load = 0;
 					break;
 				}
@@ -129,7 +149,7 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 
 	if (load) {
 		/* No valid tile was found. Let's try to load it. */
-		enum turtle_return rc = datum_load_tile(datum, latitude,
+		enum turtle_return rc = datum_tile_load(datum, latitude,
 			longitude);
 		if (rc != TURTLE_RETURN_SUCCESS) return rc;
 
@@ -156,7 +176,7 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 }
 
 /* Get the parameters of the reference ellipsoid. */
-enum turtle_return get_ellipsoid(enum datum_format format, double * a,
+static enum turtle_return get_ellipsoid(enum datum_format format, double * a,
 	double * e)
 {
 	static const double A[N_DATUM_FORMATS] = {6378137.0};
@@ -240,16 +260,33 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
 	return TURTLE_RETURN_SUCCESS;
 }
 
-/* Create a projection map from a datum. */
-enum turtle_return turtle_datum_project(struct turtle_datum * datum,
-	struct turtle_projection * projection, const struct turtle_box * box,
-	struct turtle_map ** map)
+/* Move a tile to the top of the stack. */
+void datum_tile_touch(struct turtle_datum * datum, struct datum_tile * tile)
 {
-	return TURTLE_RETURN_SUCCESS;
+	if (tile->next == NULL) return; /* Already on top. */
+	struct datum_tile * prev = tile->prev;
+	tile->next->prev = prev;
+	if (prev != NULL) prev->next = tile->next;
+	datum->stack->next = tile;
+	tile->prev = datum->stack;
+	tile->next = NULL;
+	datum->stack = tile;
+}
+
+/* Remove a tile from the stack. */
+void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile)
+{
+	struct datum_tile * prev = tile->prev;
+	struct datum_tile * next = tile->next;
+	if (prev != NULL) prev->next = next;
+	if (next != NULL) next->prev = prev;
+	else datum->stack = prev;
+	free(tile);
+	datum->stack_size--;
 }
 
 /* Load a new tile and manage the stack. */
-enum turtle_return datum_load_tile(struct turtle_datum * datum, int latitude,
+enum turtle_return datum_tile_load(struct turtle_datum * datum, int latitude,
 	int longitude) {
 	if (datum->format == DATUM_FORMAT_ASTER_GDEM2) {
 		/* Format the path. */
@@ -269,24 +306,24 @@ enum turtle_return datum_load_tile(struct turtle_datum * datum, int latitude,
 		if (rc != TURTLE_RETURN_SUCCESS) return rc;
 
 		/* Initialise the new tile. */
+		tile->clients = 0;
 		tile->x0 = longitude;
 		tile->y0 = latitude;
 		tile->dx = (tile->nx > 1) ? 1./(tile->nx-1) : 0.;
 		tile->dy = (tile->ny > 1) ? 1./(tile->ny-1) : 0.;
 
 		/* Make room for the new tile, if needed. */
-		while (datum->stack_size >= datum->max_size) {
+		if (datum->stack_size >= datum->max_size) {
 			struct datum_tile * last = datum->stack;
 			while (last->prev != NULL)
 				last = last->prev;
-			if (last->next == NULL) {
-				datum->stack = NULL;
+			while ((last != NULL) && (datum->stack_size >=
+				datum->max_size)) {
+				struct datum_tile * current = last;
+				last = last->next;
+				if (current->clients == 0)
+					datum_tile_destroy(datum, current);
 			}
-			else {
-				last->next->prev = NULL;
-			}
-			free(last);
-			datum->stack_size--;
 		}
 
 		/* Append the new tile on top of the stack. */
@@ -305,7 +342,8 @@ enum turtle_return datum_load_tile(struct turtle_datum * datum, int latitude,
 }
 
 /* Load ASTER-GDEM2 data to a tile. */
-enum turtle_return load_gdem2(const char * path, struct datum_tile ** tile)
+static enum turtle_return load_gdem2(const char * path,
+	struct datum_tile ** tile)
 {
 	struct geotiff16_reader reader;
 	enum turtle_return rc = TURTLE_RETURN_SUCCESS;

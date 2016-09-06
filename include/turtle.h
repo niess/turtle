@@ -18,7 +18,10 @@ enum turtle_return {
 	TURTLE_RETURN_BAD_PROJECTION,
 	TURTLE_RETURN_BAD_XML,
 	TURTLE_RETURN_DOMAIN_ERROR,
+	TURTLE_RETURN_LIBRARY_ERROR,
+	TURTLE_RETURN_LOCK_ERROR,
 	TURTLE_RETURN_MEMORY_ERROR,
+	TURTLE_RETURN_UNLOCK_ERROR,
 	N_TURTLE_RETURNS
 };
 
@@ -39,7 +42,7 @@ struct turtle_box {
 /* User supplied callbacks for locking or unlocking critical sections for
  * multi-threaded applications.
  */
-typedef void (* turtle_datum_cb)(void);
+typedef int turtle_datum_cb(void);
 
 /* General library routines. */
 void turtle_initialise(void);
@@ -85,8 +88,8 @@ enum turtle_return turtle_map_info(const struct turtle_map * map,
 enum turtle_return turtle_datum_create(const char * path, int stack_size,
 	turtle_datum_cb * lock, turtle_datum_cb * unlock,
 	struct turtle_datum ** datum);
-void turtle_datum_destroy(struct turtle_datum ** datum);
-void turtle_datum_clear(struct turtle_datum * datum);
+enum turtle_return turtle_datum_destroy(struct turtle_datum ** datum);
+enum turtle_return turtle_datum_clear(struct turtle_datum * datum);
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 	double latitude, double longitude, double * elevation);
 enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
@@ -98,8 +101,9 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
 /* Routines for accessing a datum using a thread-safe client. */
 enum turtle_return turtle_client_create(struct turtle_datum * datum,
 	struct turtle_client ** client);
-void turtle_client_destroy(struct turtle_client ** client);
-enum turtle_return turtle_client_elevation(const struct turtle_client * client,
+enum turtle_return turtle_client_destroy(struct turtle_client ** client);
+enum turtle_return turtle_client_clear(struct turtle_client * client);
+enum turtle_return turtle_client_elevation(struct turtle_client * client,
 	double latitude, double longitude, double * elevation);
 
 #ifdef __cplusplus

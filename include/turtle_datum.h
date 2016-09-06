@@ -17,6 +17,7 @@ enum datum_format {
 struct datum_tile {
 	/* Meta data */
 	struct datum_tile * prev, * next;
+	int clients;
 
 	/* Map data. */
 	int nx, ny;
@@ -42,5 +43,11 @@ struct turtle_datum {
 	char * buffer;
 	char path[]; /* Placeholder for the path string. */
 };
+
+/* Tile utility routines. */
+void datum_tile_touch(struct turtle_datum * datum, struct datum_tile * tile);
+void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile);
+enum turtle_return datum_tile_load(struct turtle_datum * datum, int latitude,
+	int longitude);
 
 #endif

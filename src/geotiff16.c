@@ -46,6 +46,7 @@ static void default_directory(TIFF * tiff) {
 void geotiff16_register()
 {
 	parent_extender = TIFFSetTagExtender(default_directory);
+	TIFFSetErrorHandler(NULL); /* Mute error messages. */
 }
 
 int geotiff16_open(const char* path, struct geotiff16_reader * reader)
