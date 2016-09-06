@@ -202,16 +202,15 @@ enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 	return TURTLE_RETURN_SUCCESS;
 }
 
-const struct turtle_projection * turtle_map_projection(
-	const struct turtle_map * map)
+struct turtle_projection * turtle_map_projection(struct turtle_map * map)
 {
 	if (map == NULL) return NULL;
 	return &map->projection;
 }
 
 /* Get some basic information on a map. */
-enum turtle_return turtle_map_info(const struct turtle_map * map,
-	struct turtle_box * box, double * zmin, double * zmax)
+void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
+	int * nx, int * ny, double * zmin, double * zmax, int * bit_depth)
 {
 	if (box != NULL) {
 		box->half_x = 0.5*(map->nx-1)*map->dx;
@@ -219,10 +218,11 @@ enum turtle_return turtle_map_info(const struct turtle_map * map,
 		box->x0 = map->x0+box->half_x;
 		box->y0 = map->y0+box->half_y;
 	}
+	if (nx != NULL) *nx = map->nx;
+	if (ny != NULL) *ny = map->ny;
 	if (zmin != NULL) *zmin = map->z0;
 	if (zmax != NULL) *zmax = map->z0+(pow(2, map->bit_depth)-1)*map->dz;
-
-	return TURTLE_RETURN_SUCCESS;
+	if (bit_depth != NULL) *bit_depth = map->bit_depth;
 }
 
 static struct turtle_map * map_create(int nx, int ny, int bit_depth,
@@ -503,7 +503,7 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 	);
 	const char * tmp;
 	char * projection_tag;
-	const struct turtle_projection * projection = turtle_map_projection(map);
+	const struct turtle_projection * projection = &map->projection;
 	turtle_projection_info(projection, &projection_tag);
 	if (projection_tag == NULL)
 		tmp = "";

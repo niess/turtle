@@ -37,7 +37,8 @@ enum turtle_return turtle_client_create(struct turtle_datum * datum,
 {
 	/* Check that one has a valid datum. */
 	*client = NULL;
-	if (datum == NULL) return TURTLE_RETURN_DOMAIN_ERROR;
+	if ((datum == NULL) || (datum->lock == NULL))
+		return TURTLE_RETURN_BAD_ADDRESS;
 
 	/* Allocate the new client and initialise it. */
 	*client = malloc(sizeof(**client));

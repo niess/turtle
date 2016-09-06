@@ -1,0 +1,10 @@
+{
+ "name":   "TURTLE",
+ "github": "niess/turtle",
+ "input":  "include/turtle.h",
+ "output": "docs",
+ "prefix": "turtle_",
+ "branch": "docs-pages",
+ "examples": "examples",
+ "legacy": {"input": {"include": ["HEAD"]}}
+}
