@@ -3,6 +3,8 @@
  "github": "niess/turtle",
  "input":  "include/turtle.h",
  "output": "docs",
+ "favicon": "../favicon.ico",
+ "logo": ["../images/turtle-black.png", "../index.html"],
  "prefix": "turtle_",
  "branch": "docs-pages",
  "examples": "examples",
