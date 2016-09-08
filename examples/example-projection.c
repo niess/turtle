@@ -1,11 +1,25 @@
+/**
+ * This example shows how to project the global elevation data from ASTER-GDEM2
+ * onto a local map dumped to disk. It also illustrates the usage of an error
+ * handler.
+ */
+
+/* C89 standard library. */
 #include <stdlib.h>
 #include <stdio.h>
 
+/* The TURTLE API. */
 #include "turtle.h"
 
+/**
+ * The geodetic datum and the projection map handles are declared globally.
+ * This allows us to define a simple error handler with a gracefull exit to
+ * the OS.
+ */
 static struct turtle_datum * datum = NULL;
 static struct turtle_map * map = NULL;
 
+/* Clean all allocated data and exit to the OS. */
 void exit_gracefully(enum turtle_return rc)
 {
 	turtle_map_destroy(&map);
@@ -14,6 +28,7 @@ void exit_gracefully(enum turtle_return rc)
 	exit(rc);
 }
 
+/* User supplied error handler. */
 void error_handler(enum turtle_return rc, turtle_caller_t * caller)
 {
 	fprintf(stderr, "error in %s (%s) : %s.\n", __FILE__,
@@ -21,18 +36,27 @@ void error_handler(enum turtle_return rc, turtle_caller_t * caller)
 	exit_gracefully(rc);
 }
 
+/**
+ * Let's do the job now. First a `turtle_datum` is created in order to access
+ * the ASTER-GDEM2 data. Then we create an empty `turtle_map` for the projected
+ * elevation data. Following we loop over the map nodes and fill the elevation
+ * values from the datum. Finnaly the resulting map is dumped to disk.
+ *
+ * __Warning__
+ *
+ * For this example to work you'll need the `ASTGMT2_N45E002_dem.tif` elevation
+ * data tile to be located in a folder named `ASTGTM2`.
+ */
 int main()
 {
-	enum turtle_return rc;
-
 	/* Initialise the TURTLE API */
 	turtle_initialise(error_handler);
 
 	/* Create the datum for ASTER-GDEM2 elevation data. */
-	turtle_datum_create("../turtle-data/ASTGTM2", 4, NULL, NULL, &datum);
+	turtle_datum_create("../turtle-data/ASTGTM2", 1, NULL, NULL, &datum);
 
 	/*
-	 * Create the RGF93 local projection map, centered on the Auberge des
+	 * Create a RGF93 local projection map, centered on the Auberge des
 	 * Gros Manaux at Col de Ceyssat, Auvergne, France.
 	 */
 	const int nx = 201;
