@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "turtle.h"
+#include "turtle_return.h"
 #include "turtle_client.h"
 #include "turtle_datum.h"
 
@@ -38,11 +39,12 @@ enum turtle_return turtle_client_create(struct turtle_datum * datum,
 	/* Check that one has a valid datum. */
 	*client = NULL;
 	if ((datum == NULL) || (datum->lock == NULL))
-		return TURTLE_RETURN_BAD_ADDRESS;
+		TURTLE_RETURN(TURTLE_RETURN_BAD_ADDRESS, turtle_client_create);
 
 	/* Allocate the new client and initialise it. */
 	*client = malloc(sizeof(**client));
-	if (*client == NULL) return TURTLE_RETURN_MEMORY_ERROR;
+	if (*client == NULL)
+		TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_client_create);
 	(*client)->datum = datum;
 	(*client)->tile = NULL;
 
@@ -58,7 +60,8 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client)
 
 	/* Release any active tile. */
 	enum turtle_return rc = client_release(*client, 1);
-	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	if (rc != TURTLE_RETURN_SUCCESS)
+		TURTLE_RETURN(rc, turtle_client_destroy);
 
 	/* Free the memory and return. */
 	free(*client);
@@ -70,7 +73,7 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client)
 /* Clear the client's memory. */
 enum turtle_return turtle_client_clear(struct turtle_client * client)
 {
-	return client_release(client, 1);
+	TURTLE_RETURN(client_release(client, 1), turtle_client_clear);
 }
 
 /* Supervised access to the elevation data. */
@@ -95,7 +98,8 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
 	/* Lock the datum. */
 	struct turtle_datum * datum = client->datum;
 	if ((datum->lock != NULL) && (datum->lock() != 0))
-		return TURTLE_RETURN_LOCK_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_LOCK_ERROR,
+			turtle_client_elevation);
 	enum turtle_return rc = TURTLE_RETURN_SUCCESS;
 
 	/* The requested coordinates are not in the current tile. Let's check
@@ -134,10 +138,11 @@ update:
 	/* Unlock the datum. */
 unlock:
 	if ((datum->unlock != NULL) && (datum->unlock() != 0))
-		return TURTLE_RETURN_UNLOCK_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_UNLOCK_ERROR,
+			turtle_client_elevation);
 	if (rc != TURTLE_RETURN_SUCCESS) {
 		*elevation = 0.;
-		return rc;
+		TURTLE_RETURN(rc, turtle_client_elevation);
 	}
 
 	/* Interpolate the elevation. */

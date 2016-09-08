@@ -29,6 +29,7 @@
 #include <png.h>
 
 #include "turtle.h"
+#include "turtle_return.h"
 #include "turtle_map.h"
 #include "turtle_projection.h"
 
@@ -53,15 +54,17 @@ enum turtle_return turtle_map_create(const char * projection,
 
 	/* Check the input arguments. */
 	if ((nx <= 0) || (ny <= 0) || (zmin > zmax) || ((bit_depth != 8) &&
-		(bit_depth != 16))) return TURTLE_RETURN_DOMAIN_ERROR;
+		(bit_depth != 16))) TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR,
+		turtle_map_create);
 
 	struct turtle_projection proj;
 	enum turtle_return rc = turtle_projection_configure(projection, &proj);
-	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	if (rc != TURTLE_RETURN_SUCCESS) TURTLE_RETURN(rc, turtle_map_create);
 
 	/*  Allocate the memory for the new map and initialise it. */
 	*map = map_create(nx, ny, bit_depth, &proj);
-	if (*map == NULL) return TURTLE_RETURN_MEMORY_ERROR;
+	if (*map == NULL) TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR,
+		turtle_map_create);
 
 	(*map)->x0 = box->x0-fabs(box->half_x);
 	(*map)->y0 = box->y0-fabs(box->half_y);
@@ -96,12 +99,13 @@ enum turtle_return turtle_map_load(const char * path,
 {
 	/* Check the file extension. */
 	const char * ext = path_extension(path);
-	if (ext == NULL) return TURTLE_RETURN_BAD_EXTENSION;
+	if (ext == NULL) TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION,
+		turtle_map_load);
 
 	if (strcmp(ext, "png") == 0)
-		return map_load_png(path, box, map);
+		TURTLE_RETURN(map_load_png(path, box, map), turtle_map_load);
 	else
-		return TURTLE_RETURN_BAD_EXTENSION;
+		TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_load);
 }
 
 /* Save the map to disk. */
@@ -110,12 +114,13 @@ enum turtle_return turtle_map_dump(const struct turtle_map * map,
 {
 	/* Check the file extension. */
 	const char * ext = path_extension(path);
-	if (ext == NULL) return TURTLE_RETURN_BAD_EXTENSION;
+	if (ext == NULL) TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION,
+		turtle_map_dump);
 
 	if (strcmp(ext, "png") == 0)
-		return map_dump_png(map, path);
+		TURTLE_RETURN(map_dump_png(map, path), turtle_map_dump);
 	else
-		return TURTLE_RETURN_BAD_EXTENSION;
+		TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_dump);
 }
 
 /* Fill in a map node with an elevation value. */
@@ -123,16 +128,16 @@ enum turtle_return turtle_map_fill(struct turtle_map * map, int ix, int iy,
 	double elevation)
 {
 	if (map == NULL)
-		return TURTLE_RETURN_MEMORY_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_map_fill);
 	else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny))
-		return TURTLE_RETURN_DOMAIN_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_fill);
 
 	if ((map->dz <= 0.) && (elevation != map->z0))
-		return TURTLE_RETURN_DOMAIN_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_fill);
 	const int iz = (int)((elevation-map->z0)/map->dz+0.5-FLT_EPSILON);
 	const int nz = (map->bit_depth == 8) ? 256 : 65536;
 	if ((iz < 0) || (iz >= nz))
-		return TURTLE_RETURN_DOMAIN_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_fill);
 
 	if (map->bit_depth == 8) {
 		unsigned char * z = (unsigned char *)map->z;
@@ -151,9 +156,9 @@ enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
 	int iy, double * x, double * y, double * elevation)
 {
 	if (map == NULL)
-		return TURTLE_RETURN_MEMORY_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_map_node);
 	else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny))
-		return TURTLE_RETURN_DOMAIN_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_node);
 
 	if (x != NULL)
 		*x = map->x0+ix*map->dx;
@@ -183,7 +188,7 @@ enum turtle_return turtle_map_elevation(const struct turtle_map * map,
 	int iy = (int)hy;
 
 	if (ix >= map->nx-1 || hx < 0 || iy >= map->ny-1 || hy < 0)
-		return TURTLE_RETURN_DOMAIN_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_elevation);
 	hx -= ix;
 	hy -= iy;
 

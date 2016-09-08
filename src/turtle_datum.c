@@ -24,6 +24,7 @@
 #include <stdlib.h>
 
 #include "turtle.h"
+#include "turtle_return.h"
 #include "turtle_datum.h"
 #include "geotiff16.h"
 
@@ -46,7 +47,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 	/* Check the lock and unlock consistency. */
 	if (((lock == NULL) && (unlock != NULL)) ||
 		((unlock == NULL) && (lock != NULL)))
-		return TURTLE_RETURN_BAD_ADDRESS;
+		TURTLE_RETURN(TURTLE_RETURN_BAD_ADDRESS, turtle_datum_create);
 
 	/* Check the data format. */
 	enum datum_format format = DATUM_FORMAT_NONE;
@@ -64,12 +65,14 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 			break;
 		}
 	}
-	if (format == DATUM_FORMAT_NONE) return TURTLE_RETURN_BAD_FORMAT;
+	if (format == DATUM_FORMAT_NONE)
+		TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
 
 	/* Allocate the new datum handle. */
 	int n = strlen(path)+1;
 	*datum = malloc(sizeof(**datum)+n+buffer_size[format]);
-	if (*datum == NULL) return TURTLE_RETURN_MEMORY_ERROR;
+	if (*datum == NULL)
+		TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_datum_create);
 
 	/* Initialise the handle. */
 	(*datum)->stack = NULL;
@@ -94,9 +97,10 @@ enum turtle_return turtle_datum_destroy(struct turtle_datum ** datum)
 
 	/* Clean the stack. */
 	enum turtle_return rc = turtle_datum_clear(*datum);
-	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	if (rc != TURTLE_RETURN_SUCCESS)
+		TURTLE_RETURN(rc, turtle_datum_destroy);
 	if ((*datum)->stack_size > 0)
-		return TURTLE_RETURN_MEMORY_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_datum_destroy);
 
 	/* Delete the datum and return. */
 	free(*datum);
@@ -109,7 +113,7 @@ enum turtle_return turtle_datum_destroy(struct turtle_datum ** datum)
 enum turtle_return turtle_datum_clear(struct turtle_datum * datum)
 {
 	if ((datum->lock != NULL) && (datum->lock() != 0))
-		return TURTLE_RETURN_LOCK_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_LOCK_ERROR, turtle_datum_clear);
 
 	struct datum_tile * tile = datum->stack;
 	while (tile != NULL) {
@@ -120,7 +124,7 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum)
 	}
 
 	if ((datum->unlock != NULL) && (datum->unlock() != 0))
-		return TURTLE_RETURN_UNLOCK_ERROR;
+		TURTLE_RETURN(TURTLE_RETURN_UNLOCK_ERROR, turtle_datum_clear);
 	else
 		return TURTLE_RETURN_SUCCESS;
 }
@@ -168,7 +172,8 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 		/* No valid tile was found. Let's try to load it. */
 		enum turtle_return rc = datum_tile_load(datum, latitude,
 			longitude);
-		if (rc != TURTLE_RETURN_SUCCESS) return rc;
+		if (rc != TURTLE_RETURN_SUCCESS)
+			TURTLE_RETURN(rc, turtle_datum_elevation);
 
 		struct datum_tile * stack = datum->stack;
 		hx = (longitude-stack->x0)/stack->dx;
@@ -215,7 +220,8 @@ enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
 	/* Get the parameters of the reference ellipsoid. */
 	double a, e;
 	enum turtle_return rc = get_ellipsoid(datum->format, &a, &e);
-	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	if (rc != TURTLE_RETURN_SUCCESS)
+		TURTLE_RETURN(rc, turtle_datum_ecef);
 
 	/* Compute the Cartesian coordinates. */
 	const double s = sin(latitude*M_PI/180.);
@@ -240,7 +246,8 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
 	/* Get the parameters of the reference ellipsoid. */
 	double a, e;
 	enum turtle_return rc = get_ellipsoid(datum->format, &a, &e);
-	if (rc != TURTLE_RETURN_SUCCESS) return rc;
+	if (rc != TURTLE_RETURN_SUCCESS)
+		TURTLE_RETURN(rc, turtle_datum_geodetic);
 	const double b2 = a*a*(1.-e*e);
 	const double b = sqrt(b2);
 	const double eb2 = e*e*a*a/b2;

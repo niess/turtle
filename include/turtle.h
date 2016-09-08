@@ -88,6 +88,27 @@ struct turtle_box {
 	double half_y;
 };
 
+/** Generic function pointer.
+ * 
+ * This is a generic function pointer used to identify the library functions,
+ * e.g. for error handling.
+ */
+typedef void turtle_caller_t(void);
+
+/** Callback for error handling.
+ *
+ * @param rc        The TURTLE return code.
+ * @param caller    The caller function where the error occured.
+ *
+ * The user might provide its own error handler. It will be called at the
+ * return of any TURTLE library function providing an error code.
+ *
+ * __Warnings__
+ *
+ * This callback *must* be thread safe if a `turtle_client` is used.
+ */
+typedef void turtle_handler_cb(enum turtle_return rc, turtle_caller_t * caller);
+
 /** Callback for locking or unlocking critical sections.
  *
  * @return `0` on success, any other value otherwise.
@@ -96,22 +117,26 @@ struct turtle_box {
  * the user must supply a `lock` and `unlock` callback providing exclusive
  * access to critical sections, e.g. using a semaphore.
  *
- * **Warning** : the callback *must* return `0` if the (un)lock was successfull.
+ * __Warnings__
+ *
+ * The callback *must* return `0` if the (un)lock was successfull.
  */
 typedef int turtle_datum_cb(void);
 
 /**
  * Initialise the TURTLE library.
  *
+ * @param error_handler    A user supplied error_handler or NULL.
+ *
  * Initialise the library. Call `turtle_finalise` in order to unload the
- * library.
+ * library. Optionally, an error handler might be provided.
  *
  * __Warnings__
  *
  * This function is not thread safe. Trying to re-initialise an already
  * initialised library has unpredictable behaviour.
  */
-void turtle_initialise(void);
+void turtle_initialise(turtle_handler_cb * handler);
 
 /**
  * Finalise the TURTLE library.
@@ -132,6 +157,25 @@ void turtle_finalise(void);
  * TURTLE return codes. It is thread safe.
  */
 const char * turtle_strerror(enum turtle_return rc);
+
+/**
+ * Return a string describing a TURTLE library function.
+ * 
+ * This function is meant for verbosing when handling errors. It is thread
+ * safe. 
+ */
+const char * turtle_strfunc(turtle_caller_t * function);
+
+/**
+ * Setter for the library error handler.
+ *
+ * @param handler    The user supplied error handler.
+ * 
+ * This function allows to set or alter the error handler. Only one error
+ * handler can be set at a time for all threads. It is not thread safe
+ * to modify it.
+ */
+void turtle_handler(turtle_handler_cb * handler);
 
 /**
  * Create a new geographic projection.
