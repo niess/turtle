@@ -89,24 +89,29 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 	return TURTLE_RETURN_SUCCESS;
 }
 
-/* Destroy a datum and all its loaded tiles. */
-enum turtle_return turtle_datum_destroy(struct turtle_datum ** datum)
+/* Low level routine for cleaning the stack. */
+void datum_clear(struct turtle_datum * datum, int force)
 {
-	if ((datum == NULL) || (*datum == NULL))
-		return TURTLE_RETURN_SUCCESS;
+	struct datum_tile * tile = datum->stack;
+	while (tile != NULL) {
+		struct datum_tile * current = tile;
+		tile = tile->prev;
+		if ((force != 0) || (current->clients == 0))
+			datum_tile_destroy(datum, current);
+	}
+}
 
-	/* Clean the stack. */
-	enum turtle_return rc = turtle_datum_clear(*datum);
-	if (rc != TURTLE_RETURN_SUCCESS)
-		TURTLE_RETURN(rc, turtle_datum_destroy);
-	if ((*datum)->stack_size > 0)
-		TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_datum_destroy);
+/* Destroy a datum and all its loaded tiles. */
+void turtle_datum_destroy(struct turtle_datum ** datum)
+{
+	if ((datum == NULL) || (*datum == NULL)) return;
+
+	/* Force the stack cleaning. */
+	datum_clear(*datum, 1);
 
 	/* Delete the datum and return. */
 	free(*datum);
 	*datum = NULL;
-
-	return TURTLE_RETURN_SUCCESS;
 }
 
 /* Clear the datum's stack from unused tiles. */
@@ -115,13 +120,8 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum)
 	if ((datum->lock != NULL) && (datum->lock() != 0))
 		TURTLE_RETURN(TURTLE_RETURN_LOCK_ERROR, turtle_datum_clear);
 
-	struct datum_tile * tile = datum->stack;
-	while (tile != NULL) {
-		struct datum_tile * current = tile;
-		tile = tile->prev;
-		if (current->clients == 0)
-			datum_tile_destroy(datum, current);
-	}
+	/* Soft clean of the stack. */
+	datum_clear(datum, 0);
 
 	if ((datum->unlock != NULL) && (datum->unlock() != 0))
 		TURTLE_RETURN(TURTLE_RETURN_UNLOCK_ERROR, turtle_datum_clear);

@@ -89,7 +89,7 @@ struct turtle_box {
 };
 
 /** Generic function pointer.
- * 
+ *
  * This is a generic function pointer used to identify the library functions,
  * e.g. for error handling.
  */
@@ -160,9 +160,9 @@ const char * turtle_strerror(enum turtle_return rc);
 
 /**
  * Return a string describing a TURTLE library function.
- * 
+ *
  * This function is meant for verbosing when handling errors. It is thread
- * safe. 
+ * safe.
  */
 const char * turtle_strfunc(turtle_caller_t * function);
 
@@ -170,7 +170,7 @@ const char * turtle_strfunc(turtle_caller_t * function);
  * Setter for the library error handler.
  *
  * @param handler    The user supplied error handler.
- * 
+ *
  * This function allows to set or alter the error handler. Only one error
  * handler can be set at a time for all threads. It is not thread safe
  * to modify it.
@@ -525,7 +525,7 @@ void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
  * Create a new geodetic datum.
  *
  * @param path          The path where elevation data are stored.
- * @param stack_size    The number of elevation tiles kept in memory.
+ * @param stack_size    The number of elevation data tiles kept in memory.
  * @param lock          A callback for locking critical sections, or `NULL`.
  * @param unlock        A callback for unlocking critical sections, or `NULL`.
  * @param datum         A handle to the datum.
@@ -567,31 +567,26 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
  * Destroy a gedodetic datum.
  *
  * @param datum    A handle to the datum.
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below.
  *
- * Attempts to fully destroy a datum and all its allocated tiles. On a
- * successfull return `datum` is set to `NULL`.
+ * Fully destroy a datum and all its allocated elevation data. On return
+ * `datum` is set to `NULL`.
  *
- * __Error codes__
+ * __Warnings__
  *
- *    TURTLE_RETURN_LOCK_ERROR      The lock couldn't be acquired.
- *
- *    TURTLE_RETURN_MEMORY_ERROR    There are some tiles left in the stack,
- * e.g. reserved by turtle_client's.
- *
- *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
+ * This method is not thread safe. All clients should have been destroyed or
+ * disabled first.
  */
-enum turtle_return turtle_datum_destroy(struct turtle_datum ** datum);
+void turtle_datum_destroy(struct turtle_datum ** datum);
 
 /**
- * Clear the stack of tiles with elevation data.
+ * Clear the stack of elevation data.
  *
  * @param datum    A handle to the datum.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
- * Clear the stack from any tile not currently reserved by a `turtle_client`.
+ * Clear the stack from any elevation data not currently reserved by a
+ * `turtle_client`.
  *
  * __Error codes__
  *

@@ -27,7 +27,6 @@
 /* Storage for thread specific data. */
 struct thread_data {
 	pthread_t tid;
-	enum turtle_return rc;
 	double latitude_0;
 	double longitude_0;
 	double latitude_1;
@@ -67,11 +66,12 @@ int unlock(void)
  */
 static void * run_thread(void * args)
 {
+	/* Unpack arguments and create the client. */
 	struct thread_data * data = (struct thread_data *)args;
-	struct turtle_client * client = NULL;
-	enum turtle_return rc = turtle_client_create(datum, &client);
-	if (rc != TURTLE_RETURN_SUCCESS) goto clean_and_exit;
+	struct turtle_client * client;
+	turtle_client_create(datum, &client);
 
+	/* Step along the track. */
 	const int n = 1001;
 	int i;
 	for (i = 0; i < n; i++) {
@@ -80,30 +80,41 @@ static void * run_thread(void * args)
 		const double longitude = data->longitude_0+(i*(data->longitude_1
 			-data->longitude_0))/(n-1);
 		double elevation;
-		rc = turtle_client_elevation(client, latitude, longitude,
+		turtle_client_elevation(client, latitude, longitude,
 			&elevation);
-		if (rc != TURTLE_RETURN_SUCCESS) goto clean_and_exit;
 		fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n", (long)data->tid,
 			latitude, longitude, elevation);
 	}
 
-clean_and_exit:
-	data->rc = rc;
+	/* Clean and exit. */
 	turtle_client_destroy(&client);
 	pthread_exit(0);
 }
 
 /**
  * Finally the threads are spawned in the main function after various
- * initialisation. The datum uses ASTER-GDEM2 elevation data. For this example
- * to work, you'll need to extract the 4 tiles: `ASTGMT2_N45E002_dem.tif`,
- * `ASTGMT2_N45E003_dem.tif`, `ASTGMT2_N46E002_dem.tif` and
- * `ASTGMT2_N46E003_dem.tif`, to a folder named ASTGMT2.
+ * initialisation. For this example to work, you'll need to get the
+ * ASTER-GDEM2 elevation data for the following 4 tiles:
+ *
+ *     * ASTGMT2_N45E002_dem.tif
+ *     * ASTGMT2_N45E003_dem.tif
+ *     * ASTGMT2_N46E002_dem.tif
+ *     * ASTGMT2_N46E003_dem.tif
+ *
+ * The tiles should be extracted to a folder named ASTGMT2.
  *
  * **Note** that since there are only 4 tiles that can be accessed, setting the
  * datum `stack_size` to 4 or more will result in speed up since then there is
  * no need to switch, i.e. unload and reload, tiles between threads.
  */
+/* A basic error handler with an abrupt exit(). */
+void error_handler(enum turtle_return rc, turtle_caller_t * caller)
+{
+	fprintf(stderr, "error in %s (%s) : %s.\n", __FILE__,
+		turtle_strfunc(caller), turtle_strerror(rc));
+	pthread_exit(0);
+}
+
 /* Draw a random number uniformly in [0;1] using the standard C library. */
 static double uniform(void)
 {
@@ -114,16 +125,12 @@ int main()
 {
 	/* Initialise the semaphore, the TURTLE library and the datum. */
 	sem_init(&semaphore, 0, 1);
-	turtle_initialise();
-	enum turtle_return rc = turtle_datum_create(
+	turtle_initialise(error_handler);
+	turtle_datum_create(
 		"../turtle-data/ASTGTM2", /* <= The elevation data folder. */
 		2,                        /* <= The stack size for tiles.  */
 		lock, unlock,             /* <= The lock/unlock callbacks. */
 		&datum);
-	if (rc != TURTLE_RETURN_SUCCESS) {
-		fprintf(stderr, "%s\n", turtle_strerror(rc));
-		goto clean_and_exit;
-	}
 
 	/*
 	 * Create the client threads and initialise the thread specific data
@@ -152,16 +159,11 @@ int main()
 	for (i = 0; i < N_THREADS; i++) {
 		if (pthread_join(data[i].tid, NULL) != 0)
 			goto clean_and_exit;
-		if (data[i].rc != TURTLE_RETURN_SUCCESS)
-			fprintf(stderr, "[%ld] %s\n", (long)data[i].tid,
-				turtle_strerror(data[i].rc));
 	}
 
-	/* Finalise the semaphore and TURTLE. */
+	/* Finalise TURTLE and the semaphore. */
 clean_and_exit:
-	rc = turtle_datum_destroy(&datum);
-	if (rc != TURTLE_RETURN_SUCCESS)
-		fprintf(stderr, "%s\n", turtle_strerror(rc));
+	turtle_datum_destroy(&datum);
 	turtle_finalise();
 	sem_destroy(&semaphore);
 	pthread_exit(0);
