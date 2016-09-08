@@ -20,12 +20,20 @@
 #define N_THREADS 16
 
 /**
- * The thread specific data are stored in a dedicated structure. Each thread
- * will track the elevation data along a randomly generated line going from
+ * First let's implements the threaded task and some storage for its input
+ * parameters. Each thread's task instanciates its own client in order to
+ * concurrently access the datum elevation data. Then the client is used to
+ * estimate the elevation at successive steps along a line going from
  * `(latitude_0, longitude_0)` to `(latitude_1, longitude_1)`.
+ *
+ * *Note* that the geodetic datum is declared as a global static variable,
+ * to be seen by all threads/clients.
  */
-/* Storage for thread specific data. */
-struct thread_data {
+/* Handle for the datum. */
+struct turtle_datum * datum = NULL;
+
+/* Storage for the thread input parameters. */
+struct thread_parameters {
 	pthread_t tid;
 	double latitude_0;
 	double longitude_0;
@@ -33,16 +41,38 @@ struct thread_data {
 	double longitude_1;
 };
 
-/**
- * The geodetic datum is declared as a global static variable, to be seen
- * by all threads/clients.
- */
-/* Handle for the datum. */
-struct turtle_datum * datum = NULL;
+/* The thread `run` function. */
+static void * run_thread(void * args)
+{
+	/* Unpack arguments and create the client. */
+	struct thread_parameters * params = (struct thread_parameters *)args;
+	struct turtle_client * client;
+	turtle_client_create(datum, &client);
+
+	/* Step along the track. */
+	const int n = 1001;
+	int i;
+	for (i = 0; i < n; i++) {
+		const double latitude = params->latitude_0+(i*(
+			params->latitude_1-params->latitude_0))/(n-1);
+		const double longitude = params->longitude_0+(i*(
+			params->longitude_1-params->longitude_0))/(n-1);
+		double elevation;
+		turtle_client_elevation(client, latitude, longitude,
+			&elevation);
+		fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n",
+			(long)params->tid, latitude, longitude, elevation);
+	}
+
+	/* Clean and exit. */
+	turtle_client_destroy(&client);
+	pthread_exit(0);
+}
 
 /**
- * In order to lock critical sections a semaphore is used. The lock and
- * unlock callbacks simply encapsulate the sem_wait and sem_post functions.
+ * Then we need to provide some locking mechanism to TURTLE in order to protect
+ * critical sections. That for a semaphore is used. The TURTLE lock and unlock
+ * callbacks simply encapsulate the sem_wait and sem_post functions.
  */
 /* Semaphore for locking critical sections. */
 static sem_t semaphore;
@@ -60,46 +90,14 @@ int unlock(void)
 }
 
 /**
- * The following implements a threaded task. Each thread instanciates its own
- * client in order to concurrently access the datum elevation data. Then the
- * client is used to estimate the elevation at successive steps along a line.
- */
-static void * run_thread(void * args)
-{
-	/* Unpack arguments and create the client. */
-	struct thread_data * data = (struct thread_data *)args;
-	struct turtle_client * client;
-	turtle_client_create(datum, &client);
-
-	/* Step along the track. */
-	const int n = 1001;
-	int i;
-	for (i = 0; i < n; i++) {
-		const double latitude = data->latitude_0+(i*(data->latitude_1-
-			data->latitude_0))/(n-1);
-		const double longitude = data->longitude_0+(i*(data->longitude_1
-			-data->longitude_0))/(n-1);
-		double elevation;
-		turtle_client_elevation(client, latitude, longitude,
-			&elevation);
-		fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n", (long)data->tid,
-			latitude, longitude, elevation);
-	}
-
-	/* Clean and exit. */
-	turtle_client_destroy(&client);
-	pthread_exit(0);
-}
-
-/**
  * Finally the threads are spawned in the main function after various
  * initialisation. For this example to work, you'll need to get the
  * ASTER-GDEM2 elevation data for the following 4 tiles:
  *
- *     * ASTGMT2_N45E002_dem.tif
- *     * ASTGMT2_N45E003_dem.tif
- *     * ASTGMT2_N46E002_dem.tif
- *     * ASTGMT2_N46E003_dem.tif
+ * * `ASTGMT2_N45E002_dem.tif`
+ * * `ASTGMT2_N45E003_dem.tif`
+ * * `ASTGMT2_N46E002_dem.tif`
+ * * `ASTGMT2_N46E003_dem.tif`
  *
  * The tiles should be extracted to a folder named ASTGMT2.
  *
@@ -121,6 +119,7 @@ static double uniform(void)
 	return ((double)rand())/RAND_MAX;
 }
 
+/* The main function, spawning the threads. */
 int main()
 {
 	/* Initialise the semaphore, the TURTLE library and the datum. */
@@ -136,28 +135,28 @@ int main()
 	 * Create the client threads and initialise the thread specific data
 	 * randomly.
 	 */
-	struct thread_data data[N_THREADS];
+	struct thread_parameters params[N_THREADS];
 	int i;
 	for (i = 0; i < N_THREADS; i++) {
 		if (uniform() <= 0.5) {
-			data[i].latitude_0 = 45.;
-			data[i].latitude_1 = 47.;
-			data[i].longitude_0 = 2.+2.*uniform();
-			data[i].longitude_1 = 2.+2.*uniform();
+			params[i].latitude_0 = 45.;
+			params[i].latitude_1 = 47.;
+			params[i].longitude_0 = 2.+2.*uniform();
+			params[i].longitude_1 = 2.+2.*uniform();
 		}
 		else {
-			data[i].latitude_0 = 45.+2.*uniform();
-			data[i].latitude_1 = 45.+2.*uniform();
-			data[i].longitude_0 = 2.;
-			data[i].longitude_1 = 4.;
+			params[i].latitude_0 = 45.+2.*uniform();
+			params[i].latitude_1 = 45.+2.*uniform();
+			params[i].longitude_0 = 2.;
+			params[i].longitude_1 = 4.;
 		}
-		if (pthread_create(&(data[i].tid), NULL, run_thread, data+i)
+		if (pthread_create(&(params[i].tid), NULL, run_thread, params+i)
 			!= 0) goto clean_and_exit;
 	}
 
 	/* Wait for all threads to finish. */
 	for (i = 0; i < N_THREADS; i++) {
-		if (pthread_join(data[i].tid, NULL) != 0)
+		if (pthread_join(params[i].tid, NULL) != 0)
 			goto clean_and_exit;
 	}
 

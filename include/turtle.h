@@ -88,14 +88,16 @@ struct turtle_box {
 	double half_y;
 };
 
-/** Generic function pointer.
+/**
+ * Generic function pointer.
  *
  * This is a generic function pointer used to identify the library functions,
  * e.g. for error handling.
  */
 typedef void turtle_caller_t(void);
 
-/** Callback for error handling.
+/**
+ * Callback for error handling.
  *
  * @param rc        The TURTLE return code.
  * @param caller    The caller function where the error occured.
@@ -109,7 +111,8 @@ typedef void turtle_caller_t(void);
  */
 typedef void turtle_handler_cb(enum turtle_return rc, turtle_caller_t * caller);
 
-/** Callback for locking or unlocking critical sections.
+/**
+ * Callback for locking or unlocking critical sections.
  *
  * @return `0` on success, any other value otherwise.
  *

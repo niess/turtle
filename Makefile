@@ -4,13 +4,15 @@ LIBS := -lm -ltiff $(shell pkg-config --libs $(PACKAGES))
 INC := -Iinclude
 OBJS := turtle.o turtle_projection.o turtle_map.o turtle_datum.o turtle_client.o geotiff16.o
 
-.PHONY: lib clean
+.PHONY: lib clean examples
 
 lib: lib/libturtle.so
 	@rm -f *.o
 
 clean:
 	@rm -rf example-* lib *.o
+
+examples: example-demo example-projection example-pthread
 
 lib/libturtle.so: $(OBJS)
 	@mkdir -p lib

@@ -1,7 +1,6 @@
 /**
  * This example shows how to project the global elevation data from ASTER-GDEM2
- * onto a local map dumped to disk. It also illustrates the usage of an error
- * handler.
+ * onto a local map dumped to disk.
  */
 
 /* C89 standard library. */
