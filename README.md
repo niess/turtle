@@ -28,5 +28,4 @@ to C99 however for loading or dumping some **DEM**s, you will need the following
 The API documentation can be found [here](https://niess.github.io/turtle/docs/index.html#HEAD), as well as some basic examples of usage.
 
 ## License
-The TURTLE library is  under the **GPL v2.0** license. See the provided
-`LICENSE` file.
+The TURTLE library is  under the **GPL-3.0** license. See the provided `LICENSE` file.
