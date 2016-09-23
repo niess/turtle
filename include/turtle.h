@@ -669,6 +669,54 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
 	double * elevation);
 
 /**
+ * Transform horizontal coorrdinates to a cartesian direction in ECEF.
+ *
+ * @param datum        A handle to the datum.
+ * @param latitude     The geodetic latitude.
+ * @param longitude    The geodetic longitude.
+ * @param azimuth      The geographic azimuth angle.
+ * @param elevation    The geographic elevation angle.
+ * @param direction    The corresponding direction in ECEF coordinates.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Transform horizontal coordinates to a Cartesian direction in the
+ * Earth-Centered, Earth-Fixed (ECEF) frame.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
+ */
+enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
+	double latitude, double longitude, double azimuth, double elevation,
+	double direction[3]);
+
+/**
+ * Transform a cartesian direction in ECEF to horizontal coorrdinates.
+ *
+ * @param datum        A handle to the datum.
+ * @param latitude     The geodetic latitude.
+ * @param longitude    The geodetic longitude.
+ * @param direction    The direction vector in ECEF coordinates.
+ * @param azimuth      The corresponding geographic azimuth.
+ * @param elevation    The corresponding geographic elevation.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Transform a Cartesian direction vector in the Earth-Centered, Earth-Fixed
+ * (ECEF) frame to horizontal coordinates.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_BAD_FORMAT     The data source is not supported.
+ *
+ *    TURTLE_RETURN_DOMAIN_ERROR   The direction has a null norm.
+ */
+enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
+	double latitude, double longitude, double direction[3],
+	double * azimuth, double * elevation);
+
+/**
  * Create a new client for a geodetic datum.
  *
  * @param datum     The master geodetic datum.

@@ -143,6 +143,18 @@ int main()
 	printf("    + ASTER-GDEM2  : (%.2lf, %.2lf, %.2lf)\n",
 		ecef[0], ecef[1], ecef[2]);
 
+
+	double azimuth = 26., elevation = 20.;
+	double direction[3];
+	turtle_datum_direction(datum, latitude, longitude, azimuth, elevation,
+		direction);
+
+	printf("o) The Puy de Dome summit is along:\n");
+	printf("    + Az-El        : (%.1lf, %.1lf) [deg]\n",
+		azimuth, elevation);
+	printf("    + ECEF         : (%.8lg, %.8lg, %.8lg)\n",
+		direction[0], direction[1], direction[2]);
+
 	/* Finalise and exit to the OS. */
 	turtle_map_destroy(&map);
 	turtle_datum_destroy(&datum);

@@ -284,6 +284,87 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
 	return TURTLE_RETURN_SUCCESS;
 }
 
+/* Compute the local East, North, Up (ENU) basis vectors. .
+ *
+ * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system.
+ */
+static inline void compute_enu(double latitude, double longitude, double e[3],
+	double n[3], double u[3])
+{
+	const double lambda = longitude*M_PI/180.;
+	const double phi = latitude*M_PI/180.;
+	const double sl = sin(lambda);
+	const double cl = cos(lambda);
+	const double sp = sin(phi);
+	const double cp = cos(phi);
+	e[0] = -sl;
+	e[1] = cl;
+	e[2] = 0.;
+	n[0] = -cl*sp;
+	n[1] = -sl*sp;
+	n[2] = cp;
+	u[0] = cl*cp;
+	u[1] = sl*cp;
+	u[2] = sp;
+}
+
+/* Compute the direction vector in ECEF from the horizontal coordinates.
+ *
+ * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system.
+ */
+enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
+	double latitude, double longitude, double azimuth, double elevation,
+	double direction[3])
+{
+	/* Sanity check. */
+	if ((datum->format < 0) || (datum->format >= N_DATUM_FORMATS))
+		TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT, turtle_datum_direction);
+
+	/* Compute the local E, N, U basis vectors. */
+	double e[3], n[3], u[3];
+	compute_enu(latitude, longitude, e, n, u);
+
+	/* Project on the E,N,U basis. */
+	const double az = azimuth*M_PI/180.;
+	const double el = elevation*M_PI/180.;
+	const double ce = cos(el);
+	const double r[3] = {ce*sin(az), ce*cos(az), sin(el)};
+
+	direction[0] = r[0]*e[0]+r[1]*n[0]+r[2]*u[0];
+	direction[1] = r[0]*e[1]+r[1]*n[1]+r[2]*u[1];
+	direction[2] = r[0]*e[2]+r[1]*n[2]+r[2]*u[2];
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
+enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
+	double latitude, double longitude, double direction[3],
+	double * azimuth, double * elevation)
+{
+	/* Sanity check. */
+	if ((datum->format < 0) || (datum->format >= N_DATUM_FORMATS))
+		TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT,
+		turtle_datum_horizontal);
+
+	/* Compute the local E, N, U basis vectors. */
+	double e[3], n[3], u[3];
+	compute_enu(latitude, longitude, e, n, u);
+
+	/* Project on the E,N,U basis. */
+	const double x = e[0]*direction[0]+e[1]*direction[1]+e[2]*direction[2];
+	const double y = n[0]*direction[0]+n[1]*direction[1]+n[2]*direction[2];
+	const double z = u[0]*direction[0]+u[1]*direction[1]+u[2]*direction[2];
+	double r = direction[0]*direction[0]+direction[1]*direction[1]+
+		direction[2]*direction[2];
+	if (r <= 0.) TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR,
+		turtle_datum_horizontal);
+	r = sqrt(r);
+	*azimuth = atan2(x, y)*180./M_PI;
+	*elevation = asin(z/r)*180./M_PI;
+
+	return TURTLE_RETURN_SUCCESS;
+}
+
 /* Move a tile to the top of the stack. */
 void datum_tile_touch(struct turtle_datum * datum, struct datum_tile * tile)
 {
