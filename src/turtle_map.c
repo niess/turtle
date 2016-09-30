@@ -276,7 +276,7 @@ static enum turtle_return map_load_png(const char* path,
 	/* Open the file and check the format. */
 	fid = fopen(path, "rb");
 	if (fid == NULL) {
-		rc = TURTLE_RETURN_BAD_PATH;
+		rc = TURTLE_RETURN_PATH_ERROR;
 		goto error;
 	}
 
@@ -486,7 +486,7 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 	if ((map->bit_depth != 8) && (map->bit_depth != 16)) goto exit;
 
 	/* Initialise the file and the PNG pointers. */
-	rc = TURTLE_RETURN_BAD_PATH;
+	rc = TURTLE_RETURN_PATH_ERROR;
 	fid = fopen(path, "wb+");
 	if (fid == NULL) goto exit;
 

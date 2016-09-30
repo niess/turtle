@@ -58,11 +58,11 @@ const char * turtle_strerror(enum turtle_return rc)
 		"Bad address",
 		"Bad file extension",
 		"Bad file format",
-		"No such file or directory",
 		"Unknown projection",
 		"Bad XML header",
 		"Value is out of bound",
 		"An internal error occured",
+		"No such file or directory",
 		"Couldn't lock",
 		"Not enough memory",
 		"Couldn't unlock"

@@ -34,8 +34,6 @@ enum turtle_return {
 	TURTLE_RETURN_BAD_EXTENSION,
 	/** A provided file or string has a wrong format. */
 	TURTLE_RETURN_BAD_FORMAT,
-	/** A provided path wasn't found. */
-	TURTLE_RETURN_BAD_PATH,
 	/** A provided `turtle_projection` is not supported. */
 	TURTLE_RETURN_BAD_PROJECTION,
 	/** A provided XML section was not understood. */
@@ -48,6 +46,8 @@ enum turtle_return {
 	TURTLE_RETURN_LOCK_ERROR,
 	/** Some meory couldn't be allocated. */
 	TURTLE_RETURN_MEMORY_ERROR,
+	/** A provided path wasn't found. */
+	TURTLE_RETURN_PATH_ERROR,
 	/** A lock couldn't be released. */
 	TURTLE_RETURN_UNLOCK_ERROR,
 	/** The number of TURTLE error codes. */

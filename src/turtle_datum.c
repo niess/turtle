@@ -456,7 +456,7 @@ static enum turtle_return load_gdem2(const char * path,
 
 	/* Open the geotiff16 file. */
 	if (geotiff16_open(path, &reader) != 0)
-		return TURTLE_RETURN_BAD_PATH;
+		return TURTLE_RETURN_PATH_ERROR;
 
 	/* Allocate the map. */
 	*tile = malloc(sizeof(**tile)+
