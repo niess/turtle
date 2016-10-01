@@ -38,8 +38,6 @@ static struct turtle_map * map_create(int nx, int ny, int bit_depth,
 	const struct turtle_projection * projection);
 
 /* Low level data loaders/dumpers. */
-static struct turtle_map * map_load_gdem2(const char * datum_path,
-	const char * projection, const struct turtle_box * box);
 static enum turtle_return map_load_png(const char * path,
 	const struct turtle_box * box, struct turtle_map ** map);
 static enum turtle_return map_dump_png(const struct turtle_map * map,
@@ -316,7 +314,6 @@ static enum turtle_return map_load_png(const char* path,
 		int i = 0;
 		png_text* p = text_ptr;
 		for(; i < num_text; i++) {
-			const char* key = p->key;
 			const char* text = p->text;
 			unsigned int length = p->text_length;
 			p++;
