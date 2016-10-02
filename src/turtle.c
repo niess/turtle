@@ -19,7 +19,6 @@
 /*
  * General purpose routines for the Turtle C library.
  */
-#include <libxml/parser.h>
 
 #include "turtle.h"
 #include "turtle_return.h"
@@ -34,21 +33,14 @@ void turtle_initialise(turtle_handler_cb * handler)
 	/* Set any user supplied error handler. */
 	turtle_handler(handler);
 
-	/* Initialise the libxml2 parser. */
-	xmlInitParser();
-
 	/* Register the geotiff16 tags. */
 	geotiff16_register();
 }
 
-/* Clear the TURTLE interface. BEWARE: due to libxml2 this function must
- * be called only once.
+/* Clear the TURTLE interface.
  */
 void turtle_finalise(void)
-{
-	/* Clear remanent XML paser data. */
-	xmlCleanupParser();
-}
+{}
 
 /* Get a return code as a string. */
 const char * turtle_strerror(enum turtle_return rc)
@@ -59,7 +51,7 @@ const char * turtle_strerror(enum turtle_return rc)
 		"Bad file extension",
 		"Bad file format",
 		"Unknown projection",
-		"Bad XML header",
+		"Bad JSON header",
 		"Value is out of bound",
 		"An internal error occured",
 		"Couldn't lock",

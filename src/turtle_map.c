@@ -25,8 +25,8 @@
 #include <string.h>
 
 #include <arpa/inet.h>
-#include <libxml/tree.h>
 #include <png.h>
+#include "jsmn.h"
 
 #include "turtle.h"
 #include "turtle_return.h"
@@ -249,14 +249,16 @@ static struct turtle_map * map_create(int nx, int ny, int bit_depth,
 	return map;
 }
 
-static const char * get_node_content(xmlNode * node)
+static inline int json_strcmp(const char * json, jsmntok_t * token,
+	const char * string)
 {
-	xmlNode * subnode;
-	for (subnode = node->children; subnode != NULL;
-		subnode=subnode->next) if (subnode->type == XML_TEXT_NODE) {
-		return (const char *)subnode->content;
-	}
-	return NULL;
+	return strncmp(json+token->start, string, token->end-token->start);
+}
+
+static inline int json_sscanf(const char * json, jsmntok_t * token,
+	double * value)
+{
+	return sscanf(json+token->start, "%lf", value);
 }
 
 static enum turtle_return map_load_png(const char* path,
@@ -303,8 +305,8 @@ static enum turtle_return map_load_png(const char* path,
 	ny = png_get_image_height(png_ptr, info_ptr);
 	png_read_update_info(png_ptr, info_ptr);
 
-	/* Parse the XML meta data. */
-	rc = TURTLE_RETURN_BAD_XML;
+	/* Parse the JSON meta data. */
+	rc = TURTLE_RETURN_BAD_JSON;
 	double x0 = 0., y0 = 0., z0 = 0., dx = 1., dy = 1., dz = 1.;
 	png_textp text_ptr;
 	int num_text;
@@ -314,60 +316,92 @@ static enum turtle_return map_load_png(const char* path,
 		int i = 0;
 		png_text* p = text_ptr;
 		for(; i < num_text; i++) {
-			const char* text = p->text;
+			char * text = p->text;
 			unsigned int length = p->text_length;
 			p++;
 
-			xmlDocPtr doc = NULL;
-			doc = xmlReadMemory(text, length, "noname.xml", NULL,
-				XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
-			if (doc == NULL) goto xml_end;
-			xmlNode * root = xmlDocGetRootElement(doc);
-			if (root == NULL) goto xml_end;
-			if (strcmp((const char *)root->name, "topography")
-				!= 0) goto xml_end;
+			/* Map all the tokens with JSMN. */
+			jsmn_parser parser;
+#define	N_TOKENS 17
+			jsmntok_t tokens[N_TOKENS];
+			jsmn_init(&parser);
+			const int r = jsmn_parse(&parser, text, length, tokens,
+				N_TOKENS);
+			if (r < N_TOKENS) continue;
 
-			xmlNode * node;
-			for (node = root->children; node != NULL;
-				node = node->next) if ((node->type ==
-				XML_ELEMENT_NODE) && (node->name != NULL) &&
-				(node->children != NULL)) {
-				const char * name = (const char *)node->name;
-				if (strcmp(name, "projection") == 0) {
-					const char * content =
-						get_node_content(node);
+			/* Check for a "topography" object. */
+			if ((tokens[0].type != JSMN_OBJECT) ||
+				(tokens[1].type != JSMN_STRING)) continue;
+			if (json_strcmp(text, tokens+1, "topography") != 0)
+				continue;
+#define	N_FIELDS 7
+			if ((tokens[2].type != JSMN_OBJECT) ||
+				(tokens[2].size != N_FIELDS)) goto error;
+
+			/* Parse the "topography" fields. */
+			int j, done[N_FIELDS];
+			jsmntok_t * key, * value;
+			memset(done, 0x0, sizeof(done));
+			for (j = 0, key = tokens+3, value = tokens+4;
+				j < N_FIELDS; j++, key += 2, value += 2) {
+				if (key->type != JSMN_STRING) goto error;
+				if (!done[0] && (json_strcmp(text, key,
+					"projection") == 0)) {
+					if (value->type != JSMN_STRING)
+						goto error;
+					text[value->end] = '\0';
 					if ((rc = turtle_projection_configure(
-						content, &projection)) !=
-						TURTLE_RETURN_SUCCESS)
+						text+value->start, &projection))
+						!= TURTLE_RETURN_SUCCESS)
+						goto error;
+					rc = TURTLE_RETURN_BAD_JSON;
+					done[0] = 1;
+				}
+				else {
+					if (value->type != JSMN_PRIMITIVE)
 						goto error;
 
+					if (!done[1] && (json_strcmp(text,
+						key, "x0") == 0)) {
+						if (json_sscanf(text, value,
+							&x0) != 1) goto error;
+						done[1] = 1;
+					}
+					else if (!done[2] && (json_strcmp(text,
+						key, "y0") == 0)) {
+						if (json_sscanf(text, value,
+							&y0) != 1) goto error;
+						done[2] = 1;
+					}
+					else if (!done[3] && (json_strcmp(text,
+						key, "z0") == 0)) {
+						if (json_sscanf(text, value,
+							&z0) != 1) goto error;
+						done[3] = 1;
+					}
+					else if (!done[4] && (json_strcmp(text,
+						key, "dx") == 0)) {
+						if (json_sscanf(text, value,
+							&dx) != 1) goto error;
+						done[4] = 1;
+					}
+					else if (!done[5] && (json_strcmp(text,
+						key, "dy") == 0)) {
+						if (json_sscanf(text, value,
+							&dy) != 1) goto error;
+						done[5] = 1;
+					}
+					else if (!done[6] && (json_strcmp(text,
+						key, "dz") == 0)) {
+						if (json_sscanf(text, value,
+							&dz) != 1) goto error;
+						done[6] = 1;
+					}
+					else goto error;
 				}
-				double * attribute = NULL;
-				if (strlen((const char *)name) != 2) continue;
-				if (name[1] == '0') {
-					if (name[0] == 'x')
-						attribute = &x0;
-					else if (name[0] == 'y')
-						attribute = &y0;
-					else if (name[0] == 'z')
-						attribute = &z0;
-				}
-				else if (name[0] == 'd') {
-					if (name[1] == 'x')
-						attribute = &dx;
-					else if (name[1] == 'y')
-						attribute = &dy;
-					else if (name[1] == 'z')
-						attribute = &dz;
-				}
-				if (attribute == NULL) continue;
-
-				const char * content = get_node_content(node);
-				if (content == NULL) goto error;
-				sscanf(content, "%lf", attribute);
 			}
-xml_end:
-			if (doc != NULL) xmlFreeDoc(doc);
+#undef	N_FIELDS
+#undef	N_TOKENS
 		}
 	}
 
@@ -476,6 +510,8 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 	png_bytep * row_pointers = NULL;
 	png_structp png_ptr = NULL;
 	png_infop info_ptr = NULL;
+	int header_size = 2048;
+	char * header = NULL;
 	enum turtle_return rc;
 
 	/* Check the bit depth. */
@@ -511,17 +547,25 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 		tmp = "";
 	else
 		tmp = projection_tag;
-	char header[2048];
-	sprintf(header, "<topography><x0>%.3lf</x0><y0>%.3lf</y0>"
-		"<z0>%.3lf</z0><dx>%.3lf</dx><dy>%.3lf</dy>"
-		"<dz>%.5e</dz><projection>%s</projection></topography>",
-		map->x0, map->y0, map->z0, map->dx, map->dy, map->dz,
-		tmp);
+	for (;;) {
+		char * new = realloc(header, header_size);
+		if (new == NULL) goto exit;
+		header = new;
+		if (snprintf(header, header_size,
+			"{\"topography\" : {\"x0\" : %.3lf, \"y0\" : %.3lf, "
+			"\"z0\" : %.3lf, \"dx\" : %.3lf, \"dy\" : %.3lf, "
+			"\"dz\" : %.5e, \"projection\" : \"%s\"}}",
+			map->x0, map->y0, map->z0, map->dx, map->dy, map->dz,
+			tmp) < header_size) break;
+		header_size += 2048;
+	}
 	free(projection_tag);
 	png_text text[] = {{PNG_TEXT_COMPRESSION_NONE, "Comment", header,
 		strlen(header)}};
 	png_set_text(png_ptr, info_ptr, text, sizeof(text)/sizeof(text[0]));
 	png_write_info(png_ptr, info_ptr);
+	free(header);
+	header = NULL;
 
 	/* Write the data */
 	row_pointers = (png_bytep*)calloc(ny, sizeof(png_bytep));
@@ -560,6 +604,7 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 	rc = TURTLE_RETURN_SUCCESS;
 
 exit:
+	free(header);
 	if (fid != NULL)
 		fclose(fid);
 	if (row_pointers != NULL) {

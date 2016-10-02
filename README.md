@@ -21,7 +21,7 @@ memory usage.
 
 Currently there is no automatic build procedure. If on a Linux box you might
 try and adapt the provided `setup.sh` and `Makefile`. The source code conforms
-to C99 however for loading or dumping some **DEM**s, you will need the following librariries: **libxml2**, **libpng** and **libtiff**.
+to C99 however for loading or dumping **DEM**s, you will need the following librariries: **libpng** and **libtiff**.
 
 ## Documentation
 

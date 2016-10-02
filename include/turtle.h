@@ -36,8 +36,8 @@ enum turtle_return {
 	TURTLE_RETURN_BAD_FORMAT,
 	/** A provided `turtle_projection` is not supported. */
 	TURTLE_RETURN_BAD_PROJECTION,
-	/** A provided XML section was not understood. */
-	TURTLE_RETURN_BAD_XML,
+	/** Some JSON metadata couldn't be understood. */
+	TURTLE_RETURN_BAD_JSON,
 	/** Some input parameters are out of their validity range. */
 	TURTLE_RETURN_DOMAIN_ERROR,
 	/** An TURTLE low level library error occured. */
@@ -136,8 +136,7 @@ typedef int turtle_datum_cb(void);
  *
  * __Warnings__
  *
- * This function is not thread safe. Trying to re-initialise an already
- * initialised library has unpredictable behaviour.
+ * This function is not thread safe.
  */
 void turtle_initialise(turtle_handler_cb * handler);
 
@@ -148,8 +147,7 @@ void turtle_initialise(turtle_handler_cb * handler);
  *
  * __Warnings__
  *
- * This function is not thread safe. Trying to re-finalise an already finalised
- * library has unpredictable behaviour.
+ * This function is not thread safe.
  */
 void turtle_finalise(void);
 
@@ -402,7 +400,7 @@ void turtle_map_destroy(struct turtle_map ** map);
  *
  *    TURTLE_RETURN_MEMORY_ERROR     The map couldn't be allocated.
  *
- *    TURTLE_RETURN_XML_ERROR        The XML metadata are invalid (.png file).
+ *    TURTLE_RETURN_JSON_ERROR       The JSON metadata are invalid (.png file).
  *
  */
 enum turtle_return turtle_map_load(const char * path,
