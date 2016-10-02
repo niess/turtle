@@ -33,8 +33,10 @@ void turtle_initialise(turtle_handler_cb * handler)
 	/* Set any user supplied error handler. */
 	turtle_handler(handler);
 
+#ifndef	TURTLE_NO_TIFF
 	/* Register the geotiff16 tags. */
 	geotiff16_register();
+#endif
 }
 
 /* Clear the TURTLE interface.

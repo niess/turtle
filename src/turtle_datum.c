@@ -26,7 +26,9 @@
 #include "turtle.h"
 #include "turtle_return.h"
 #include "turtle_datum.h"
+#ifndef TURTLE_NO_TIFF
 #include "geotiff16.h"
+#endif
 
 #ifndef M_PI
 /* Define pi, if unknown. */
@@ -34,8 +36,10 @@
 #endif
 
 /* Low level load function(s) for tiles. */
+#ifndef TURTLE_NO_TIFF
 static enum turtle_return load_gdem2(const char * path,
 	struct datum_tile ** tile);
+#endif
 
 /* Create a new datum. */
 enum turtle_return turtle_datum_create(const char * path, int stack_size,
@@ -393,6 +397,7 @@ void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile)
 /* Load a new tile and manage the stack. */
 enum turtle_return datum_tile_load(struct turtle_datum * datum, int latitude,
 	int longitude) {
+#ifndef TURTLE_NO_TIFF
 	if (datum->format == DATUM_FORMAT_ASTER_GDEM2) {
 		/* Format the path. */
 		const int absL = abs(latitude);
@@ -442,10 +447,14 @@ enum turtle_return datum_tile_load(struct turtle_datum * datum, int latitude,
 	else {
 		return TURTLE_RETURN_BAD_FORMAT;
 	}
+#else
+	return TURTLE_RETURN_BAD_FORMAT;
+#endif
 
 	return TURTLE_RETURN_SUCCESS;
 }
 
+#ifndef TURTLE_NO_TIFF
 /* Load ASTER-GDEM2 data to a tile. */
 static enum turtle_return load_gdem2(const char * path,
 	struct datum_tile ** tile)
@@ -476,3 +485,4 @@ clean_and_exit:
 	geotiff16_close(&reader);
 	return rc;
 }
+#endif

@@ -21,7 +21,9 @@ memory usage.
 
 Currently there is no automatic build procedure. If on a Linux box you might
 try and adapt the provided `setup.sh` and `Makefile`. The source code conforms
-to C99 however for loading or dumping **DEM**s, you will need the following librariries: **libpng** and **libtiff**.
+to C99 however for loading or dumping **DEM**s, you will need the following librariries:
+**libpng** for local maps and **libtiff** for ASTER-GDEM data. Note that build options
+allow to disable either or both formats and their dependencies if not needed.
 
 ## Documentation
 

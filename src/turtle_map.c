@@ -21,12 +21,16 @@
  */
 #include <float.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef	TURTLE_NO_PNG
+/* Required for .png map format. */
 #include <arpa/inet.h>
 #include <png.h>
 #include "jsmn.h"
+#endif
 
 #include "turtle.h"
 #include "turtle_return.h"
@@ -38,10 +42,12 @@ static struct turtle_map * map_create(int nx, int ny, int bit_depth,
 	const struct turtle_projection * projection);
 
 /* Low level data loaders/dumpers. */
+#ifndef	TURTLE_NO_PNG
 static enum turtle_return map_load_png(const char * path,
 	const struct turtle_box * box, struct turtle_map ** map);
 static enum turtle_return map_dump_png(const struct turtle_map * map,
 	const char * path);
+#endif
 
 /* Create a handle to a new empty map. */
 enum turtle_return turtle_map_create(const char * projection,
@@ -100,10 +106,14 @@ enum turtle_return turtle_map_load(const char * path,
 	if (ext == NULL) TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION,
 		turtle_map_load);
 
+#ifndef	TURTLE_NO_PNG
 	if (strcmp(ext, "png") == 0)
 		TURTLE_RETURN(map_load_png(path, box, map), turtle_map_load);
 	else
 		TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_load);
+#else
+	TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_load);
+#endif
 }
 
 /* Save the map to disk. */
@@ -115,10 +125,14 @@ enum turtle_return turtle_map_dump(const struct turtle_map * map,
 	if (ext == NULL) TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION,
 		turtle_map_dump);
 
+#ifndef TURTLE_NO_PNG
 	if (strcmp(ext, "png") == 0)
 		TURTLE_RETURN(map_dump_png(map, path), turtle_map_dump);
 	else
 		TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_dump);
+#else
+	TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_dump);
+#endif
 }
 
 /* Fill in a map node with an elevation value. */
@@ -249,6 +263,7 @@ static struct turtle_map * map_create(int nx, int ny, int bit_depth,
 	return map;
 }
 
+#ifndef	TURTLE_NO_PNG
 static inline int json_strcmp(const char * json, jsmntok_t * token,
 	const char * string)
 {
@@ -586,8 +601,7 @@ static enum turtle_return map_dump_png(const struct turtle_map * map,
 				ptr++;
 			}
 		}
-		else
-		{
+		else {
 			uint16_t * ptr = (uint16_t*)row_pointers[i];
 			const uint16_t * z = (const uint16_t  *)(map->z)+
 				(ny-i-1)*nx;
@@ -618,3 +632,4 @@ exit:
 
 	return rc;
 }
+#endif
