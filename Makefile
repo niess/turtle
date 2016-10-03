@@ -35,6 +35,9 @@ lib/libturtle.so: $(OBJS)
 	@mkdir -p lib
 	@gcc -o $@ $(CFLAGS) -shared $(INC) $(OBJS) $(LIBS)
 
+%.o: src/%.c src/%.h
+	@gcc $(CFLAGS) $(INC) -o $@ -c $<
+
 %.o: src/%.c include/%.h
 	@gcc $(CFLAGS) $(INC) -o $@ -c $<
 

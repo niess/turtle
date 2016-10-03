@@ -82,7 +82,7 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
 {
 	/* Get the proper tile. */
 	struct datum_tile * current = client->tile;
-	double hx, hy;
+	double hx = 0., hy = 0.; /* Patch a non relevant warning. */
 	int ix, iy;
 
 	if (current != NULL) {
