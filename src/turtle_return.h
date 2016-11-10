@@ -25,14 +25,14 @@
 #include "turtle.h"
 
 /* Helper macro for returning an encapsulated error code. */
-#define TURTLE_RETURN(rc, caller) return turtle_return(rc, \
-	(turtle_caller_t *)caller)
+#define TURTLE_RETURN(rc, caller)                                              \
+        return turtle_return(rc, (turtle_caller_t *)caller)
 
 /*
  * Utility function for encapsulating `returns` with a user supplied
  * error handler.
  */
-enum turtle_return turtle_return(enum turtle_return rc,
-	turtle_caller_t * caller);
+enum turtle_return turtle_return(
+    enum turtle_return rc, turtle_caller_t * caller);
 
 #endif

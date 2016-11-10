@@ -6,8 +6,8 @@
  */
 
 /* C89 standard library. */
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /* POSIX threads. */
 #include <pthread.h>
@@ -34,39 +34,39 @@ struct turtle_datum * datum = NULL;
 
 /* Storage for the thread input parameters. */
 struct thread_parameters {
-	pthread_t tid;
-	double latitude_0;
-	double longitude_0;
-	double latitude_1;
-	double longitude_1;
+        pthread_t tid;
+        double latitude_0;
+        double longitude_0;
+        double latitude_1;
+        double longitude_1;
 };
 
 /* The thread `run` function. */
 static void * run_thread(void * args)
 {
-	/* Unpack arguments and create the client. */
-	struct thread_parameters * params = (struct thread_parameters *)args;
-	struct turtle_client * client;
-	turtle_client_create(datum, &client);
+        /* Unpack arguments and create the client. */
+        struct thread_parameters * params = (struct thread_parameters *)args;
+        struct turtle_client * client;
+        turtle_client_create(datum, &client);
 
-	/* Step along the track. */
-	const int n = 1001;
-	int i;
-	for (i = 0; i < n; i++) {
-		const double latitude = params->latitude_0+(i*(
-			params->latitude_1-params->latitude_0))/(n-1);
-		const double longitude = params->longitude_0+(i*(
-			params->longitude_1-params->longitude_0))/(n-1);
-		double elevation;
-		turtle_client_elevation(client, latitude, longitude,
-			&elevation);
-		fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n",
-			(long)params->tid, latitude, longitude, elevation);
-	}
+        /* Step along the track. */
+        const int n = 1001;
+        int i;
+        for (i = 0; i < n; i++) {
+                const double latitude = params->latitude_0 +
+                    (i * (params->latitude_1 - params->latitude_0)) / (n - 1);
+                const double longitude = params->longitude_0 +
+                    (i * (params->longitude_1 - params->longitude_0)) / (n - 1);
+                double elevation;
+                turtle_client_elevation(
+                    client, latitude, longitude, &elevation);
+                fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n",
+                    (long)params->tid, latitude, longitude, elevation);
+        }
 
-	/* Clean and exit. */
-	turtle_client_destroy(&client);
-	pthread_exit(0);
+        /* Clean and exit. */
+        turtle_client_destroy(&client);
+        pthread_exit(0);
 }
 
 /**
@@ -79,14 +79,14 @@ static sem_t semaphore;
 
 int lock(void)
 {
-	/* Get the lock */
-	return sem_wait(&semaphore);
+        /* Get the lock */
+        return sem_wait(&semaphore);
 }
 
 int unlock(void)
 {
-	/* Release the lock. */
-	return sem_post(&semaphore);
+        /* Release the lock. */
+        return sem_post(&semaphore);
 }
 
 /**
@@ -108,62 +108,58 @@ int unlock(void)
 /* A basic error handler with an abrupt exit(). */
 void error_handler(enum turtle_return rc, turtle_caller_t * caller)
 {
-	fprintf(stderr, "error in %s (%s) : %s.\n", __FILE__,
-		turtle_strfunc(caller), turtle_strerror(rc));
-	pthread_exit(0);
+        fprintf(stderr, "error in %s (%s) : %s.\n", __FILE__,
+            turtle_strfunc(caller), turtle_strerror(rc));
+        pthread_exit(0);
 }
 
 /* Draw a random number uniformly in [0;1] using the standard C library. */
-static double uniform(void)
-{
-	return ((double)rand())/RAND_MAX;
-}
+static double uniform(void) { return ((double)rand()) / RAND_MAX; }
 
 /* The main function, spawning the threads. */
 int main()
 {
-	/* Initialise the semaphore, the TURTLE library and the datum. */
-	sem_init(&semaphore, 0, 1);
-	turtle_initialise(error_handler);
-	turtle_datum_create(
-		"../turtle-data/ASTGTM2", /* <= The elevation data folder. */
-		2,                        /* <= The stack size for tiles.  */
-		lock, unlock,             /* <= The lock/unlock callbacks. */
-		&datum);
+        /* Initialise the semaphore, the TURTLE library and the datum. */
+        sem_init(&semaphore, 0, 1);
+        turtle_initialise(error_handler);
+        turtle_datum_create(
+            "../turtle-data/ASTGTM2", /* <= The elevation data folder. */
+            2,                        /* <= The stack size for tiles.  */
+            lock, unlock,             /* <= The lock/unlock callbacks. */
+            &datum);
 
-	/*
-	 * Create the client threads and initialise the thread specific data
-	 * randomly.
-	 */
-	struct thread_parameters params[N_THREADS];
-	int i;
-	for (i = 0; i < N_THREADS; i++) {
-		if (uniform() <= 0.5) {
-			params[i].latitude_0 = 45.;
-			params[i].latitude_1 = 47.;
-			params[i].longitude_0 = 2.+2.*uniform();
-			params[i].longitude_1 = 2.+2.*uniform();
-		}
-		else {
-			params[i].latitude_0 = 45.+2.*uniform();
-			params[i].latitude_1 = 45.+2.*uniform();
-			params[i].longitude_0 = 2.;
-			params[i].longitude_1 = 4.;
-		}
-		if (pthread_create(&(params[i].tid), NULL, run_thread, params+i)
-			!= 0) goto clean_and_exit;
-	}
+        /*
+         * Create the client threads and initialise the thread specific data
+         * randomly.
+         */
+        struct thread_parameters params[N_THREADS];
+        int i;
+        for (i = 0; i < N_THREADS; i++) {
+                if (uniform() <= 0.5) {
+                        params[i].latitude_0 = 45.;
+                        params[i].latitude_1 = 47.;
+                        params[i].longitude_0 = 2. + 2. * uniform();
+                        params[i].longitude_1 = 2. + 2. * uniform();
+                } else {
+                        params[i].latitude_0 = 45. + 2. * uniform();
+                        params[i].latitude_1 = 45. + 2. * uniform();
+                        params[i].longitude_0 = 2.;
+                        params[i].longitude_1 = 4.;
+                }
+                if (pthread_create(
+                        &(params[i].tid), NULL, run_thread, params + i) != 0)
+                        goto clean_and_exit;
+        }
 
-	/* Wait for all threads to finish. */
-	for (i = 0; i < N_THREADS; i++) {
-		if (pthread_join(params[i].tid, NULL) != 0)
-			goto clean_and_exit;
-	}
+        /* Wait for all threads to finish. */
+        for (i = 0; i < N_THREADS; i++) {
+                if (pthread_join(params[i].tid, NULL) != 0) goto clean_and_exit;
+        }
 
-	/* Finalise TURTLE and the semaphore. */
+/* Finalise TURTLE and the semaphore. */
 clean_and_exit:
-	turtle_datum_destroy(&datum);
-	turtle_finalise();
-	sem_destroy(&semaphore);
-	pthread_exit(0);
+        turtle_datum_destroy(&datum);
+        turtle_finalise();
+        sem_destroy(&semaphore);
+        pthread_exit(0);
 }

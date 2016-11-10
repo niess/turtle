@@ -26,32 +26,32 @@ extern "C" {
  * Return Codes used by TURTLE.
  */
 enum turtle_return {
-	/** The operation succeeded. */
-	TURTLE_RETURN_SUCCESS = 0,
-	/** A wrong pointer address was provided, e.g. NULL. */
-	TURTLE_RETURN_BAD_ADDRESS,
-	/** A provided file extension is not supported or recognised. */
-	TURTLE_RETURN_BAD_EXTENSION,
-	/** A provided file or string has a wrong format. */
-	TURTLE_RETURN_BAD_FORMAT,
-	/** A provided `turtle_projection` is not supported. */
-	TURTLE_RETURN_BAD_PROJECTION,
-	/** Some JSON metadata couldn't be understood. */
-	TURTLE_RETURN_BAD_JSON,
-	/** Some input parameters are out of their validity range. */
-	TURTLE_RETURN_DOMAIN_ERROR,
-	/** An TURTLE low level library error occured. */
-	TURTLE_RETURN_LIBRARY_ERROR,
-	/** A lock couldn't be acquired. */
-	TURTLE_RETURN_LOCK_ERROR,
-	/** Some meory couldn't be allocated. */
-	TURTLE_RETURN_MEMORY_ERROR,
-	/** A provided path wasn't found. */
-	TURTLE_RETURN_PATH_ERROR,
-	/** A lock couldn't be released. */
-	TURTLE_RETURN_UNLOCK_ERROR,
-	/** The number of TURTLE error codes. */
-	N_TURTLE_RETURNS
+        /** The operation succeeded. */
+        TURTLE_RETURN_SUCCESS = 0,
+        /** A wrong pointer address was provided, e.g. NULL. */
+        TURTLE_RETURN_BAD_ADDRESS,
+        /** A provided file extension is not supported or recognised. */
+        TURTLE_RETURN_BAD_EXTENSION,
+        /** A provided file or string has a wrong format. */
+        TURTLE_RETURN_BAD_FORMAT,
+        /** A provided `turtle_projection` is not supported. */
+        TURTLE_RETURN_BAD_PROJECTION,
+        /** Some JSON metadata couldn't be understood. */
+        TURTLE_RETURN_BAD_JSON,
+        /** Some input parameters are out of their validity range. */
+        TURTLE_RETURN_DOMAIN_ERROR,
+        /** An TURTLE low level library error occured. */
+        TURTLE_RETURN_LIBRARY_ERROR,
+        /** A lock couldn't be acquired. */
+        TURTLE_RETURN_LOCK_ERROR,
+        /** Some meory couldn't be allocated. */
+        TURTLE_RETURN_MEMORY_ERROR,
+        /** A provided path wasn't found. */
+        TURTLE_RETURN_PATH_ERROR,
+        /** A lock couldn't be released. */
+        TURTLE_RETURN_UNLOCK_ERROR,
+        /** The number of TURTLE error codes. */
+        N_TURTLE_RETURNS
 };
 
 /**
@@ -78,14 +78,14 @@ struct turtle_client;
  * Bounding box for projection maps.
  */
 struct turtle_box {
-	/** Origin's X coordinate. */
-	double x0;
-	/** Origin's Y coordinate. */
-	double y0;
-	/** Half width along the X-axis. */
-	double half_x;
-	/** Half width along the Y-axis. */
-	double half_y;
+        /** Origin's X coordinate. */
+        double x0;
+        /** Origin's Y coordinate. */
+        double y0;
+        /** Half width along the X-axis. */
+        double half_x;
+        /** Half width along the Y-axis. */
+        double half_y;
 };
 
 /**
@@ -217,8 +217,8 @@ void turtle_handler(turtle_handler_cb * handler);
  *
  *    TURTLE_RETURN_MEMORY_ERROR      The projection couldnt be allocated.
  */
-enum turtle_return turtle_projection_create(const char * name,
-	struct turtle_projection ** projection);
+enum turtle_return turtle_projection_create(
+    const char * name, struct turtle_projection ** projection);
 
 /**
  * Destroy a geographic projection.
@@ -251,8 +251,8 @@ void turtle_projection_destroy(struct turtle_projection ** projection);
  *
  *    TURTLE_RETURN_BAD_PROJECTION    The projection isn't supported.
  */
-enum turtle_return turtle_projection_configure(const char * name,
-	struct turtle_projection * projection);
+enum turtle_return turtle_projection_configure(
+    const char * name, struct turtle_projection * projection);
 
 /**
  * Information on a geographic projection.
@@ -279,7 +279,7 @@ enum turtle_return turtle_projection_configure(const char * name,
  *    TURTLE_RETURN_MEMORY_ERROR      The name string couldn't be allocated.
  */
 enum turtle_return turtle_projection_info(
-	const struct turtle_projection * projection, char ** name);
+    const struct turtle_projection * projection, char ** name);
 
 /**
  * Apply a geographic projection to geodetic coordinates.
@@ -302,8 +302,8 @@ enum turtle_return turtle_projection_info(
  *    TURTLE_RETURN_BAD_PROJECTION    The projection isn't supported.
  */
 enum turtle_return turtle_projection_project(
-	const struct turtle_projection * projection, double latitude,
-	double longitude, double * x, double * y);
+    const struct turtle_projection * projection, double latitude,
+    double longitude, double * x, double * y);
 
 /**
  * Unfold a geographic projection to recover the geodetic coordinates.
@@ -326,8 +326,8 @@ enum turtle_return turtle_projection_project(
  *    TURTLE_RETURN_BAD_PROJECTION    The provided projection isn't supported.
  */
 enum turtle_return turtle_projection_unproject(
-	const struct turtle_projection * projection,
-	double x, double y, double * latitude, double * longitude);
+    const struct turtle_projection * projection, double x, double y,
+    double * latitude, double * longitude);
 
 /**
  * Create a new projection map.
@@ -362,8 +362,8 @@ enum turtle_return turtle_projection_unproject(
  *    TURTLE_RETURN_MEMORY_ERROR      The map couldn't be allocated.
  */
 enum turtle_return turtle_map_create(const char * projection,
-	const struct turtle_box * box, int nx, int ny, double zmin,
-	double zmax, int bit_depth, struct turtle_map ** map);
+    const struct turtle_box * box, int nx, int ny, double zmin, double zmax,
+    int bit_depth, struct turtle_map ** map);
 
 /**
  * Destroy a projection map.
@@ -403,8 +403,8 @@ void turtle_map_destroy(struct turtle_map ** map);
  *    TURTLE_RETURN_JSON_ERROR       The JSON metadata are invalid (.png file).
  *
  */
-enum turtle_return turtle_map_load(const char * path,
-	const struct turtle_box * box, struct turtle_map ** map);
+enum turtle_return turtle_map_load(
+    const char * path, const struct turtle_box * box, struct turtle_map ** map);
 
 /**
  * Dump a projection map to a file.
@@ -429,8 +429,8 @@ enum turtle_return turtle_map_load(const char * path,
  *    TURTLE_RETURN_MEMORY_ERROR     Some temporary memory couldn't be
  * allocated.
  */
-enum turtle_return turtle_map_dump(const struct turtle_map * map,
-	const char * path);
+enum turtle_return turtle_map_dump(
+    const struct turtle_map * map, const char * path);
 
 /**
  * Fill the elevation value of a map node.
@@ -452,8 +452,8 @@ enum turtle_return turtle_map_dump(const struct turtle_map * map,
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    Some input parameter isn't valid.
  */
-enum turtle_return turtle_map_fill(struct turtle_map * map, int ix, int iy,
-	double elevation);
+enum turtle_return turtle_map_fill(
+    struct turtle_map * map, int ix, int iy, double elevation);
 
 /**
  * Get the properties of a map node.
@@ -470,8 +470,8 @@ enum turtle_return turtle_map_fill(struct turtle_map * map, int ix, int iy,
  * Get the properties of a map node, i.e. its geographic coordinates and
  * elevation value.
  */
-enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
-	int iy, double * x, double * y, double * elevation);
+enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
+    double * x, double * y, double * elevation);
 
 /**
  * Get the map elevation at a geographic coordinate.
@@ -491,8 +491,8 @@ enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    The coordinates are not valid.
  */
-enum turtle_return turtle_map_elevation(const struct turtle_map * map,
-	double x, double y, double * elevation);
+enum turtle_return turtle_map_elevation(
+    const struct turtle_map * map, double x, double y, double * elevation);
 
 /**
  * Get a handle to the map's projection.
@@ -520,7 +520,7 @@ struct turtle_projection * turtle_map_projection(struct turtle_map * map);
  * parameter can be set to NULL if the corresponding property is not needed.
  */
 void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
-	int * nx, int * ny, double * zmin, double * zmax, int * bit_depth);
+    int * nx, int * ny, double * zmin, double * zmax, int * bit_depth);
 
 /**
  * Create a new geodetic datum.
@@ -561,8 +561,8 @@ void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
  *    TURTLE_RETURN_MEMORY_ERROR    The datum couldn't be allocated.
  */
 enum turtle_return turtle_datum_create(const char * path, int stack_size,
-	turtle_datum_cb * lock, turtle_datum_cb * unlock,
-	struct turtle_datum ** datum);
+    turtle_datum_cb * lock, turtle_datum_cb * unlock,
+    struct turtle_datum ** datum);
 
 /**
  * Destroy a gedodetic datum.
@@ -620,7 +620,7 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum);
  * datum's path.
  */
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
-	double latitude, double longitude, double * elevation);
+    double latitude, double longitude, double * elevation);
 
 /**
  * Transform geodetic coordinates to cartesian ECEF ones.
@@ -641,7 +641,7 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
  *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
  */
 enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
-	double latitude, double longitude, double elevation, double ecef[3]);
+    double latitude, double longitude, double elevation, double ecef[3]);
 
 /**
  * Transform cartesian ECEF coordinates to geodetic ones.
@@ -663,8 +663,7 @@ enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
  *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
  */
 enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
-	double ecef[3], double * latitude, double * longitude,
-	double * elevation);
+    double ecef[3], double * latitude, double * longitude, double * elevation);
 
 /**
  * Transform horizontal coorrdinates to a cartesian direction in ECEF.
@@ -686,8 +685,8 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
  *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
  */
 enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
-	double latitude, double longitude, double azimuth, double elevation,
-	double direction[3]);
+    double latitude, double longitude, double azimuth, double elevation,
+    double direction[3]);
 
 /**
  * Transform a cartesian direction in ECEF to horizontal coorrdinates.
@@ -711,8 +710,8 @@ enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
  *    TURTLE_RETURN_DOMAIN_ERROR   The direction has a null norm.
  */
 enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
-	double latitude, double longitude, double direction[3],
-	double * azimuth, double * elevation);
+    double latitude, double longitude, double direction[3], double * azimuth,
+    double * elevation);
 
 /**
  * Create a new client for a geodetic datum.
@@ -735,8 +734,8 @@ enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The client couldn't be allocated.
  */
-enum turtle_return turtle_client_create(struct turtle_datum * datum,
-	struct turtle_client ** client);
+enum turtle_return turtle_client_create(
+    struct turtle_datum * datum, struct turtle_client ** client);
 
 /**
  * Create a new client for a geodetic datum.
@@ -798,7 +797,7 @@ enum turtle_return turtle_client_clear(struct turtle_client * client);
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
 enum turtle_return turtle_client_elevation(struct turtle_client * client,
-	double latitude, double longitude, double * elevation);
+    double latitude, double longitude, double * elevation);
 
 #ifdef __cplusplus
 }

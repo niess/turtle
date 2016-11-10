@@ -7,7 +7,7 @@ INC := -Iinclude
 # Flags for .png files.
 USE_PNG := 1
 ifeq ($(USE_PNG),1)
-	PACKAGE := libpng12
+	PACKAGE := libpng
 	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
 	LIBS += $(shell pkg-config --libs $(PACKAGE))
 	OBJS +=  jsmn.o
