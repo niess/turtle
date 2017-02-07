@@ -181,7 +181,7 @@ enum turtle_return turtle_projection_info(
                             (projection->settings.utm.hemisphere > 0) ? 'N' :
                                                                         'S';
                         double tmp =
-                            projection->settings.utm.longitude_0 / 6. + 183.;
+                            (projection->settings.utm.longitude_0 + 183.) / 6.;
                         int zone = (int)tmp;
                         if (fabs(tmp - zone) <= FLT_EPSILON)
                                 nw = snprintf(
