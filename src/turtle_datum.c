@@ -37,7 +37,7 @@
 
 /* Low level load function(s) for tiles. */
 #ifndef TURTLE_NO_TIFF
-static enum turtle_return load_gdem2(
+static enum turtle_return load_geotiff(
     const char * path, struct datum_tile ** tile);
 #endif
 
@@ -419,15 +419,11 @@ enum turtle_return datum_tile_load(
 
                 /* Load the tile data. */
                 struct datum_tile * tile;
-                enum turtle_return rc = load_gdem2(datum->path, &tile);
+                enum turtle_return rc = load_geotiff(datum->path, &tile);
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
 
-                /* Initialise the new tile. */
+                /* Initialise client's references. */
                 tile->clients = 0;
-                tile->x0 = longitude;
-                tile->y0 = latitude;
-                tile->dx = (tile->nx > 1) ? 1. / (tile->nx - 1) : 0.;
-                tile->dy = (tile->ny > 1) ? 1. / (tile->ny - 1) : 0.;
 
                 /* Make room for the new tile, if needed. */
                 if (datum->stack_size >= datum->max_size) {
@@ -459,8 +455,8 @@ enum turtle_return datum_tile_load(
 }
 
 #ifndef TURTLE_NO_TIFF
-/* Load ASTER-GDEM2 data to a tile. */
-static enum turtle_return load_gdem2(
+/* Load geotiff elevation data to a tile. */
+static enum turtle_return load_geotiff(
     const char * path, struct datum_tile ** tile)
 {
         struct geotiff16_reader reader;
@@ -481,6 +477,11 @@ static enum turtle_return load_gdem2(
         /* Copy the tile data. */
         (*tile)->nx = reader.width;
         (*tile)->ny = reader.height;
+        (*tile)->x0 = reader.tiepoint[1][0] + 0.5 * reader.scale[0];
+        (*tile)->y0 =
+            reader.tiepoint[1][1] + (0.5 - reader.height) * reader.scale[1];
+        (*tile)->dx = reader.scale[0];
+        (*tile)->dy = reader.scale[1];
         if (geotiff16_readinto(&reader, (*tile)->z) != 0)
                 rc = TURTLE_RETURN_BAD_FORMAT;
 

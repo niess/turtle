@@ -22,6 +22,7 @@
  */
 #include "geotiff16.h"
 #include <stdlib.h>
+#include <string.h>
 
 struct reader_data {
         struct geotiff16_reader api;
@@ -79,6 +80,16 @@ int geotiff16_open(const char * path, struct geotiff16_reader * reader)
         TIFFGetField(reader->tiff, TIFFTAG_IMAGELENGTH, &reader->width);
         tsize_t size = TIFFScanlineSize(reader->tiff);
         reader->height = size / sizeof(int16);
+        int count;
+        double * data;
+        TIFFGetField(reader->tiff, TIFFTAG_GEOPIXELSCALE, &count, &data);
+        if (count == 3) memcpy(reader->scale, data, sizeof(reader->scale));
+        TIFFGetField(reader->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);
+        if (count == 6) {
+                memcpy(reader->tiepoint[0], data, sizeof(reader->tiepoint[0]));
+                memcpy(
+                    reader->tiepoint[1], data + 3, sizeof(reader->tiepoint[1]));
+        }
 
         return 0;
 }

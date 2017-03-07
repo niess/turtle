@@ -29,6 +29,7 @@
 /* Data for reading a geotiff 16b file. */
 struct geotiff16_reader {
         uint32_t width, height;
+        double scale[3], tiepoint[2][3];
         TIFF * tiff;
 };
 

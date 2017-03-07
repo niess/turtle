@@ -33,7 +33,7 @@ enum datum_format {
 /* Container for a data tile. */
 struct datum_tile {
         /* Meta data */
-        struct datum_tile *prev, *next;
+        struct datum_tile * prev, * next;
         int clients;
 
         /* Map data. */
