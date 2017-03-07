@@ -26,14 +26,14 @@
 
 enum datum_format {
         DATUM_FORMAT_NONE = -1,
-        DATUM_FORMAT_ASTER_GDEM2,
+        DATUM_FORMAT_GEOTIFF,
         N_DATUM_FORMATS
 };
 
 /* Container for a data tile. */
 struct datum_tile {
         /* Meta data */
-        struct datum_tile * prev, * next;
+        struct datum_tile *prev, *next;
         int clients;
 
         /* Map data. */
@@ -56,9 +56,13 @@ struct turtle_datum {
         turtle_datum_cb * lock;
         turtle_datum_cb * unlock;
 
-        /* Buffer for I/Os. */
-        char * buffer;
-        char path[]; /* Placeholder for the path string. */
+        /* Lookup data for tile's file names. */
+        double latitude_0, latitude_delta;
+        double longitude_0, longitude_delta;
+        int latitude_n, longitude_n;
+        char ** path;
+
+        char data[]; /* Placeholder for data. */
 };
 
 /* Tile utility routines. */

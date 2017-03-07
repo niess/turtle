@@ -80,8 +80,8 @@ int geotiff16_open(const char * path, struct geotiff16_reader * reader)
         TIFFGetField(reader->tiff, TIFFTAG_IMAGELENGTH, &reader->width);
         tsize_t size = TIFFScanlineSize(reader->tiff);
         reader->height = size / sizeof(int16);
-        int count;
-        double * data;
+        int count = 0;
+        double * data = NULL;
         TIFFGetField(reader->tiff, TIFFTAG_GEOPIXELSCALE, &count, &data);
         if (count == 3) memcpy(reader->scale, data, sizeof(reader->scale));
         TIFFGetField(reader->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);

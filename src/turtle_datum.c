@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "tinydir.h"
+
 #include "turtle.h"
 #include "turtle_datum.h"
 #include "turtle_return.h"
@@ -36,10 +38,10 @@
 #endif
 
 /* Low level load function(s) for tiles. */
-#ifndef TURTLE_NO_TIFF
+static enum turtle_return load_geotiff_meta(
+    const char * path, struct datum_tile * tile);
 static enum turtle_return load_geotiff(
     const char * path, struct datum_tile ** tile);
-#endif
 
 /* Create a new datum. */
 enum turtle_return turtle_datum_create(const char * path, int stack_size,
@@ -53,30 +55,71 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
             ((unlock == NULL) && (lock != NULL)))
                 TURTLE_RETURN(TURTLE_RETURN_BAD_ADDRESS, turtle_datum_create);
 
-        /* Check the data format. */
+        /* Scan the provided path for the tile data. */
         enum datum_format format = DATUM_FORMAT_NONE;
-        const char * basename = strrchr(path, '/');
-        if (basename == NULL)
-                basename = path;
-        else
-                basename++;
+        double lat_min = 1E+05, long_min = 1E+05;
+        double lat_max = -1E+05, long_max = -1E+05;
+        double lat_delta = 0., long_delta = 0.;
+        int data_size = 0;
 
-        static const char * format_str[N_DATUM_FORMATS] = { "ASTGTM2" };
-        static const int buffer_size[N_DATUM_FORMATS] = { 32 };
+        tinydir_dir dir;
+        for (tinydir_open(&dir, path); dir.has_next; tinydir_next(&dir)) {
+                tinydir_file file;
+                tinydir_readfile(&dir, &file);
+                if (file.is_dir) continue;
 
-        int i;
-        for (i = 0; i < N_DATUM_FORMATS; i++) {
-                if (strcmp(basename, format_str[i]) == 0) {
-                        format = i;
-                        break;
+                /* Check the format. */
+                if (format == DATUM_FORMAT_NONE) {
+                        if ((strcmp(file.extension, "tif") == 0) ||
+                            (strcmp(file.extension, "TIF") == 0))
+                                format = DATUM_FORMAT_GEOTIFF;
+                        else
+                                continue;
                 }
+
+                /* Get the tile meta-data. */
+                struct datum_tile tile;
+                if (format == DATUM_FORMAT_GEOTIFF)
+                        if (load_geotiff_meta(file.path, &tile) !=
+                            TURTLE_RETURN_SUCCESS)
+                                continue;
+
+                /* Update the lookup data. */
+                const double dx = tile.dx * (tile.nx - 1);
+                const double dy = tile.dy * (tile.ny - 1);
+                if (long_delta == 0.)
+                        long_delta = dx;
+                else if (long_delta != dx)
+                        goto format_error;
+                if (lat_delta == 0.)
+                        lat_delta = dy;
+                else if (lat_delta != dy)
+                        goto format_error;
+                if (tile.x0 < long_min) long_min = tile.x0;
+                if (tile.y0 < lat_min) lat_min = tile.y0;
+                const double x1 = tile.x0 + dx;
+                if (x1 > long_max) long_max = x1;
+                const double y1 = tile.y0 + dy;
+                if (y1 > lat_max) lat_max = y1;
+                data_size += strlen(file.path) + 1;
         }
-        if (format == DATUM_FORMAT_NONE)
-                TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
+        tinydir_close(&dir);
+
+        /* Check the grid size. */
+        int lat_n = 0, long_n = 0;
+        if ((lat_delta > 0.) && (long_delta > 0.)) {
+                const double dx = (long_max - long_min) / long_delta;
+                long_n = (int)dx;
+                if ((double)long_n != dx) return TURTLE_RETURN_BAD_FORMAT;
+                const double dy = (lat_max - lat_min) / lat_delta;
+                lat_n = (int)dy;
+                if ((double)lat_n != dy) return TURTLE_RETURN_BAD_FORMAT;
+        }
 
         /* Allocate the new datum handle. */
-        int n = strlen(path) + 1;
-        *datum = malloc(sizeof(**datum) + n + buffer_size[format]);
+        const int path_size = lat_n * long_n * sizeof(char *);
+        data_size += path_size;
+        *datum = malloc(sizeof(**datum) + data_size);
         if (*datum == NULL)
                 TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_datum_create);
 
@@ -87,11 +130,51 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         (*datum)->format = format;
         (*datum)->lock = lock;
         (*datum)->unlock = unlock;
-        memcpy((*datum)->path, path, n);
-        if ((*datum)->path[n - 2] != '/') (*datum)->path[n - 1] = '/';
-        (*datum)->buffer = (*datum)->path + n;
+        (*datum)->latitude_0 = lat_min;
+        (*datum)->longitude_0 = long_min;
+        (*datum)->latitude_delta = lat_delta;
+        (*datum)->longitude_delta = long_delta;
+        (*datum)->latitude_n = lat_n;
+        (*datum)->longitude_n = long_n;
+        (*datum)->path = (char **)((*datum)->data);
+
+        if ((lat_n == 0) || (long_n == 0)) return TURTLE_RETURN_SUCCESS;
+
+        /* Build the lookup data. */
+        int i;
+        for (i = 0; i < lat_n * long_n; i++) (*datum)->path[i] = NULL;
+
+        char * cursor = (*datum)->data;
+        for (tinydir_open(&dir, path); dir.has_next; tinydir_next(&dir)) {
+                tinydir_file file;
+                tinydir_readfile(&dir, &file);
+                if (file.is_dir) continue;
+
+                /* Get the tile meta-data. */
+                struct datum_tile tile;
+                if (format == DATUM_FORMAT_GEOTIFF)
+                        if (load_geotiff_meta(file.path, &tile) !=
+                            TURTLE_RETURN_SUCCESS)
+                                continue;
+
+                /* Compute the lookup index. */
+                const int ix = (int)((tile.x0 - long_min) / long_delta);
+                const int iy = (int)((tile.y0 - lat_min) / lat_delta);
+                i = iy * long_n + ix;
+
+                /* Copy the path name. */
+                const int n = strlen(file.path) + 1;
+                memcpy(cursor, file.path, n);
+                (*datum)->path[i] = cursor;
+                cursor += n;
+        }
+        tinydir_close(&dir);
 
         return TURTLE_RETURN_SUCCESS;
+
+format_error:
+        tinydir_close(&dir);
+        return TURTLE_RETURN_BAD_FORMAT;
 }
 
 /* Low level routine for cleaning the stack. */
@@ -404,57 +487,83 @@ void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile)
 enum turtle_return datum_tile_load(
     struct turtle_datum * datum, int latitude, int longitude)
 {
-#ifndef TURTLE_NO_TIFF
-        if (datum->format == DATUM_FORMAT_ASTER_GDEM2) {
-                /* Format the path. */
-                const int absL = abs(latitude);
-                const int absl = abs(longitude);
-                if ((absl > 180) || (absL > 89))
-                        return TURTLE_RETURN_DOMAIN_ERROR;
-                char cL, cl;
-                cL = (latitude >= 0) ? 'N' : 'S';
-                cl = (longitude >= 0) ? 'E' : 'W';
-                sprintf(datum->buffer, "ASTGTM2_%c%02d%c%03d_dem.tif", cL, absL,
-                    cl, absl);
+        /* Lookup the requested file. */
+        const int ix =
+            (int)((longitude - datum->longitude_0) / datum->longitude_delta);
+        if ((ix < 0) || (ix >= datum->longitude_n))
+                return TURTLE_RETURN_PATH_ERROR;
+        const int iy =
+            (int)((latitude - datum->latitude_0) / datum->latitude_delta);
+        if ((iy < 0) || (iy >= datum->latitude_n))
+                return TURTLE_RETURN_PATH_ERROR;
+        const int index = iy * datum->longitude_n + ix;
+        if (datum->path[index] == NULL) return TURTLE_RETURN_PATH_ERROR;
 
+        /* Load the tile data according to the format. */
+        struct datum_tile * tile = NULL;
+        if (datum->format == DATUM_FORMAT_GEOTIFF) {
                 /* Load the tile data. */
-                struct datum_tile * tile;
-                enum turtle_return rc = load_geotiff(datum->path, &tile);
+                enum turtle_return rc = load_geotiff(datum->path[index], &tile);
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
-
-                /* Initialise client's references. */
-                tile->clients = 0;
-
-                /* Make room for the new tile, if needed. */
-                if (datum->stack_size >= datum->max_size) {
-                        struct datum_tile * last = datum->stack;
-                        while (last->prev != NULL) last = last->prev;
-                        while ((last != NULL) &&
-                            (datum->stack_size >= datum->max_size)) {
-                                struct datum_tile * current = last;
-                                last = last->next;
-                                if (current->clients == 0)
-                                        datum_tile_destroy(datum, current);
-                        }
-                }
-
-                /* Append the new tile on top of the stack. */
-                tile->next = NULL;
-                tile->prev = datum->stack;
-                if (datum->stack != NULL) datum->stack->next = tile;
-                datum->stack = tile;
-                datum->stack_size++;
-        } else {
+        } else
                 return TURTLE_RETURN_BAD_FORMAT;
+
+        /* Initialise the client's references. */
+        tile->clients = 0;
+
+        /* Make room for the new tile, if needed. */
+        if (datum->stack_size >= datum->max_size) {
+                struct datum_tile * last = datum->stack;
+                while (last->prev != NULL) last = last->prev;
+                while (
+                    (last != NULL) && (datum->stack_size >= datum->max_size)) {
+                        struct datum_tile * current = last;
+                        last = last->next;
+                        if (current->clients == 0)
+                                datum_tile_destroy(datum, current);
+                }
         }
-#else
-        return TURTLE_RETURN_BAD_FORMAT;
-#endif
+
+        /* Append the new tile on top of the stack. */
+        tile->next = NULL;
+        tile->prev = datum->stack;
+        if (datum->stack != NULL) datum->stack->next = tile;
+        datum->stack = tile;
+        datum->stack_size++;
 
         return TURTLE_RETURN_SUCCESS;
 }
 
 #ifndef TURTLE_NO_TIFF
+/* Copy the tile meta data. */
+void copy_geotiff_meta(
+    struct geotiff16_reader * reader, struct datum_tile * tile)
+{
+        tile->nx = reader->width;
+        tile->ny = reader->height;
+        tile->x0 = reader->tiepoint[1][0] + 0.5 * reader->scale[0];
+        tile->y0 =
+            reader->tiepoint[1][1] + (0.5 - reader->height) * reader->scale[1];
+        tile->dx = reader->scale[0];
+        tile->dy = reader->scale[1];
+}
+
+/* Load the geotiff meta data to a tile. */
+static enum turtle_return load_geotiff_meta(
+    const char * path, struct datum_tile * tile)
+{
+        /* Open the geotiff16 file. */
+        struct geotiff16_reader reader;
+        if (geotiff16_open(path, &reader) != 0) return TURTLE_RETURN_PATH_ERROR;
+
+        /* Copy the tile meta data. */
+        copy_geotiff_meta(&reader, tile);
+
+        /* Close and return. */
+        geotiff16_close(&reader);
+        return TURTLE_RETURN_SUCCESS;
+}
+
 /* Load geotiff elevation data to a tile. */
 static enum turtle_return load_geotiff(
     const char * path, struct datum_tile ** tile)
@@ -475,18 +584,24 @@ static enum turtle_return load_geotiff(
         }
 
         /* Copy the tile data. */
-        (*tile)->nx = reader.width;
-        (*tile)->ny = reader.height;
-        (*tile)->x0 = reader.tiepoint[1][0] + 0.5 * reader.scale[0];
-        (*tile)->y0 =
-            reader.tiepoint[1][1] + (0.5 - reader.height) * reader.scale[1];
-        (*tile)->dx = reader.scale[0];
-        (*tile)->dy = reader.scale[1];
+        copy_geotiff_meta(&reader, *tile);
         if (geotiff16_readinto(&reader, (*tile)->z) != 0)
                 rc = TURTLE_RETURN_BAD_FORMAT;
 
 clean_and_exit:
         geotiff16_close(&reader);
         return rc;
+}
+#else
+static enum turtle_return load_geotiff_meta(
+    const char * path, struct datum_tile * tile)
+{
+        return TURTLE_RETURN_BAD_FORMAT;
+}
+
+static enum turtle_return load_geotiff(
+    const char * path, struct datum_tile ** tile)
+{
+        return TURTLE_RETURN_BAD_FORMAT;
 }
 #endif

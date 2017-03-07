@@ -7,8 +7,7 @@ TURTLE is a C99 library for rendering a terrain elevation from various
 **D**igital **E**levation **M**odels (**DEM**s). Its main features are:
 
 * Support for local projection maps (**UTM**, **Lambert**, **RGF93**) as well
-as for the [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp) world wide
-model.
+as for world wide models with tiles, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp).
 
 * Provide utilities for frame transforms between the supported projections,
 geodetic coordinates and Cartesian **E**arth-**C**entered, **E**arth-**F**ixed
@@ -26,7 +25,8 @@ to C99 however for loading or dumping **DEM**s, you will need the following
 librariries:
 
 * **libpng** for local maps.
-* **libtiff** for ASTER-GDEM data.
+* **libtiff** for geotiff data, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp) or
+[GEBCO](http://www.gebco.net/).
 
 Note that build options allow to disable either or both formats and their
 dependencies if not needed.
