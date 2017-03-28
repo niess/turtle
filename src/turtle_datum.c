@@ -19,6 +19,7 @@
 /*
  * Turtle datum handle for access to world-wide elevation data.
  */
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,11 +110,15 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         int lat_n = 0, long_n = 0;
         if ((lat_delta > 0.) && (long_delta > 0.)) {
                 const double dx = (long_max - long_min) / long_delta;
-                long_n = (int)dx;
-                if ((double)long_n != dx) return TURTLE_RETURN_BAD_FORMAT;
+                long_n = (int)(dx + FLT_EPSILON);
+                if (fabs(long_n - dx) > FLT_EPSILON)
+                        TURTLE_RETURN(
+                            TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
                 const double dy = (lat_max - lat_min) / lat_delta;
-                lat_n = (int)dy;
-                if ((double)lat_n != dy) return TURTLE_RETURN_BAD_FORMAT;
+                lat_n = (int)(dy + FLT_EPSILON);
+                if (fabs(lat_n - dy) > FLT_EPSILON)
+                        TURTLE_RETURN(
+                            TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
         }
 
         /* Allocate the new datum handle. */
@@ -144,7 +149,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         int i;
         for (i = 0; i < lat_n * long_n; i++) (*datum)->path[i] = NULL;
 
-        char * cursor = (*datum)->data;
+        char * cursor = (*datum)->data + path_size;
         for (tinydir_open(&dir, path); dir.has_next; tinydir_next(&dir)) {
                 tinydir_file file;
                 tinydir_readfile(&dir, &file);
