@@ -541,7 +541,7 @@ enum turtle_return datum_tile_load(
 
 #ifndef TURTLE_NO_TIFF
 /* Copy the tile meta data. */
-void copy_geotiff_meta(
+static void copy_geotiff_meta(
     struct geotiff16_reader * reader, struct datum_tile * tile)
 {
         tile->nx = reader->width;
