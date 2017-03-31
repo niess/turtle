@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 enum datum_format {
-        DATUM_FORMAT_NONE = -1,
+        DATUM_FORMAT_NONE = 0,
         DATUM_FORMAT_GEOTIFF,
         N_DATUM_FORMATS
 };

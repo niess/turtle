@@ -294,10 +294,11 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 static enum turtle_return get_ellipsoid(
     enum datum_format format, double * a, double * e)
 {
-        static const double A[N_DATUM_FORMATS] = { 6378137.0 };
-        static const double E[N_DATUM_FORMATS] = { 0.081819190842622 };
+        static const double A[N_DATUM_FORMATS] = { 6378137., 6378137. };
+        static const double E[N_DATUM_FORMATS] = { 0.081819190842622,
+	    0.081819190842622 };
 
-        if ((format < 0) || (format >= N_DATUM_FORMATS))
+        if ((format < DATUM_FORMAT_NONE) || (format >= N_DATUM_FORMATS))
                 return TURTLE_RETURN_BAD_FORMAT;
 
         *a = A[format];
@@ -409,7 +410,8 @@ enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
     double direction[3])
 {
         /* Sanity check. */
-        if ((datum->format < 0) || (datum->format >= N_DATUM_FORMATS))
+        if ((datum->format < DATUM_FORMAT_NONE) ||
+            (datum->format >= N_DATUM_FORMATS))
                 TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT, turtle_datum_direction);
 
         /* Compute the local E, N, U basis vectors. */
@@ -434,7 +436,8 @@ enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
     double * elevation)
 {
         /* Sanity check. */
-        if ((datum->format < 0) || (datum->format >= N_DATUM_FORMATS))
+        if ((datum->format < DATUM_FORMAT_NONE) ||
+            (datum->format >= N_DATUM_FORMATS))
                 TURTLE_RETURN(
                     TURTLE_RETURN_BAD_FORMAT, turtle_datum_horizontal);
 
