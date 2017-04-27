@@ -22,7 +22,7 @@ memory usage.
 Currently there is no automatic build procedure. If on a Linux box you might
 try and adapt the provided `setup.sh` and `Makefile`. The source code conforms
 to C99 however for loading or dumping **DEM**s, you will need the following
-librariries:
+librairies:
 
 * **libpng** for local maps.
 * **libtiff** for geotiff data, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp) or
@@ -38,5 +38,6 @@ The API documentation can be found
 basic examples of usage.
 
 ## License
-The TURTLE library is  under the **GPL-3.0** license. See the provided
-`LICENSE` file.
+
+The TURTLE library is  under the **GNU LGPLv3** license. See the provided
+`LICENSE` and `COPYING.LESSER` files.
