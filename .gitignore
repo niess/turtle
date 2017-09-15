@@ -1,3 +1,10 @@
 # Ignore any library object.
 lib
 *.so
+
+# Ignore any binaries.
+*.o
+bin
+
+# Ignore examples output.
+*.png

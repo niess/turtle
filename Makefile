@@ -2,7 +2,7 @@
 CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
 OBJS := turtle.o turtle_projection.o turtle_map.o turtle_datum.o turtle_client.o
-INC := -Iinclude
+INC := -Iinclude -Ideps/tinydir
 
 # Flags for .png files.
 USE_PNG := 1
@@ -11,6 +11,7 @@ ifeq ($(USE_PNG),1)
 	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
 	LIBS += $(shell pkg-config --libs $(PACKAGE))
 	OBJS +=  jsmn.o
+	INC += -Ideps/jsmn
 else
 	CFLAGS += -DTURTLE_NO_PNG
 endif
@@ -41,15 +42,20 @@ lib/libturtle.so: $(OBJS)
 %.o: src/%.c include/%.h
 	@gcc $(CFLAGS) $(INC) -o $@ -c $<
 
-# Rules for building the examples.
-examples: example-demo example-projection example-pthread
+%.o: deps/jsmn/%.c deps/jsmn/%.h
+	@gcc $(CFLAGS) -o $@ -c $<
 
-example-pthread: examples/example-pthread.c
+# Rules for building the examples.
+examples: bin/example-demo bin/example-projection bin/example-pthread
+
+bin/example-pthread: examples/example-pthread.c
+	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -lturtle -lpthread
 
-example-%: examples/example-%.c
+bin/example-%: examples/example-%.c
+	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -lturtle
 
 # Clean-up rule.
 clean:
-	@rm -rf example-* lib *.o
+	@rm -rf bin lib *.o

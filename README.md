@@ -21,15 +21,23 @@ memory usage.
 
 Currently there is no automatic build procedure. If on a Linux box you might
 try and adapt the provided `setup.sh` and `Makefile`. The source code conforms
-to C99 however for loading or dumping **DEM**s, you will need the following
-librairies:
+to C99. For loading or dumping **DEM**s, you will need the following
+libraries and packages:
 
-* **libpng** for local maps.
-* **libtiff** for geotiff data, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp) or
-[GEBCO](http://www.gebco.net/).
+* **libpng** and [JSMN][JSMN] for local maps.
+* **libtiff** for geotiff data, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp)
+  or [GEBCO](http://www.gebco.net/).
+* [TinyDir][TinyDir] for OS independent directories management.
 
-Note that build options allow to disable either or both formats and their
-dependencies if not needed.
+Note that build options allow to disable either or both of PNG or TIFF formats,
+and their dependencies, if not needed.
+
+Note also that while **libpng** and **libtiff** are expected to be installed
+on your system, you can directly get [JSMN][JSMN] and [TinyDir][TinyDir] as
+submodules, e.g. using `git clone --recursive`.
+
+[JSMN]: https://github.com/zserge/jsmn
+[TinyDIr]: https://github.com/cxong/tinydir
 
 ## Documentation
 
