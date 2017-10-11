@@ -12,7 +12,3 @@ lib_dir=$basedir/lib
 inc_dir=$basedir/include
 [[ "$C_INCLUDE_PATH" =~ "${inc_dir}" ]] || export C_INCLUDE_PATH=${inc_dir}:$C_INCLUDE_PATH
 [[ "$CPLUS_INCLUDE_PATH" =~ "${inc_dir}" ]] || export CPLUS_INCLUDE_PATH=${inc_dir}:$CPLUS_INCLUDE_PATH
-
-# Local install of libtiff.
-tiff_dir=/tmv_soft/tools/tiff/3.9.4/
-[[ -d "${tiff_dir}" ]] && . ${tiff_dir}/setup.sh
