@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
- * 
+ *
  * Topographic Utilities for Rendering The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,6 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-
 
 #ifndef TURTLE_H
 #define TURTLE_H

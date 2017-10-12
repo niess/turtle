@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
- * 
+ *
  * Topographic Utilities for Rendering The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -65,8 +65,10 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         double lat_delta = 0., long_delta = 0.;
         int data_size = 0;
 
+        int rc;
         tinydir_dir dir;
-        for (tinydir_open(&dir, path); dir.has_next; tinydir_next(&dir)) {
+        for (rc = tinydir_open(&dir, path); (rc == 0) && dir.has_next;
+             tinydir_next(&dir)) {
                 tinydir_file file;
                 tinydir_readfile(&dir, &file);
                 if (file.is_dir) continue;
@@ -106,7 +108,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
                 if (y1 > lat_max) lat_max = y1;
                 data_size += strlen(file.path) + 1;
         }
-        tinydir_close(&dir);
+        if (rc == 0) tinydir_close(&dir);
 
         /* Check the grid size. */
         int lat_n = 0, long_n = 0;
@@ -298,7 +300,7 @@ static enum turtle_return get_ellipsoid(
 {
         static const double A[N_DATUM_FORMATS] = { 6378137., 6378137. };
         static const double E[N_DATUM_FORMATS] = { 0.081819190842622,
-	    0.081819190842622 };
+                0.081819190842622 };
 
         if ((format < DATUM_FORMAT_NONE) || (format >= N_DATUM_FORMATS))
                 return TURTLE_RETURN_BAD_FORMAT;
