@@ -1,8 +1,10 @@
 # Default compilation flags.
+DEPS_DIR := deps
+
 CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
 OBJS := turtle.o turtle_projection.o turtle_map.o turtle_datum.o turtle_client.o
-INC := -Iinclude -Ideps/tinydir
+INC := -Iinclude -I$(DEPS_DIR)/tinydir
 
 # Flags for .png files.
 USE_PNG := 1
@@ -11,7 +13,7 @@ ifeq ($(USE_PNG),1)
 	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
 	LIBS += $(shell pkg-config --libs $(PACKAGE))
 	OBJS +=  jsmn.o
-	INC += -Ideps/jsmn
+	INC += -I$(DEPS_DIR)/jsmn
 else
 	CFLAGS += -DTURTLE_NO_PNG
 endif
@@ -42,7 +44,7 @@ lib/libturtle.so: $(OBJS)
 %.o: src/%.c include/%.h
 	@gcc $(CFLAGS) $(INC) -o $@ -c $<
 
-%.o: deps/jsmn/%.c deps/jsmn/%.h
+%.o: $(DEPS_DIR)/jsmn/%.c $(DEPS_DIR)/jsmn/%.h
 	@gcc $(CFLAGS) -o $@ -c $<
 
 # Rules for building the examples.
