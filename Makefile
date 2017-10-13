@@ -7,8 +7,8 @@ OBJS := turtle.o turtle_projection.o turtle_map.o turtle_datum.o turtle_client.o
 INC := -Iinclude -I$(DEPS_DIR)/tinydir
 
 # Flags for .png files.
-USE_PNG := 1
-ifeq ($(USE_PNG),1)
+TURTLE_USE_PNG := 1
+ifeq ($(TURTLE_USE_PNG),1)
 	PACKAGE := libpng
 	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
 	LIBS += $(shell pkg-config --libs $(PACKAGE))
@@ -19,8 +19,8 @@ else
 endif
 
 # Flags for GEOTIFF files.
-USE_TIFF := 1
-ifeq ($(USE_TIFF),1)
+TURTLE_USE_TIFF := 1
+ifeq ($(TURTLE_USE_TIFF),1)
 	LIBS += -ltiff
 	OBJS +=  geotiff16.o
 else
