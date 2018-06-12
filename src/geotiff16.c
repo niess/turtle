@@ -20,7 +20,7 @@
 
 /*
  * Interface to geotiff files providing a reader for 16b data, e.g. ASTER-GDEM2
- * tiles.
+ * or SRTM tiles.
  */
 #include "geotiff16.h"
 #include <stdlib.h>
@@ -40,6 +40,8 @@ struct reader_data {
 #define TIFFTAG_GEOKEYDIRECTORY 34735
 #define TIFFTAG_GEODOUBLEPARAMS 34736
 #define TIFFTAG_GEOASCIIPARAMS 34737
+#define TIFFTAG_GDAL_METADATA 42112
+#define TIFFTAG_GDAL_NODATA 42113
 
 static const TIFFFieldInfo field_info[] = { { TIFFTAG_GEOPIXELSCALE, -1, -1,
                                                 TIFF_DOUBLE, FIELD_CUSTOM, 1, 1,
@@ -53,7 +55,11 @@ static const TIFFFieldInfo field_info[] = { { TIFFTAG_GEOPIXELSCALE, -1, -1,
         { TIFFTAG_GEODOUBLEPARAMS, -1, -1, TIFF_DOUBLE, FIELD_CUSTOM, 1, 1,
             "GeoDoubleParams" },
         { TIFFTAG_GEOASCIIPARAMS, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
-            "GeoASCIIParams" } };
+            "GeoASCIIParams" },
+        { TIFFTAG_GDAL_METADATA, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
+            "GDAL_METADATA" },
+        { TIFFTAG_GDAL_NODATA, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
+            "GDAL_NODATA" }};
 
 /* Extender for GEOTIFF tags. */
 static TIFFExtendProc parent_extender = NULL;
