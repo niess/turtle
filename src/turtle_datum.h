@@ -71,6 +71,6 @@ struct turtle_datum {
 void datum_tile_touch(struct turtle_datum * datum, struct datum_tile * tile);
 void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile);
 enum turtle_return datum_tile_load(
-    struct turtle_datum * datum, int latitude, int longitude);
+    struct turtle_datum * datum, double latitude, double longitude);
 
 #endif

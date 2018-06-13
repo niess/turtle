@@ -183,7 +183,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 
 format_error:
         tinydir_close(&dir);
-        return TURTLE_RETURN_BAD_FORMAT;
+        TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
 }
 
 /* Low level routine for cleaning the stack. */
@@ -497,7 +497,7 @@ void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile)
 
 /* Load a new tile and manage the stack. */
 enum turtle_return datum_tile_load(
-    struct turtle_datum * datum, int latitude, int longitude)
+    struct turtle_datum * datum, double latitude, double longitude)
 {
         /* Lookup the requested file. */
         const int ix =
@@ -553,9 +553,9 @@ static void copy_geotiff_meta(
 {
         tile->nx = reader->width;
         tile->ny = reader->height;
-        tile->x0 = reader->tiepoint[1][0] + 0.5 * reader->scale[0];
+        tile->x0 = reader->tiepoint[1][0];
         tile->y0 =
-            reader->tiepoint[1][1] + (0.5 - reader->height) * reader->scale[1];
+            reader->tiepoint[1][1] + (1. - reader->height) * reader->scale[1];
         tile->dx = reader->scale[0];
         tile->dy = reader->scale[1];
 }

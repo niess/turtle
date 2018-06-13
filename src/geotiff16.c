@@ -85,18 +85,17 @@ int geotiff16_open(const char * path, struct geotiff16_reader * reader)
         if (reader->tiff == NULL) return -1;
 
         /* Initialise the new reader and return. */
-        TIFFGetField(reader->tiff, TIFFTAG_IMAGELENGTH, &reader->width);
+        TIFFGetField(reader->tiff, TIFFTAG_IMAGELENGTH, &reader->height);
         tsize_t size = TIFFScanlineSize(reader->tiff);
-        reader->height = size / sizeof(int16);
+        reader->width = size / sizeof(int16);
         int count = 0;
         double * data = NULL;
         TIFFGetField(reader->tiff, TIFFTAG_GEOPIXELSCALE, &count, &data);
         if (count == 3) memcpy(reader->scale, data, sizeof(reader->scale));
         TIFFGetField(reader->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);
         if (count == 6) {
-                memcpy(reader->tiepoint[0], data, sizeof(reader->tiepoint[0]));
-                memcpy(
-                    reader->tiepoint[1], data + 3, sizeof(reader->tiepoint[1]));
+                memcpy(&reader->tiepoint[0][0], data, 3 * sizeof(*data));
+                memcpy(&reader->tiepoint[1][0], data + 3, 3 * sizeof(*data));
         }
 
         return 0;
@@ -111,9 +110,9 @@ void geotiff16_close(struct geotiff16_reader * reader)
 
 int geotiff16_readinto(struct geotiff16_reader * reader, int16_t * buffer)
 {
-        buffer += reader->height * (reader->width - 1);
+        buffer += reader->width * (reader->height - 1);
         int i;
-        for (i = 0; i < reader->width; i++, buffer -= reader->height) {
+        for (i = 0; i < reader->height; i++, buffer -= reader->width) {
                 if (TIFFReadScanline(reader->tiff, buffer, i, 0) != 1)
                         return -1;
         }
