@@ -27,9 +27,9 @@
 #include <string.h>
 
 #include "turtle.h"
-#include "turtle_client.h"
-#include "turtle_datum.h"
-#include "turtle_return.h"
+#include "client.h"
+#include "datum.h"
+#include "return.h"
 
 /* Management routine(s). */
 static enum turtle_return client_release(

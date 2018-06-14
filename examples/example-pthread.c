@@ -17,7 +17,7 @@
 #include "turtle.h"
 
 /* The number of threads/clients to run. */
-#define N_THREADS 16
+#define N_THREADS 4
 
 /**
  * First let's implements the threaded task and some storage for its input
@@ -44,6 +44,10 @@ struct thread_parameters {
 /* The thread `run` function. */
 static void * run_thread(void * args)
 {
+        /* Prototypes for lock & unlock functions, securing concurent accesss */
+        int lock(void);
+        int unlock(void);
+
         /* Unpack arguments and create the client. */
         struct thread_parameters * params = (struct thread_parameters *)args;
         struct turtle_client * client;
@@ -60,8 +64,10 @@ static void * run_thread(void * args)
                 double elevation;
                 turtle_client_elevation(
                     client, latitude, longitude, &elevation);
+                lock();
                 fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n",
                     (long)params->tid, latitude, longitude, elevation);
+                unlock();
         }
 
         /* Clean and exit. */
@@ -123,9 +129,9 @@ int main()
         sem_init(&semaphore, 0, 1);
         turtle_initialise(error_handler);
         turtle_datum_create(
-            "../turtle-data/ASTGTM2", /* <= The elevation data folder. */
-            2,                        /* <= The stack size for tiles.  */
-            lock, unlock,             /* <= The lock/unlock callbacks. */
+            "share/topography", /* <= The elevation data folder. */
+            4,                  /* <= The stack size for tiles.  */
+            lock, unlock,       /* <= The lock/unlock callbacks. */
             &datum);
 
         /*

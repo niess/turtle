@@ -28,8 +28,8 @@
 #include <string.h>
 
 #include "turtle.h"
-#include "turtle_projection.h"
-#include "turtle_return.h"
+#include "projection.h"
+#include "return.h"
 
 #ifndef M_PI
 /* Define pi, if unknown. */

@@ -19,28 +19,25 @@
  */
 
 /*
- * Interface to geotiff files providing a reader for 16b data, e.g. ASTER-GDEM2
- * tiles.
+ * Interface to hgt files providing a reader for 16b data, e.g. SRTM tiles.
  */
-#ifndef GEOTIFF16_H
-#define GEOTIFF16_H
+#ifndef TURTLE_READER_HGT_H
+#define TURTLE_READER_HGT_H
 
 #include <stdint.h>
-#include <tiffio.h>
+#include <stdio.h>
 
-/* Data for reading a geotiff 16b file. */
-struct geotiff16_reader {
-        uint32_t width, height;
-        double scale[3], tiepoint[2][3];
-        TIFF * tiff;
+/* Data for reading an hgt file. */
+struct hgt_reader {
+        int size;
+        double scale;
+        double origin[2];
+        FILE * fid;
 };
 
-/* Register the geotiff tags to libtiff. */
-void geotiff16_register();
-
 /* Manage a geotiff 16b file reader. */
-int geotiff16_open(const char * path, struct geotiff16_reader * reader);
-void geotiff16_close(struct geotiff16_reader * reader);
-int geotiff16_readinto(struct geotiff16_reader * reader, int16_t * buffer);
+int hgt_open(const char * path, struct hgt_reader * reader);
+void hgt_close(struct hgt_reader * reader);
+int hgt_readinto(struct hgt_reader * reader, int16_t * buffer);
 
 #endif

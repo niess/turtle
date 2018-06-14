@@ -8,3 +8,6 @@ bin
 
 # Ignore examples output.
 *.png
+
+# Ignore shared data
+share

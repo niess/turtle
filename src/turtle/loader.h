@@ -18,27 +18,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-/*
- * Turtle projection map handle for managing local maps.
- */
-#ifndef TURTLE_MAP_H
-#define TURTLE_MAP_H
+/* Tile loading functions for a turle_datum. */
+#ifndef TURTLE_LOADER_H
+#define TURTLE_LOADER_H
 
-#include "turtle_projection.h"
-
-/* Container for a projection map. */
-struct turtle_map {
-        /* Map data. */
-        int bit_depth;
-        int nx, ny;
-        double x0, y0, z0;
-        double dx, dy, dz;
-        void * z;
-
-        /* Projection. */
-        struct turtle_projection projection;
-
-        char data[]; /* Placeholder for dynamic data. */
+enum loader_format {
+        LOADER_FORMAT_UNKNOWN = 0,
+        LOADER_FORMAT_GEOTIFF,
+        LOADER_FORMAT_HGT
 };
+
+enum loader_format loader_format(const char * path);
+enum turtle_return loader_meta(const char * path, struct datum_tile * tile);
+enum turtle_return loader_load(const char * path, struct datum_tile ** tile);
 
 #endif

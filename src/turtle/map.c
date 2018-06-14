@@ -35,9 +35,9 @@
 #endif
 
 #include "turtle.h"
-#include "turtle_map.h"
-#include "turtle_projection.h"
-#include "turtle_return.h"
+#include "map.h"
+#include "projection.h"
+#include "return.h"
 
 /* Generic map allocation and initialisation. */
 static struct turtle_map * map_create(

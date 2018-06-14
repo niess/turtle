@@ -51,8 +51,8 @@ int main()
         /* Initialise the TURTLE API */
         turtle_initialise(error_handler);
 
-        /* Create the datum for ASTER-GDEM2 elevation data. */
-        turtle_datum_create("../turtle-data/ASTGTM2", 1, NULL, NULL, &datum);
+        /* Create the datum for elevation data. */
+        turtle_datum_create("share/topography", 1, NULL, NULL, &datum);
 
         /*
          * Create a RGF93 local projection map, centered on the Auberge des

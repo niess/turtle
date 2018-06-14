@@ -26,12 +26,6 @@
 
 #include <stdint.h>
 
-enum datum_format {
-        DATUM_FORMAT_NONE = 0,
-        DATUM_FORMAT_GEOTIFF,
-        N_DATUM_FORMATS
-};
-
 /* Container for a data tile. */
 struct datum_tile {
         /* Meta data */
@@ -50,9 +44,6 @@ struct turtle_datum {
         /* The stack of loaded tiles. */
         struct datum_tile * stack;
         int stack_size, max_size;
-
-        /* Data format. */
-        enum datum_format format;
 
         /* Callbacks for lock handling. */
         turtle_datum_cb * lock;

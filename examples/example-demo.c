@@ -128,7 +128,7 @@ int main()
          * elevation data.
          */
         struct turtle_datum * datum;
-        turtle_datum_create("../turtle-data/ASTGTM2", 1, NULL, NULL, &datum);
+        turtle_datum_create("share/topography", 1, NULL, NULL, &datum);
 
         /* Get the orgin's elevation from the datum. */
         double elevation_ASTER;

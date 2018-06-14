@@ -632,17 +632,11 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
  * @param longitude    The geodetic longitude.
  * @param elevation    The geodetic elevation.
  * @param ecef         The corresponding ECEF coordinates.
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below.
  *
  * Transform geodetic coordinates to Cartesian ones in the Earth-Centered,
  * Earth-Fixed (ECEF) frame.
- *
- * __Error codes__
- *
- *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
  */
-enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
+void turtle_datum_ecef(struct turtle_datum * datum,
     double latitude, double longitude, double elevation, double ecef[3]);
 
 /**
@@ -653,18 +647,12 @@ enum turtle_return turtle_datum_ecef(struct turtle_datum * datum,
  * @param latitude     The corresponding geodetic latitude.
  * @param longitude    The corresponding geodetic longitude.
  * @param elevation    The corresponding geodetic elevation.
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below.
  *
  * Transform Cartesian coordinates in the Earth-Centered, Earth-Fixed (ECEF)
  * frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
  * single iteration.
- *
- * __Error codes__
- *
- *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
  */
-enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
+void turtle_datum_geodetic(struct turtle_datum * datum,
     double ecef[3], double * latitude, double * longitude, double * elevation);
 
 /**
@@ -676,17 +664,11 @@ enum turtle_return turtle_datum_geodetic(struct turtle_datum * datum,
  * @param azimuth      The geographic azimuth angle.
  * @param elevation    The geographic elevation angle.
  * @param direction    The corresponding direction in ECEF coordinates.
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below.
  *
  * Transform horizontal coordinates to a Cartesian direction in the
  * Earth-Centered, Earth-Fixed (ECEF) frame.
- *
- * __Error codes__
- *
- *    TURTLE_RETURN_BAD_FORMAT   The data source is not supported.
  */
-enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
+void turtle_datum_direction(struct turtle_datum * datum,
     double latitude, double longitude, double azimuth, double elevation,
     double direction[3]);
 
@@ -706,8 +688,6 @@ enum turtle_return turtle_datum_direction(struct turtle_datum * datum,
  * (ECEF) frame to horizontal coordinates.
  *
  * __Error codes__
- *
- *    TURTLE_RETURN_BAD_FORMAT     The data source is not supported.
  *
  *    TURTLE_RETURN_DOMAIN_ERROR   The direction has a null norm.
  */

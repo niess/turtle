@@ -23,8 +23,9 @@
  */
 
 #include "turtle.h"
-#include "geotiff16.h"
-#include "turtle_return.h"
+
+#include "turtle/loader/geotiff16.h"
+#include "turtle/return.h"
 
 /* The library user supplied error handler. */
 static turtle_handler_cb * _handler = NULL;
