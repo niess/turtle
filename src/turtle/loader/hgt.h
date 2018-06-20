@@ -38,6 +38,8 @@ struct hgt_reader {
 /* Manage a geotiff 16b file reader. */
 int hgt_open(const char * path, struct hgt_reader * reader);
 void hgt_close(struct hgt_reader * reader);
-int hgt_readinto(struct hgt_reader * reader, int16_t * buffer);
+
+struct datum_tile;
+int hgt_readinto(struct hgt_reader * reader, struct datum_tile * tile);
 
 #endif

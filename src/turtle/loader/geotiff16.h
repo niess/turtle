@@ -41,6 +41,9 @@ void geotiff16_register();
 /* Manage a geotiff 16b file reader. */
 int geotiff16_open(const char * path, struct geotiff16_reader * reader);
 void geotiff16_close(struct geotiff16_reader * reader);
-int geotiff16_readinto(struct geotiff16_reader * reader, int16_t * buffer);
+
+struct datum_tile;
+int geotiff16_readinto(
+    struct geotiff16_reader * reader, struct datum_tile * tile);
 
 #endif

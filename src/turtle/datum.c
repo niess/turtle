@@ -272,10 +272,11 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
         if (iy < 0) iy = 0;
         int ix1 = (ix >= nx - 1) ? nx - 1 : ix + 1;
         int iy1 = (iy >= ny - 1) ? ny - 1 : iy + 1;
-        const int16_t * zm = datum->stack->z;
-        *elevation = zm[iy * nx + ix] * (1. - hx) * (1. - hy) +
-            zm[iy1 * nx + ix] * (1. - hx) * hy +
-            zm[iy * nx + ix1] * hx * (1. - hy) + zm[iy1 * nx + ix1] * hx * hy;
+        struct datum_tile * tile = datum->stack;
+        datum_tile_cb * zm = tile->z;
+        *elevation = zm(tile, ix, iy) * (1. - hx) * (1. - hy) +
+            zm(tile, ix, iy1) * (1. - hx) * hy +
+            zm(tile, ix1, iy) * hx * (1. - hy) + zm(tile, ix1, iy1) * hx * hy;
         return TURTLE_RETURN_SUCCESS;
 }
 

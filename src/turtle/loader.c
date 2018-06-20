@@ -78,7 +78,7 @@ static enum turtle_return load_geotiff(
 
         /* Copy the tile data. */
         copy_geotiff_meta(&reader, *tile);
-        if (geotiff16_readinto(&reader, (*tile)->z) != 0)
+        if (geotiff16_readinto(&reader, *tile) != 0)
                 rc = TURTLE_RETURN_BAD_FORMAT;
 
 clean_and_exit:
@@ -139,8 +139,7 @@ static enum turtle_return load_hgt(
 
         /* Copy the tile data. */
         copy_hgt_meta(&reader, *tile);
-        if (hgt_readinto(&reader, (*tile)->z) != 0)
-                rc = TURTLE_RETURN_BAD_FORMAT;
+        if (hgt_readinto(&reader, *tile) != 0) rc = TURTLE_RETURN_BAD_FORMAT;
 
 clean_and_exit:
         hgt_close(&reader);

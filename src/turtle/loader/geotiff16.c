@@ -22,9 +22,13 @@
  * Interface to geotiff files providing a reader for 16b data, e.g. ASTER-GDEM2
  * or SRTM tiles.
  */
-#include "geotiff16.h"
 #include <stdlib.h>
 #include <string.h>
+
+#include "turtle.h"
+#include "../datum.h"
+
+#include "geotiff16.h"
 
 struct reader_data {
         struct geotiff16_reader api;
@@ -108,13 +112,26 @@ void geotiff16_close(struct geotiff16_reader * reader)
         reader->tiff = NULL;
 }
 
-int geotiff16_readinto(struct geotiff16_reader * reader, int16_t * buffer)
+static int16_t get_z(struct datum_tile * tile, int ix, int iy)
 {
+        return tile->data[iy * tile->nx + ix];
+}
+
+int geotiff16_readinto(
+    struct geotiff16_reader * reader, struct datum_tile * tile)
+{
+        tile->z = NULL;
+
+        /* Unpack the data */
+        int16_t * buffer = tile->data;
         buffer += reader->width * (reader->height - 1);
         int i;
         for (i = 0; i < reader->height; i++, buffer -= reader->width) {
                 if (TIFFReadScanline(reader->tiff, buffer, i, 0) != 1)
                         return -1;
         }
+
+        /* Set the data provider */
+        tile->z = &get_z;
         return 0;
 }

@@ -26,17 +26,24 @@
 
 #include <stdint.h>
 
+/* Callback for accessing elevation data */
+struct datum_tile;
+typedef int16_t datum_tile_cb(struct datum_tile * tile, int ix, int iy);
+
 /* Container for a data tile. */
 struct datum_tile {
         /* Meta data */
         struct datum_tile *prev, *next;
         int clients;
 
+        /* Callback for accessing elevation data */
+        datum_tile_cb * z;
+
         /* Map data. */
         int nx, ny;
         double x0, y0;
         double dx, dy;
-        int16_t z[];
+        int16_t data[];
 };
 
 /* Container for a geodetic datum. */

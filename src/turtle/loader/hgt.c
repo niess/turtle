@@ -26,6 +26,9 @@
 
 #include <arpa/inet.h>
 
+#include "turtle.h"
+#include "../datum.h"
+
 #include "hgt.h"
 
 int hgt_open(const char * path, struct hgt_reader * reader)
@@ -74,20 +77,24 @@ void hgt_close(struct hgt_reader * reader)
         }
 }
 
-int hgt_readinto(struct hgt_reader * reader, int16_t * buffer)
+static int16_t get_z(struct datum_tile * tile, int ix, int iy)
 {
-        /* Load the raw data from file */
-        int i, n = reader->size;
-        int16_t * s;
-        for (i = 0, s = buffer + n * (n - 1); i < n; i++, s -= n) {
-                if (fread(s, sizeof(*s), n, reader->fid) != n)
-                        return -1;
-        }
+        iy = tile->ny - 1 - iy;
+        return ntohs(tile->data[iy * tile->nx + ix]);
+}
 
-        /* Normalise the byte order */
-        n *= reader->size;
-        for (i = 0, s = buffer; i < n; i++, s++)
-                *s = ntohs(*s);
+int hgt_readinto(struct hgt_reader * reader, struct datum_tile * tile)
+{
+        tile->z = NULL;
+
+        /* Load the raw data from file */
+        const int n = reader->size * reader->size;
+        int16_t * buffer = tile->data;
+        if (fread(buffer, sizeof(*buffer), n, reader->fid) != n)
+                return -1;
+
+        /* Set the data provider */
+        tile->z = &get_z;
 
         return 0;
 }
