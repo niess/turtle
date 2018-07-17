@@ -451,21 +451,22 @@ enum turtle_return datum_tile_load(
     struct turtle_datum * datum, double latitude, double longitude)
 {
         /* Lookup the requested file. */
+        if ((longitude < datum->longitude_0) || (latitude < datum->latitude_0))
+                return TURTLE_RETURN_PATH_ERROR;
         const int ix =
             (int)((longitude - datum->longitude_0) / datum->longitude_delta);
-        if ((ix < 0) || (ix >= datum->longitude_n))
-                return TURTLE_RETURN_PATH_ERROR;
+        if (ix >= datum->longitude_n) return TURTLE_RETURN_PATH_ERROR;
         const int iy =
             (int)((latitude - datum->latitude_0) / datum->latitude_delta);
-        if ((iy < 0) || (iy >= datum->latitude_n))
-                return TURTLE_RETURN_PATH_ERROR;
+        if (iy >= datum->latitude_n) return TURTLE_RETURN_PATH_ERROR;
         const int index = iy * datum->longitude_n + ix;
         if (datum->path[index] == NULL) return TURTLE_RETURN_PATH_ERROR;
 
         /* Load the tile data according to the format. */
         struct datum_tile * tile = NULL;
         enum turtle_return rc;
-        if ((rc = loader_load(datum->path[index], &tile)) != TURTLE_RETURN_SUCCESS)
+        if ((rc = loader_load(datum->path[index], &tile))
+            != TURTLE_RETURN_SUCCESS)
                 return rc;
 
         /* Initialise the client's references. */
