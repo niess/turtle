@@ -53,9 +53,12 @@ int hgt_open(const char * path, struct hgt_reader * reader)
         if (filename[0] == 'S')
                 reader->origin[1] = -reader->origin[1];
 
-        for (p = filename + 8; (*p != 0x0) && (*p != '.'); p++)
-                ;
-        const int n = p - filename - 8;
+        const char * ext = NULL;
+        for (p = filename + 7; *p != 0x0; p++) {
+                if (*p == '.') ext = p + 1;
+        }
+
+        const int n = ext - filename - 8;
         if ((n == 0) || (strncmp(filename + 8, "SRTMGL1", n) == 0))
                 reader->size = 3601;
         else
