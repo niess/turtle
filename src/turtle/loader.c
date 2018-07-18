@@ -21,9 +21,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "turtle.h"
 #include "datum.h"
 #include "loader.h"
+#include "turtle.h"
 
 #ifndef TURTLE_NO_TIFF
 #include "loader/geotiff16.h"
@@ -91,8 +91,7 @@ clean_and_exit:
 #include "loader/hgt.h"
 
 /* Copy the tile meta data. */
-static void copy_hgt_meta(
-    struct hgt_reader * reader, struct datum_tile * tile)
+static void copy_hgt_meta(struct hgt_reader * reader, struct datum_tile * tile)
 {
         tile->nx = reader->size;
         tile->ny = reader->size;
@@ -119,8 +118,7 @@ static enum turtle_return load_hgt_meta(
 }
 
 /* Load hgt elevation data to a tile. */
-static enum turtle_return load_hgt(
-    const char * path, struct datum_tile ** tile)
+static enum turtle_return load_hgt(const char * path, struct datum_tile ** tile)
 {
         struct hgt_reader reader;
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
@@ -151,13 +149,12 @@ clean_and_exit:
 enum loader_format loader_format(const char * path)
 {
         /* Look for teh file extension */
-        const char * extension = NULL, * p;
+        const char *extension = NULL, *p;
         for (p = path; *p != 0x0; p++)
                 if (*p == '.') extension = p + 1;
-        if (extension == NULL)
-                return LOADER_FORMAT_UNKNOWN;
+        if (extension == NULL) return LOADER_FORMAT_UNKNOWN;
 
-        /* Check the extension */
+                /* Check the extension */
 #ifndef TURTLE_NO_TIFF
         if ((strcmp(extension, "tif") == 0) || (strcmp(extension, "TIF") == 0))
                 return LOADER_FORMAT_GEOTIFF;
@@ -177,8 +174,7 @@ enum turtle_return loader_meta(const char * path, struct datum_tile * tile)
                 return load_geotiff_meta(path, tile);
 #endif
 #ifndef TURTLE_NO_HGT
-        if (format == LOADER_FORMAT_HGT)
-                return load_hgt_meta(path, tile);
+        if (format == LOADER_FORMAT_HGT) return load_hgt_meta(path, tile);
 #endif
         return TURTLE_RETURN_BAD_FORMAT;
 }
@@ -188,12 +184,10 @@ enum turtle_return loader_load(const char * path, struct datum_tile ** tile)
 {
         enum loader_format format = loader_format(path);
 #ifndef TURTLE_NO_TIFF
-        if (format == LOADER_FORMAT_GEOTIFF)
-                return load_geotiff(path, tile);
+        if (format == LOADER_FORMAT_GEOTIFF) return load_geotiff(path, tile);
 #endif
 #ifndef TURTLE_NO_HGT
-        if (format == LOADER_FORMAT_HGT)
-                return load_hgt(path, tile);
+        if (format == LOADER_FORMAT_HGT) return load_hgt(path, tile);
 #endif
         return TURTLE_RETURN_BAD_FORMAT;
 }

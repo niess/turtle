@@ -23,12 +23,7 @@
  */
 
 #include "turtle.h"
-
 #include "turtle/loader/geotiff16.h"
-#include "turtle/return.h"
-
-/* The library user supplied error handler. */
-static turtle_handler_cb * _handler = NULL;
 
 /* Initialise the TURTLE interface. */
 void turtle_initialise(turtle_handler_cb * handler)
@@ -45,22 +40,6 @@ void turtle_initialise(turtle_handler_cb * handler)
 /* Clear the TURTLE interface.
  */
 void turtle_finalise(void) {}
-
-/* Get a return code as a string. */
-const char * turtle_strerror(enum turtle_return rc)
-{
-        static const char * msg[N_TURTLE_RETURNS] = { "Operation succeeded",
-                "Bad address", "Bad file extension", "Bad file format",
-                "Unknown projection", "Bad JSON header",
-                "Value is out of bound", "An internal error occured",
-                "Couldn't lock", "Not enough memory",
-                "No such file or directory", "Couldn't unlock" };
-
-        if ((rc < 0) || (rc >= N_TURTLE_RETURNS))
-                return NULL;
-        else
-                return msg[rc];
-}
 
 /* Get a library function name as a string. */
 const char * turtle_strfunc(turtle_caller_t * caller)
@@ -92,15 +71,4 @@ const char * turtle_strfunc(turtle_caller_t * caller)
 
         return NULL;
 #undef TOSTRING
-}
-
-/* Setter for the error handler. */
-void turtle_handler(turtle_handler_cb * handler) { _handler = handler; }
-
-/* Utility function for encapsulating `returns` with the error handler. */
-enum turtle_return turtle_return(enum turtle_return rc, void (*caller)(void))
-{
-        if ((_handler != NULL) && (rc != TURTLE_RETURN_SUCCESS))
-                _handler(rc, caller);
-        return rc;
 }

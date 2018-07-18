@@ -103,6 +103,7 @@ typedef void turtle_caller_t(void);
  *
  * @param rc        The TURTLE return code.
  * @param caller    The caller function where the error occured.
+ * @param message   A formated message describing the error.
  *
  * The user might provide its own error handler. It will be called at the
  * return of any TURTLE library function providing an error code.
@@ -111,7 +112,8 @@ typedef void turtle_caller_t(void);
  *
  * This callback *must* be thread safe if a `turtle_client` is used.
  */
-typedef void turtle_handler_cb(enum turtle_return rc, turtle_caller_t * caller);
+typedef void turtle_handler_cb(
+    enum turtle_return rc, turtle_caller_t * caller, const char * message);
 
 /**
  * Callback for locking or unlocking critical sections.
@@ -152,14 +154,6 @@ void turtle_initialise(turtle_handler_cb * handler);
  * This function is not thread safe.
  */
 void turtle_finalise(void);
-
-/**
- * Return a string describing a `turtle_return` code.
- *
- * This function is analog to the C89 `strerror` function but specific to
- * TURTLE return codes. It is thread safe.
- */
-const char * turtle_strerror(enum turtle_return rc);
 
 /**
  * Return a string describing a TURTLE library function.
@@ -636,8 +630,8 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
  * Transform geodetic coordinates to Cartesian ones in the Earth-Centered,
  * Earth-Fixed (ECEF) frame.
  */
-void turtle_datum_ecef(struct turtle_datum * datum,
-    double latitude, double longitude, double elevation, double ecef[3]);
+void turtle_datum_ecef(struct turtle_datum * datum, double latitude,
+    double longitude, double elevation, double ecef[3]);
 
 /**
  * Transform cartesian ECEF coordinates to geodetic ones.
@@ -652,8 +646,8 @@ void turtle_datum_ecef(struct turtle_datum * datum,
  * frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
  * single iteration.
  */
-void turtle_datum_geodetic(struct turtle_datum * datum,
-    double ecef[3], double * latitude, double * longitude, double * elevation);
+void turtle_datum_geodetic(struct turtle_datum * datum, double ecef[3],
+    double * latitude, double * longitude, double * elevation);
 
 /**
  * Transform horizontal coorrdinates to a cartesian direction in ECEF.
@@ -668,9 +662,8 @@ void turtle_datum_geodetic(struct turtle_datum * datum,
  * Transform horizontal coordinates to a Cartesian direction in the
  * Earth-Centered, Earth-Fixed (ECEF) frame.
  */
-void turtle_datum_direction(struct turtle_datum * datum,
-    double latitude, double longitude, double azimuth, double elevation,
-    double direction[3]);
+void turtle_datum_direction(struct turtle_datum * datum, double latitude,
+    double longitude, double azimuth, double elevation, double direction[3]);
 
 /**
  * Transform a cartesian direction in ECEF to horizontal coorrdinates.

@@ -27,9 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "turtle.h"
+#include "error.h"
 #include "projection.h"
-#include "return.h"
+#include "turtle.h"
 
 #ifndef M_PI
 /* Define pi, if unknown. */
@@ -58,14 +58,12 @@ enum turtle_return turtle_projection_create(
         *projection = NULL;
         struct turtle_projection tmp;
         enum turtle_return rc = turtle_projection_configure(name, &tmp);
-        if (rc != TURTLE_RETURN_SUCCESS)
-                TURTLE_RETURN(rc, turtle_projection_create);
+        if (rc != TURTLE_RETURN_SUCCESS) return rc;
 
         /* Allocate memory for the new handle. */
         *projection = malloc(sizeof(**projection));
         if (*projection == NULL)
-                TURTLE_RETURN(
-                    TURTLE_RETURN_MEMORY_ERROR, turtle_projection_create);
+                return TURTLE_ERROR_MEMORY(turtle_projection_create);
 
         /* Copy the config and return. */
         memcpy(*projection, &tmp, sizeof(tmp));
@@ -107,8 +105,9 @@ enum turtle_return turtle_projection_configure(
 
         if (n == 0) {
                 /* No projection has been defined. */
-                TURTLE_RETURN(
-                    TURTLE_RETURN_BAD_PROJECTION, turtle_projection_configure);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_PROJECTION,
+                    turtle_projection_configure,
+                    "missing projection specifier");
         } else if (strncmp(p, "Lambert", n) == 0) {
                 /* This is a Lambert projection. Let's parse the parameters
                  * set.
@@ -133,13 +132,16 @@ enum turtle_return turtle_projection_configure(
                 int zone;
                 char hemisphere;
                 if (sscanf(p, "%d%c", &zone, &hemisphere) != 2)
-                        TURTLE_RETURN(TURTLE_RETURN_BAD_PROJECTION,
-                            turtle_projection_configure);
+                        return TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_PROJECTION,
+                            turtle_projection_configure,
+                            "invalid UTM specifier `%s`", p);
                 if (hemisphere == '.') {
                         double longitude_0;
                         if (sscanf(p, "%lf%c", &longitude_0, &hemisphere) != 2)
-                                TURTLE_RETURN(TURTLE_RETURN_BAD_PROJECTION,
-                                    turtle_projection_configure);
+                                return TURTLE_ERROR_FORMAT(
+                                    TURTLE_RETURN_BAD_PROJECTION,
+                                    turtle_projection_configure,
+                                    "invalid extended UTM specifier `%s`", p);
                         projection->settings.utm.longitude_0 = longitude_0;
                 } else
                         projection->settings.utm.longitude_0 = 6. * zone - 183.;
@@ -148,13 +150,14 @@ enum turtle_return turtle_projection_configure(
                 else if (hemisphere == 'S')
                         projection->settings.utm.hemisphere = -1;
                 else
-                        TURTLE_RETURN(TURTLE_RETURN_BAD_PROJECTION,
-                            turtle_projection_configure);
+                        return TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_PROJECTION,
+                            turtle_projection_configure,
+                            "invalid UTM hemisphere `%c`", hemisphere);
                 return TURTLE_RETURN_SUCCESS;
         }
 
-        TURTLE_RETURN(
-            TURTLE_RETURN_BAD_PROJECTION, turtle_projection_configure);
+        return TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_PROJECTION,
+            turtle_projection_configure, "invalid projection `%s`", p);
 }
 
 /* Get the name string corresponding to the projection configuration. */
@@ -206,7 +209,15 @@ enum turtle_return turtle_projection_info(
 error:
         free(*name);
         *name = NULL;
-        TURTLE_RETURN(rc, turtle_projection_info);
+        if (rc == TURTLE_RETURN_SUCCESS)
+                return TURTLE_RETURN_SUCCESS;
+        else if (rc == TURTLE_RETURN_BAD_PROJECTION) {
+                return TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_PROJECTION,
+                    turtle_projection_info, "invalid projection type `%d`",
+                    projection->type);
+        } else {
+                return TURTLE_ERROR_MEMORY(turtle_projection_info);
+        }
 }
 
 /* Project geodetic coordinates to flat ones. */
@@ -218,19 +229,15 @@ enum turtle_return turtle_projection_project(
         *y = 0.;
 
         if (projection == NULL)
-                TURTLE_RETURN(
-                    TURTLE_RETURN_BAD_ADDRESS, turtle_projection_project);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_ADDRESS,
+                    turtle_projection_project, "missing projection");
         else if (projection->type == PROJECTION_NONE)
-                TURTLE_RETURN(
-                    TURTLE_RETURN_BAD_ADDRESS, turtle_projection_project);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_PROJECTION,
+                    turtle_projection_project, "invalid projection");
         else if (projection->type == PROJECTION_LAMBERT)
-                TURTLE_RETURN(
-                    project_lambert(projection, latitude, longitude, x, y),
-                    turtle_projection_project);
+                return project_lambert(projection, latitude, longitude, x, y);
         else
-                TURTLE_RETURN(
-                    project_utm(projection, latitude, longitude, x, y),
-                    turtle_projection_project);
+                return project_utm(projection, latitude, longitude, x, y);
 }
 
 /* Unproject flat coordinates to geodetic ones. */
@@ -242,19 +249,15 @@ enum turtle_return turtle_projection_unproject(
         *longitude = 0.;
 
         if (projection == NULL)
-                TURTLE_RETURN(
-                    TURTLE_RETURN_BAD_ADDRESS, turtle_projection_unproject);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_ADDRESS,
+                    turtle_projection_unproject, "missing projection");
         else if (projection->type == PROJECTION_NONE)
-                TURTLE_RETURN(
-                    TURTLE_RETURN_BAD_ADDRESS, turtle_projection_unproject);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_PROJECTION,
+                    turtle_projection_unproject, "invalid projection");
         else if (projection->type == PROJECTION_LAMBERT)
-                TURTLE_RETURN(
-                    unproject_lambert(projection, x, y, latitude, longitude),
-                    turtle_projection_unproject);
+                return unproject_lambert(projection, x, y, latitude, longitude);
         else
-                TURTLE_RETURN(
-                    unproject_utm(projection, x, y, latitude, longitude),
-                    turtle_projection_unproject);
+                return unproject_utm(projection, x, y, latitude, longitude);
 }
 
 /* Compute the isometric latitude for Lambert projections.

@@ -25,8 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "turtle.h"
 #include "../datum.h"
+#include "turtle.h"
 
 #include "geotiff16.h"
 
@@ -63,7 +63,7 @@ static const TIFFFieldInfo field_info[] = { { TIFFTAG_GEOPIXELSCALE, -1, -1,
         { TIFFTAG_GDAL_METADATA, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
             "GDAL_METADATA" },
         { TIFFTAG_GDAL_NODATA, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
-            "GDAL_NODATA" }};
+            "GDAL_NODATA" } };
 
 /* Extender for GEOTIFF tags. */
 static TIFFExtendProc parent_extender = NULL;

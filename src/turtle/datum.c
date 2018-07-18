@@ -28,10 +28,10 @@
 
 #include "tinydir.h"
 
-#include "turtle.h"
 #include "datum.h"
+#include "error.h"
 #include "loader.h"
-#include "return.h"
+#include "turtle.h"
 
 #ifndef M_PI
 /* Define pi, if unknown. */
@@ -48,13 +48,14 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         /* Check the lock and unlock consistency. */
         if (((lock == NULL) && (unlock != NULL)) ||
             ((unlock == NULL) && (lock != NULL)))
-                TURTLE_RETURN(TURTLE_RETURN_BAD_ADDRESS, turtle_datum_create);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_ADDRESS,
+                    turtle_datum_create, "inconsistent lock & unlock");
 
         /* Scan the provided path for the tile data. */
         double lat_min = 1E+05, long_min = 1E+05;
         double lat_max = -1E+05, long_max = -1E+05;
         double lat_delta = 0., long_delta = 0.;
-        int data_size = 0;
+        int data_size = strlen(path) + 1;
 
         int rc;
         tinydir_dir dir;
@@ -65,8 +66,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
                 if (file.is_dir) continue;
 
                 /* Check the format. */
-                if (loader_format(file.path) == LOADER_FORMAT_UNKNOWN)
-                        continue;
+                if (loader_format(file.path) == LOADER_FORMAT_UNKNOWN) continue;
 
                 /* Get the tile meta-data. */
                 struct datum_tile tile;
@@ -100,21 +100,20 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
                 const double dx = (long_max - long_min) / long_delta;
                 long_n = (int)(dx + FLT_EPSILON);
                 if (fabs(long_n - dx) > FLT_EPSILON)
-                        TURTLE_RETURN(
-                            TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
+                        return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_FORMAT,
+                            turtle_datum_create, "invalid longitude grid");
                 const double dy = (lat_max - lat_min) / lat_delta;
                 lat_n = (int)(dy + FLT_EPSILON);
                 if (fabs(lat_n - dy) > FLT_EPSILON)
-                        TURTLE_RETURN(
-                            TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
+                        return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_FORMAT,
+                            turtle_datum_create, "invalid latitude grid");
         }
 
         /* Allocate the new datum handle. */
         const int path_size = lat_n * long_n * sizeof(char *);
         data_size += path_size;
         *datum = malloc(sizeof(**datum) + data_size);
-        if (*datum == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_datum_create);
+        if (*datum == NULL) return TURTLE_ERROR_MEMORY(turtle_datum_create);
 
         /* Initialise the handle. */
         (*datum)->stack = NULL;
@@ -128,7 +127,10 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         (*datum)->longitude_delta = long_delta;
         (*datum)->latitude_n = lat_n;
         (*datum)->longitude_n = long_n;
-        (*datum)->path = (char **)((*datum)->data);
+        const int root_size = strlen(path) + 1;
+        (*datum)->root = (char *)((*datum)->data);
+        memcpy((*datum)->root, path, root_size);
+        (*datum)->path = (char **)((*datum)->data + root_size);
 
         if ((lat_n == 0) || (long_n == 0)) return TURTLE_RETURN_SUCCESS;
 
@@ -143,8 +145,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
                 if (file.is_dir) continue;
 
                 /* Check the format. */
-                if (loader_format(file.path) == LOADER_FORMAT_UNKNOWN)
-                        continue;
+                if (loader_format(file.path) == LOADER_FORMAT_UNKNOWN) continue;
 
                 /* Check the tile meta-data. */
                 struct datum_tile tile;
@@ -168,7 +169,8 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
 
 format_error:
         tinydir_close(&dir);
-        TURTLE_RETURN(TURTLE_RETURN_BAD_FORMAT, turtle_datum_create);
+        return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_FORMAT,
+            turtle_datum_create, "inconsistent elevation tiles");
 }
 
 /* Low level routine for cleaning the stack. */
@@ -200,13 +202,13 @@ void turtle_datum_destroy(struct turtle_datum ** datum)
 enum turtle_return turtle_datum_clear(struct turtle_datum * datum)
 {
         if ((datum->lock != NULL) && (datum->lock() != 0))
-                TURTLE_RETURN(TURTLE_RETURN_LOCK_ERROR, turtle_datum_clear);
+                return TURTLE_ERROR_LOCK(turtle_datum_clear);
 
         /* Soft clean of the stack. */
         datum_clear(datum, 0);
 
         if ((datum->unlock != NULL) && (datum->unlock() != 0))
-                TURTLE_RETURN(TURTLE_RETURN_UNLOCK_ERROR, turtle_datum_clear);
+                return TURTLE_ERROR_UNLOCK(turtle_datum_clear);
         else
                 return TURTLE_RETURN_SUCCESS;
 }
@@ -253,8 +255,15 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
                 /* No valid tile was found. Let's try to load it. */
                 enum turtle_return rc =
                     datum_tile_load(datum, latitude, longitude);
-                if (rc != TURTLE_RETURN_SUCCESS)
-                        TURTLE_RETURN(rc, turtle_datum_elevation);
+                if (rc == TURTLE_RETURN_MEMORY_ERROR) {
+                        return TURTLE_ERROR_MEMORY(turtle_datum_elevation);
+                } else if (rc == TURTLE_RETURN_PATH_ERROR) {
+                        return TURTLE_ERROR_MISSING_DATA(
+                            turtle_datum_elevation, datum);
+                } else if (rc != TURTLE_RETURN_SUCCESS) {
+                        return TURTLE_ERROR_UNEXPECTED(
+                            rc, turtle_datum_elevation);
+                }
 
                 struct datum_tile * stack = datum->stack;
                 hx = (longitude - stack->x0) / stack->dx;
@@ -285,8 +294,8 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
 #define WGS84_E 0.081819190842622
 
 /* Compute ECEF coordinates from latitude and longitude. */
-void turtle_datum_ecef(struct turtle_datum * datum,
-    double latitude, double longitude, double elevation, double ecef[3])
+void turtle_datum_ecef(struct turtle_datum * datum, double latitude,
+    double longitude, double elevation, double ecef[3])
 {
         /* Get the parameters of the reference ellipsoid. */
         const double a = WGS84_A, e = WGS84_E;
@@ -305,8 +314,8 @@ void turtle_datum_ecef(struct turtle_datum * datum,
  *
  * Reference: B. R. Bowring's 1985 algorithm (single iteration).
  */
-void turtle_datum_geodetic(struct turtle_datum * datum,
-    double ecef[3], double * latitude, double * longitude, double * elevation)
+void turtle_datum_geodetic(struct turtle_datum * datum, double ecef[3],
+    double * latitude, double * longitude, double * elevation)
 {
         /* Get the parameters of the reference ellipsoid. */
         const double a = WGS84_A, e = WGS84_E;
@@ -373,9 +382,8 @@ static inline void compute_enu(
  *
  * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system.
  */
-void turtle_datum_direction(struct turtle_datum * datum,
-    double latitude, double longitude, double azimuth, double elevation,
-    double direction[3])
+void turtle_datum_direction(struct turtle_datum * datum, double latitude,
+    double longitude, double azimuth, double elevation, double direction[3])
 {
         /* Compute the local E, N, U basis vectors. */
         double e[3], n[3], u[3];
@@ -410,8 +418,8 @@ enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
         double r = direction[0] * direction[0] + direction[1] * direction[1] +
             direction[2] * direction[2];
         if (r <= 0.)
-                TURTLE_RETURN(
-                    TURTLE_RETURN_DOMAIN_ERROR, turtle_datum_horizontal);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
+                    turtle_datum_horizontal, "null direction vector");
         r = sqrt(r);
         *azimuth = atan2(x, y) * 180. / M_PI;
         *elevation = asin(z / r) * 180. / M_PI;
@@ -465,8 +473,8 @@ enum turtle_return datum_tile_load(
         /* Load the tile data according to the format. */
         struct datum_tile * tile = NULL;
         enum turtle_return rc;
-        if ((rc = loader_load(datum->path[index], &tile))
-            != TURTLE_RETURN_SUCCESS)
+        if ((rc = loader_load(datum->path[index], &tile)) !=
+            TURTLE_RETURN_SUCCESS)
                 return rc;
 
         /* Initialise the client's references. */

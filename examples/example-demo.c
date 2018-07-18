@@ -10,11 +10,11 @@
 #include "turtle.h"
 
 /* Error handler: dump any error message and exit to the OS. */
-void exit_abruptly(enum turtle_return rc, turtle_caller_t * caller)
+void exit_abruptly(
+    enum turtle_return rc, turtle_caller_t * caller, const char * message)
 {
         if (rc != TURTLE_RETURN_SUCCESS)
-                fprintf(stderr, "error in %s: %s.\n", turtle_strfunc(caller),
-                    turtle_strerror(rc));
+                fprintf(stderr, "error: %s.\n", message);
         exit(0);
 }
 
@@ -42,7 +42,8 @@ int main()
         struct turtle_map * map;
         enum turtle_return rc = turtle_map_load(path, NULL, &map);
         if (rc != TURTLE_RETURN_SUCCESS)
-                exit_abruptly(rc, (turtle_caller_t *)turtle_map_load);
+                exit_abruptly(rc, (turtle_caller_t *)turtle_map_load,
+                    "could not load map");
 
         printf("o) Loaded projection map `%s`\n", path);
 
@@ -79,7 +80,7 @@ int main()
          * error handler as argument to `turtle_initialise`.
          */
         /* Set an error handler from here on. */
-        turtle_handler(exit_abruptly);
+        turtle_handler(&exit_abruptly);
 
         /** Let us illustrate how to manipulate `turtle_projection`s in order to
          * do frame coordinates conversions.

@@ -26,10 +26,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "turtle.h"
 #include "client.h"
 #include "datum.h"
-#include "return.h"
+#include "error.h"
+#include "turtle.h"
 
 /* Management routine(s). */
 static enum turtle_return client_release(
@@ -42,12 +42,12 @@ enum turtle_return turtle_client_create(
         /* Check that one has a valid datum. */
         *client = NULL;
         if ((datum == NULL) || (datum->lock == NULL))
-                TURTLE_RETURN(TURTLE_RETURN_BAD_ADDRESS, turtle_client_create);
+                TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_ADDRESS,
+                    turtle_client_create, "invalid datum or missing lock");
 
         /* Allocate the new client and initialise it. */
         *client = malloc(sizeof(**client));
-        if (*client == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_client_create);
+        if (*client == NULL) return TURTLE_ERROR_MEMORY(turtle_client_create);
         (*client)->datum = datum;
         (*client)->tile = NULL;
         (*client)->index_la = INT_MIN;
@@ -64,8 +64,10 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client)
 
         /* Release any active tile. */
         enum turtle_return rc = client_release(*client, 1);
-        if (rc != TURTLE_RETURN_SUCCESS)
-                TURTLE_RETURN(rc, turtle_client_destroy);
+        if (rc == TURTLE_RETURN_LOCK_ERROR)
+                return TURTLE_ERROR_LOCK(turtle_client_destroy);
+        else if (rc == TURTLE_RETURN_UNLOCK_ERROR)
+                return TURTLE_ERROR_UNLOCK(turtle_client_destroy);
 
         /* Free the memory and return. */
         free(*client);
@@ -77,7 +79,13 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client)
 /* Clear the client's memory. */
 enum turtle_return turtle_client_clear(struct turtle_client * client)
 {
-        TURTLE_RETURN(client_release(client, 1), turtle_client_clear);
+        enum turtle_return rc = client_release(client, 1);
+        if (rc == TURTLE_RETURN_LOCK_ERROR)
+                return TURTLE_ERROR_LOCK(turtle_client_clear);
+        else if (rc == TURTLE_RETURN_UNLOCK_ERROR)
+                return TURTLE_ERROR_UNLOCK(turtle_client_clear);
+        else
+                return TURTLE_RETURN_SUCCESS;
 }
 
 /* Supervised access to the elevation data. */
@@ -99,14 +107,13 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                         goto interpolate;
         } else if (((int)latitude == client->index_la) &&
             ((int)longitude == client->index_lo))
-                TURTLE_RETURN(
-                    TURTLE_RETURN_PATH_ERROR, turtle_client_elevation);
+                return TURTLE_ERROR_MISSING_DATA(
+                    turtle_client_elevation, client->datum);
 
         /* Lock the datum. */
         struct turtle_datum * datum = client->datum;
         if ((datum->lock != NULL) && (datum->lock() != 0))
-                TURTLE_RETURN(
-                    TURTLE_RETURN_LOCK_ERROR, turtle_client_elevation);
+                return TURTLE_ERROR_LOCK(turtle_client_elevation);
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
 
         /* The requested coordinates are not in the current tile. Let's check
@@ -153,11 +160,20 @@ update:
 /* Unlock the datum. */
 unlock:
         if ((datum->unlock != NULL) && (datum->unlock() != 0))
-                TURTLE_RETURN(
-                    TURTLE_RETURN_UNLOCK_ERROR, turtle_client_elevation);
+                return TURTLE_ERROR_UNLOCK(turtle_client_elevation);
         if (rc != TURTLE_RETURN_SUCCESS) {
                 *elevation = 0.;
-                TURTLE_RETURN(rc, turtle_client_elevation);
+                if (rc == TURTLE_RETURN_PATH_ERROR) {
+                        return TURTLE_ERROR_MISSING_DATA(
+                            turtle_client_elevation, client->datum);
+                } else if (rc == TURTLE_RETURN_LOCK_ERROR) {
+                        return TURTLE_ERROR_LOCK(turtle_client_elevation);
+                } else if (rc == TURTLE_RETURN_UNLOCK_ERROR) {
+                        return TURTLE_ERROR_UNLOCK(turtle_client_elevation);
+                } else {
+                        return TURTLE_ERROR_UNEXPECTED(
+                            rc, turtle_client_elevation);
+                }
         }
 
 /* Interpolate the elevation. */

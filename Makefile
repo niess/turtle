@@ -3,7 +3,7 @@ DEPS_DIR := deps
 
 CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
-OBJS := client.o datum.o loader.o map.o projection.o turtle.o
+OBJS := client.o datum.o error.o loader.o map.o projection.o turtle.o
 INC := -Iinclude -I$(DEPS_DIR)/tinydir
 
 # Flag for PNG files.

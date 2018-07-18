@@ -24,6 +24,8 @@
 #ifndef TURTLE_DATUM_H
 #define TURTLE_DATUM_H
 
+#include "turtle.h"
+
 #include <stdint.h>
 
 /* Callback for accessing elevation data */
@@ -60,6 +62,7 @@ struct turtle_datum {
         double latitude_0, latitude_delta;
         double longitude_0, longitude_delta;
         int latitude_n, longitude_n;
+        char * root;
         char ** path;
 
         char data[]; /* Placeholder for data. */

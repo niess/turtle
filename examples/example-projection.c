@@ -28,10 +28,10 @@ void exit_gracefully(enum turtle_return rc)
 }
 
 /* User supplied error handler. */
-void error_handler(enum turtle_return rc, turtle_caller_t * caller)
+void error_handler(
+    enum turtle_return rc, turtle_caller_t * caller, const char * message)
 {
-        fprintf(stderr, "error in %s (%s) : %s.\n", __FILE__,
-            turtle_strfunc(caller), turtle_strerror(rc));
+        fprintf(stderr, "error: %s.\n", message);
         exit_gracefully(rc);
 }
 

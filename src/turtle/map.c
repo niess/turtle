@@ -34,10 +34,10 @@
 #include <png.h>
 #endif
 
-#include "turtle.h"
+#include "error.h"
 #include "map.h"
 #include "projection.h"
-#include "return.h"
+#include "turtle.h"
 
 /* Generic map allocation and initialisation. */
 static struct turtle_map * map_create(
@@ -61,16 +61,16 @@ enum turtle_return turtle_map_create(const char * projection,
         /* Check the input arguments. */
         if ((nx <= 0) || (ny <= 0) || (zmin > zmax) ||
             ((bit_depth != 8) && (bit_depth != 16)))
-                TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_create);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
+                    turtle_map_create, "invalid input parameter(s)");
 
         struct turtle_projection proj;
         enum turtle_return rc = turtle_projection_configure(projection, &proj);
-        if (rc != TURTLE_RETURN_SUCCESS) TURTLE_RETURN(rc, turtle_map_create);
+        if (rc != TURTLE_RETURN_SUCCESS) return rc;
 
         /*  Allocate the memory for the new map and initialise it. */
         *map = map_create(nx, ny, bit_depth, &proj);
-        if (*map == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_map_create);
+        if (*map == NULL) return TURTLE_ERROR_MEMORY(turtle_map_create);
 
         (*map)->x0 = box->x0 - fabs(box->half_x);
         (*map)->y0 = box->y0 - fabs(box->half_y);
@@ -105,16 +105,30 @@ enum turtle_return turtle_map_load(
 {
         /* Check the file extension. */
         const char * ext = path_extension(path);
-        if (ext == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_load);
+        if (ext == NULL) return TURTLE_ERROR_NO_EXTENSION(turtle_map_load);
 
 #ifndef TURTLE_NO_PNG
-        if (strcmp(ext, "png") == 0)
-                TURTLE_RETURN(map_load_png(path, box, map), turtle_map_load);
-        else
-                TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_load);
+        if (strcmp(ext, "png") == 0) {
+                enum turtle_return rc = map_load_png(path, box, map);
+                if (rc == TURTLE_RETURN_SUCCESS) {
+                        return TURTLE_RETURN_SUCCESS;
+                } else if (rc == TURTLE_RETURN_PATH_ERROR) {
+                        return TURTLE_ERROR_PATH(turtle_map_load, path);
+                } else if (rc == TURTLE_RETURN_DOMAIN_ERROR) {
+                        return TURTLE_ERROR_BOX(turtle_map_load);
+                } else if (rc == TURTLE_RETURN_MEMORY_ERROR) {
+                        return TURTLE_ERROR_MEMORY(turtle_map_load);
+                } else if (rc == TURTLE_RETURN_BAD_JSON) {
+                        return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_JSON,
+                            turtle_map_load, "invalid JSON metadata");
+                } else {
+                        return TURTLE_ERROR_UNEXPECTED(rc, turtle_map_load);
+                }
+        } else {
+                return TURTLE_ERROR_EXTENSION(turtle_map_load, ext);
+        }
 #else
-        TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_load);
+        return TURTLE_ERROR_EXTENSION(turtle_map_load, ext);
 #endif
 }
 
@@ -124,16 +138,28 @@ enum turtle_return turtle_map_dump(
 {
         /* Check the file extension. */
         const char * ext = path_extension(path);
-        if (ext == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_dump);
+        if (ext == NULL) return TURTLE_ERROR_NO_EXTENSION(turtle_map_dump);
 
 #ifndef TURTLE_NO_PNG
-        if (strcmp(ext, "png") == 0)
-                TURTLE_RETURN(map_dump_png(map, path), turtle_map_dump);
-        else
-                TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_dump);
+        if (strcmp(ext, "png") == 0) {
+                enum turtle_return rc = map_dump_png(map, path);
+                if (rc == TURTLE_RETURN_SUCCESS) {
+                        return TURTLE_RETURN_SUCCESS;
+                } else if (rc == TURTLE_RETURN_PATH_ERROR) {
+                        return TURTLE_ERROR_PATH(turtle_map_dump, path);
+                } else if (rc == TURTLE_RETURN_BAD_FORMAT) {
+                        return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_FORMAT,
+                            turtle_map_dump, "invalid data format");
+                } else if (rc == TURTLE_RETURN_MEMORY_ERROR) {
+                        return TURTLE_ERROR_MEMORY(turtle_map_dump);
+                } else {
+                        return TURTLE_ERROR_UNEXPECTED(rc, turtle_map_load);
+                }
+        } else {
+                return TURTLE_ERROR_EXTENSION(turtle_map_dump, ext);
+        }
 #else
-        TURTLE_RETURN(TURTLE_RETURN_BAD_EXTENSION, turtle_map_dump);
+        return TURTLE_ERROR_EXTENSION(turtle_map_dump, ext);
 #endif
 }
 
@@ -141,18 +167,21 @@ enum turtle_return turtle_map_dump(
 enum turtle_return turtle_map_fill(
     struct turtle_map * map, int ix, int iy, double elevation)
 {
-        if (map == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_map_fill);
-        else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny))
-                TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_fill);
+        if (map == NULL) {
+                return TURTLE_ERROR_MEMORY(turtle_map_fill);
+        } else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny)) {
+                return TURTLE_ERROR_OUTSIDE_MAP(turtle_map_fill);
+        }
 
         if ((map->dz <= 0.) && (elevation != map->z0))
-                TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_fill);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
+                    turtle_map_fill, "inconsistent elevation value");
         const int iz =
             (int)((elevation - map->z0) / map->dz + 0.5 - FLT_EPSILON);
         const int nz = (map->bit_depth == 8) ? 256 : 65536;
         if ((iz < 0) || (iz >= nz))
-                TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_fill);
+                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
+                    turtle_map_fill, "elevation is outside of map span");
 
         if (map->bit_depth == 8) {
                 unsigned char * z = (unsigned char *)map->z;
@@ -169,10 +198,11 @@ enum turtle_return turtle_map_fill(
 enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
     double * x, double * y, double * elevation)
 {
-        if (map == NULL)
-                TURTLE_RETURN(TURTLE_RETURN_MEMORY_ERROR, turtle_map_node);
-        else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny))
-                TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_node);
+        if (map == NULL) {
+                return TURTLE_ERROR_MEMORY(turtle_map_node);
+        } else if ((ix < 0) || (ix >= map->nx) || (iy < 0) || (iy >= map->ny)) {
+                return TURTLE_ERROR_OUTSIDE_MAP(turtle_map_node);
+        }
 
         if (x != NULL) *x = map->x0 + ix * map->dx;
         if (y != NULL) *y = map->y0 + iy * map->dy;
@@ -199,7 +229,7 @@ enum turtle_return turtle_map_elevation(
         int iy = (int)hy;
 
         if (ix >= map->nx - 1 || hx < 0 || iy >= map->ny - 1 || hy < 0)
-                TURTLE_RETURN(TURTLE_RETURN_DOMAIN_ERROR, turtle_map_elevation);
+                return TURTLE_ERROR_OUTSIDE_MAP(turtle_map_elevation);
         hx -= ix;
         hy -= iy;
 
@@ -367,8 +397,9 @@ static enum turtle_return map_load_png(
                         for (j = 0, key = tokens + 3, value = tokens + 4;
                              j < N_FIELDS; j++, key += 2, value += 2) {
                                 if (key->type != JSMN_STRING) goto error;
-                                if (!done[0] && (json_strcmp(text, key,
-                                                     "projection") == 0)) {
+                                if (!done[0] &&
+                                    (json_strcmp(text, key, "projection") ==
+                                        0)) {
                                         if (value->type != JSMN_STRING)
                                                 goto error;
                                         text[value->end] = '\0';
@@ -383,8 +414,9 @@ static enum turtle_return map_load_png(
                                         if (value->type != JSMN_PRIMITIVE)
                                                 goto error;
 
-                                        if (!done[1] && (json_strcmp(text, key,
-                                                             "x0") == 0)) {
+                                        if (!done[1] &&
+                                            (json_strcmp(text, key, "x0") ==
+                                                0)) {
                                                 if (json_sscanf(
                                                         text, value, &x0) != 1)
                                                         goto error;

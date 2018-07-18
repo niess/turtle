@@ -18,10 +18,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
- /*
-  * Interface to geotiff files providing a reader for 16b data, e.g. ASTER-GDEM2
-  * or SRTM tiles.
-  */
+/*
+ * Interface to geotiff files providing a reader for 16b data, e.g. ASTER-GDEM2
+ * or SRTM tiles.
+ */
 #ifndef TURTLE_READER_GEOTIFF16_H
 #define TURTLE_READER_GEOTIFF16_H
 

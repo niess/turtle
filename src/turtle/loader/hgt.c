@@ -18,16 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
- /*
-  * Interface to hgt files providing a reader for 16b data, e.g. SRTM tiles.
-  */
+/*
+ * Interface to hgt files providing a reader for 16b data, e.g. SRTM tiles.
+ */
 #include <stdlib.h>
 #include <string.h>
 
 #include <arpa/inet.h>
 
-#include "turtle.h"
 #include "../datum.h"
+#include "turtle.h"
 
 #include "hgt.h"
 
@@ -41,17 +41,14 @@ int hgt_open(const char * path, struct hgt_reader * reader)
         const char * filename = path;
         const char * p;
         for (p = path; *p != 0x0; p++) {
-                if ((*p == '/') || (*p == '\\'))
-                        filename = p + 1;
+                if ((*p == '/') || (*p == '\\')) filename = p + 1;
         }
 
         if (strlen(filename) < 8) return -1;
         reader->origin[0] = atoi(filename + 4);
-        if (filename[3] == 'W')
-                reader->origin[0] = -reader->origin[0];
+        if (filename[3] == 'W') reader->origin[0] = -reader->origin[0];
         reader->origin[1] = atoi(filename + 1);
-        if (filename[0] == 'S')
-                reader->origin[1] = -reader->origin[1];
+        if (filename[0] == 'S') reader->origin[1] = -reader->origin[1];
 
         const char * ext = NULL;
         for (p = filename + 7; *p != 0x0; p++) {
@@ -93,8 +90,7 @@ int hgt_readinto(struct hgt_reader * reader, struct datum_tile * tile)
         /* Load the raw data from file */
         const int n = reader->size * reader->size;
         int16_t * buffer = tile->data;
-        if (fread(buffer, sizeof(*buffer), n, reader->fid) != n)
-                return -1;
+        if (fread(buffer, sizeof(*buffer), n, reader->fid) != n) return -1;
 
         /* Set the data provider */
         tile->z = &get_z;
