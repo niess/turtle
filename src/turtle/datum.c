@@ -138,7 +138,7 @@ enum turtle_return turtle_datum_create(const char * path, int stack_size,
         int i;
         for (i = 0; i < lat_n * long_n; i++) (*datum)->path[i] = NULL;
 
-        char * cursor = (*datum)->data + path_size;
+        char * cursor = (char *)((*datum)->path) + path_size;
         for (tinydir_open(&dir, path); dir.has_next; tinydir_next(&dir)) {
                 tinydir_file file;
                 tinydir_readfile(&dir, &file);
@@ -215,8 +215,10 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum)
 
 /* Get the datum elevation at the given geodetic coordinates. */
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
-    double latitude, double longitude, double * elevation)
+    double latitude, double longitude, double * elevation, int * inside)
 {
+        if (inside != NULL) *inside = 0;
+
         /* Get the proper tile. */
         double hx, hy;
         int load = 1;
@@ -258,8 +260,12 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
                 if (rc == TURTLE_RETURN_MEMORY_ERROR) {
                         return TURTLE_ERROR_MEMORY(turtle_datum_elevation);
                 } else if (rc == TURTLE_RETURN_PATH_ERROR) {
-                        return TURTLE_ERROR_MISSING_DATA(
-                            turtle_datum_elevation, datum);
+                        if (inside != NULL) {
+                                return TURTLE_RETURN_SUCCESS;
+                        } else {
+                                return TURTLE_ERROR_MISSING_DATA(
+                                    turtle_datum_elevation, datum);
+                        }
                 } else if (rc != TURTLE_RETURN_SUCCESS) {
                         return TURTLE_ERROR_UNEXPECTED(
                             rc, turtle_datum_elevation);
@@ -286,6 +292,8 @@ enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
         *elevation = zm(tile, ix, iy) * (1. - hx) * (1. - hy) +
             zm(tile, ix, iy1) * (1. - hx) * hy +
             zm(tile, ix1, iy) * hx * (1. - hy) + zm(tile, ix1, iy1) * hx * hy;
+
+        if (inside != NULL) *inside = 1;
         return TURTLE_RETURN_SUCCESS;
 }
 
@@ -314,8 +322,8 @@ void turtle_datum_ecef(struct turtle_datum * datum, double latitude,
  *
  * Reference: B. R. Bowring's 1985 algorithm (single iteration).
  */
-void turtle_datum_geodetic(struct turtle_datum * datum, double ecef[3],
-    double * latitude, double * longitude, double * elevation)
+void turtle_datum_geodetic(struct turtle_datum * datum, const double ecef[3],
+    double * latitude, double * longitude, double * altitude)
 {
         /* Get the parameters of the reference ellipsoid. */
         const double a = WGS84_A, e = WGS84_E;
@@ -325,19 +333,21 @@ void turtle_datum_geodetic(struct turtle_datum * datum, double ecef[3],
 
         /* Compute the geodetic coordinates. */
         if ((ecef[0] == 0.) && (ecef[1] == 0.)) {
-                *latitude = (ecef[2] >= 0.) ? 90. : -90.;
-                *longitude = 0.0;
-                *elevation = fabs(ecef[2]) - b;
+                if (latitude != NULL) *latitude = (ecef[2] >= 0.) ? 90. : -90.;
+                if (longitude != NULL) *longitude = 0.0;
+                if (altitude != NULL) *altitude = fabs(ecef[2]) - b;
                 return;
         }
 
-        *longitude = atan2(ecef[1], ecef[0]) * 180. / M_PI;
+        if (longitude != NULL)
+                *longitude = atan2(ecef[1], ecef[0]) * 180. / M_PI;
+        if ((latitude == NULL) && (altitude == NULL)) return;
 
         const double p2 = ecef[0] * ecef[0] + ecef[1] * ecef[1];
         const double p = sqrt(p2);
         if (ecef[2] == 0.) {
-                *latitude = 0.;
-                *elevation = p - a;
+                if (latitude != NULL) *latitude = 0.;
+                if (altitude != NULL) *altitude = p - a;
                 return;
         }
 
@@ -348,10 +358,14 @@ void turtle_datum_geodetic(struct turtle_datum * datum, double ecef[3],
         const double su = cu * tu;
         const double tp =
             (ecef[2] + eb2 * b * su * su * su) / (p - e * e * a * cu * cu * cu);
-        *latitude = atan(tp) * 180. / M_PI;
-        const double cp = 1. / sqrt(1.0 + tp * tp);
-        const double sp = cp * tp;
-        *elevation = p * cp + ecef[2] * sp - a * sqrt(1. - e * e * sp * sp);
+        if (latitude != NULL) *latitude = atan(tp) * 180. / M_PI;
+
+        if (altitude != NULL) {
+                const double cp = 1. / sqrt(1.0 + tp * tp);
+                const double sp = cp * tp;
+                *altitude =
+                    p * cp + ecef[2] * sp - a * sqrt(1. - e * e * sp * sp);
+        }
 }
 
 /* Compute the local East, North, Up (ENU) basis vectors. .
@@ -401,8 +415,8 @@ void turtle_datum_direction(struct turtle_datum * datum, double latitude,
 }
 
 enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
-    double latitude, double longitude, double direction[3], double * azimuth,
-    double * elevation)
+    double latitude, double longitude, const double direction[3],
+    double * azimuth, double * elevation)
 {
         /* Compute the local E, N, U basis vectors. */
         double e[3], n[3], u[3];
@@ -421,8 +435,8 @@ enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
                 return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
                     turtle_datum_horizontal, "null direction vector");
         r = sqrt(r);
-        *azimuth = atan2(x, y) * 180. / M_PI;
-        *elevation = asin(z / r) * 180. / M_PI;
+        if (azimuth != NULL) *azimuth = atan2(x, y) * 180. / M_PI;
+        if (elevation != NULL) *elevation = asin(z / r) * 180. / M_PI;
 
         return TURTLE_RETURN_SUCCESS;
 }

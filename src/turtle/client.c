@@ -90,8 +90,10 @@ enum turtle_return turtle_client_clear(struct turtle_client * client)
 
 /* Supervised access to the elevation data. */
 enum turtle_return turtle_client_elevation(struct turtle_client * client,
-    double latitude, double longitude, double * elevation)
+    double latitude, double longitude, double * elevation, int * inside)
 {
+        if (inside != NULL) *inside = 0;
+
         /* Get the proper tile. */
         struct datum_tile * current = client->tile;
         double hx = 0., hy = 0.; /* Patch a non relevant warning. */
@@ -106,9 +108,14 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                     (hy <= current->ny))
                         goto interpolate;
         } else if (((int)latitude == client->index_la) &&
-            ((int)longitude == client->index_lo))
-                return TURTLE_ERROR_MISSING_DATA(
-                    turtle_client_elevation, client->datum);
+            ((int)longitude == client->index_lo)) {
+                if (inside != NULL) {
+                        return TURTLE_RETURN_SUCCESS;
+                } else {
+                        return TURTLE_ERROR_MISSING_DATA(
+                            turtle_client_elevation, client->datum);
+                }
+        }
 
         /* Lock the datum. */
         struct turtle_datum * datum = client->datum;
@@ -164,8 +171,12 @@ unlock:
         if (rc != TURTLE_RETURN_SUCCESS) {
                 *elevation = 0.;
                 if (rc == TURTLE_RETURN_PATH_ERROR) {
-                        return TURTLE_ERROR_MISSING_DATA(
-                            turtle_client_elevation, client->datum);
+                        if (inside != NULL) {
+                                return TURTLE_RETURN_SUCCESS;
+                        } else {
+                                return TURTLE_ERROR_MISSING_DATA(
+                                    turtle_client_elevation, client->datum);
+                        }
                 } else if (rc == TURTLE_RETURN_LOCK_ERROR) {
                         return TURTLE_ERROR_LOCK(turtle_client_elevation);
                 } else if (rc == TURTLE_RETURN_UNLOCK_ERROR) {
@@ -193,6 +204,8 @@ interpolate:
         *elevation = zm(tile, ix, iy) * (1. - hx) * (1. - hy) +
             zm(tile, ix, iy1) * (1. - hx) * hy +
             zm(tile, ix1, iy) * hx * (1. - hy) + zm(tile, ix1, iy1) * hx * hy;
+
+        if (inside != NULL) *inside = 1;
         return TURTLE_RETURN_SUCCESS;
 }
 

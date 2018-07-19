@@ -37,14 +37,14 @@ void error_handler(
 
 /**
  * Let's do the job now. First a `turtle_datum` is created in order to access
- * the ASTER-GDEM2 data. Then we create an empty `turtle_map` for the projected
+ * the elevation data. Then we create an empty `turtle_map` for the projected
  * elevation data. Following we loop over the map nodes and fill the elevation
  * values from the datum. Finnaly the resulting map is dumped to disk.
  *
  * __Warning__
  *
- * For this example to work you'll need the `ASTGMT2_N45E002_dem.tif` elevation
- * data tile to be located in a folder named `ASTGTM2`.
+ * For this example to work you'll need elevation data tiles (e.g. ASTER-GDEM2,
+ * or SRTM) to be located in a folder named `share/topography`.
  */
 int main()
 {
@@ -77,7 +77,7 @@ int main()
                         /* Fill the elevation. */
                         double elevation;
                         turtle_datum_elevation(
-                            datum, latitude, longitude, &elevation);
+                            datum, latitude, longitude, &elevation, NULL);
                         turtle_map_fill(map, ix, iy, elevation);
                 }
 

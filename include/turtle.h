@@ -77,6 +77,11 @@ struct turtle_datum;
 struct turtle_client;
 
 /**
+ * Handle to an ECEF stepper through geographic data.
+ */
+struct turtle_stepper;
+
+/**
  * Bounding box for projection maps.
  */
 struct turtle_box {
@@ -476,19 +481,23 @@ enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
  * @param x            The geographic X-coordinate.
  * @param y            The geographic Y-coordinate.
  * @param elevation    The elevation value.
+ * @param inside       Flag for bounds check or `NULL`.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
  * Compute an estimate of the map elevation at the given geographic
  * coordinates. The elevation is linearly interpolated using the 4 nodes that
- * surround the given coordinate.
+ * surround the given coordinate. Providing a non `NULL` value for *inside*
+ * allows to check if the provided coordinates are inside the map or not.
+ * **Note** that no bound error is raised in the latter case, when *inside* is
+ * not `NULL`.
  *
  * __Error codes__
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    The coordinates are not valid.
  */
-enum turtle_return turtle_map_elevation(
-    const struct turtle_map * map, double x, double y, double * elevation);
+enum turtle_return turtle_map_elevation(const struct turtle_map * map, double x,
+    double y, double * elevation, int * inside);
 
 /**
  * Get a handle to the map's projection.
@@ -600,12 +609,15 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum);
  * @param latitude     The geodetic latitude.
  * @param longitude    The geodetic longitude.
  * @param elevation    The estimated elevation.
+ * @param inside       Flag for bounds check or `NULL`.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
  * Compute an estimate of the elevation at the given geodetic coordinates. The
  * elevation is linearly interpolated using the 4 nodes that surround the given
- * coordinate.
+ * coordinate. Providing a non `NULL` value for *inside* allows to check if the
+ * provided coordinates are inside the datum tiles or not. **Note** that no
+ * bound error is raised in the latter case, when *inside* is not `NULL`.
  *
  * __Warnings__ this function is not thread safe. A `turtle_client` must be
  * used instead for concurrent accesses to the datum elevation data.
@@ -616,7 +628,7 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum);
  * datum's path.
  */
 enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
-    double latitude, double longitude, double * elevation);
+    double latitude, double longitude, double * elevation, int * inside);
 
 /**
  * Transform geodetic coordinates to cartesian ECEF ones.
@@ -640,14 +652,14 @@ void turtle_datum_ecef(struct turtle_datum * datum, double latitude,
  * @param ecef         The ECEF coordinates.
  * @param latitude     The corresponding geodetic latitude.
  * @param longitude    The corresponding geodetic longitude.
- * @param elevation    The corresponding geodetic elevation.
+ * @param altitude     The corresponding geodetic altitude.
  *
  * Transform Cartesian coordinates in the Earth-Centered, Earth-Fixed (ECEF)
  * frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
  * single iteration.
  */
-void turtle_datum_geodetic(struct turtle_datum * datum, double ecef[3],
-    double * latitude, double * longitude, double * elevation);
+void turtle_datum_geodetic(struct turtle_datum * datum, const double ecef[3],
+    double * latitude, double * longitude, double * altitude);
 
 /**
  * Transform horizontal coorrdinates to a cartesian direction in ECEF.
@@ -685,8 +697,8 @@ void turtle_datum_direction(struct turtle_datum * datum, double latitude,
  *    TURTLE_RETURN_DOMAIN_ERROR   The direction has a null norm.
  */
 enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
-    double latitude, double longitude, double direction[3], double * azimuth,
-    double * elevation);
+    double latitude, double longitude, const double direction[3],
+    double * azimuth, double * elevation);
 
 /**
  * Create a new client for a geodetic datum.
@@ -713,7 +725,7 @@ enum turtle_return turtle_client_create(
     struct turtle_datum * datum, struct turtle_client ** client);
 
 /**
- * Create a new client for a geodetic datum.
+ * Properly clean a client for a geodetic datum.
  *
  * @param client    A handle to the client.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
@@ -755,12 +767,15 @@ enum turtle_return turtle_client_clear(struct turtle_client * client);
  * @param latitude     The geodetic latitude.
  * @param longitude    The geodetic longitude.
  * @param elevation    The estimated elevation.
+ * @param inside       Flag for bounds check or `NULL`.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
  * Compute an estimate of the elevation at the given geodetic coordinates. The
  * elevation is linearly interpolated using the 4 nodes that surround the given
- * coordinate.
+ * coordinate. Providing a non `NULL` value for *inside* allows to check if the
+ * provided coordinates are inside the datum tiles or not. **Note** that no
+ * bound error is raised in the latter case, when *inside* is not `NULL`.
  *
  * __Error codes__
  *
@@ -772,7 +787,160 @@ enum turtle_return turtle_client_clear(struct turtle_client * client);
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
 enum turtle_return turtle_client_elevation(struct turtle_client * client,
-    double latitude, double longitude, double * elevation);
+    double latitude, double longitude, double * elevation, int * inside);
+
+/**
+* Create a new ECEF stepper.
+*
+* @param stepper   A handle to an ECEF stepper.
+* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+* code is returned as detailed below.
+*
+* Allocate memory for a new stepper providing smart access to geodetic and
+* elevation data given ECEF coordinates. Call `turtle_stepper_destroy`
+* in order to properly recover any allocated memory.
+*
+* __Error codes__
+*
+*    TURTLE_RETURN_MEMORY_ERROR    The stepper couldn't be allocated.
+*/
+enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper);
+
+/**
+ * Properly clean an ECEf stepper.
+ *
+ * @param stepper    A handle to an ECEF stepper.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Attempts to destroy an ECEF stepper. **Note** that the stepper might have
+ * created a `turtle_client` for thread safe access to a datum's elevation.
+ * If so, the client is automatically destroyed as well.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_LOCK_ERROR      The client lock couldn't be acquired.
+ *
+ *    TURTLE_RETURN_UNLOCK_ERROR    The client lock couldn't be released.
+ */
+enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper);
+
+/**
+ * Set the validity range for local approximation to geographic transforms.
+ *
+ * @param stepper    A handle to an ECEF stepper.
+ * @param range      The approximation range, in m.
+ *
+ * Setting a strictly positive range enables the use of local approximations to
+ * geographic transforms, for small consecutive steps. Note that by default
+ * this feature is disabled. A typical range value is 100 m, resulting in Less
+ * than 1 cm distortions.
+ */
+void turtle_stepper_range_set(struct turtle_stepper * stepper, double range);
+
+/**
+ * Get the validity range for local approximation to geographic transforms.
+ *
+ * @param stepper    A handle to an ECEF stepper.
+ * @return The approximation range, in m.
+ */
+double turtle_stepper_range_get(const struct turtle_stepper * stepper);
+
+/**
+ * Add a `turtle_datum` data layer to a stepper.
+ *
+ * @param stepper   A handle to an ECEF stepper.
+ * @param datum     The datum to access.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Register a new data layer for the stepper accessing an existing
+ * `turtle_datum`. Nore that if the datum supports multithreading, i.e. has
+ * a registered lock, then a `turtle_client` is automatically created in order
+ * to access the datum.
+ *
+ * **Note** that the last created layer is the top layer, i.e. it has priority
+ * over layers beneath.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_BAD_ADDRESS     The client could not be created.
+ *
+ *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+ */
+enum turtle_return turtle_stepper_add_datum(
+    struct turtle_stepper * stepper, struct turtle_datum * datum);
+
+/**
+* Add a `turtle_map` data layer to a stepper.
+*
+* @param stepper   A handle to an ECEF stepper.
+* @param map       The map to access.
+* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+* code is returned as detailed below.
+*
+* Register a new data layer for the stepper accessing an existing
+* `turtle_map`.
+*
+* **Note** that the last created layer is the top layer, i.e. it has priority
+* over layers beneath.
+*
+* __Error codes__
+*
+*    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+*/
+enum turtle_return turtle_stepper_add_map(
+    struct turtle_stepper * stepper, struct turtle_map * map);
+
+/**
+* Add a flat data layer to a stepper.
+*
+* @param stepper         A handle to an ECEF stepper.
+* @param ground_level    The uniform ground level.
+* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+* code is returned as detailed below.
+*
+* Register a new data layer for the stepper providing a flat ground.
+*
+* **Note** that the last created layer is the top layer, i.e. it has priority
+* over layers beneath.
+*
+* __Error codes__
+*
+*    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+*/
+enum turtle_return turtle_stepper_add_flat(
+    struct turtle_stepper * stepper, double ground_level);
+
+/**
+* Access geography data from ECEF, step by step.
+*
+* @param stepper              A handle to an ECEF stepper.
+* @param position             The ECEF position of interest.
+* @param latitude             The corresponding geodetic latitude.
+* @param longitude            The corresponding geodetic longitude.
+* @param altitude             The corresponding geodetic altitude.
+* @param ground_elevation     The corresponding ground elevation.
+* @param layer                The selected data layer.
+* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+* code is returned as detailed below.
+*
+* Inspect the stepper's data stack and provide the top most valid one. If no
+* valid layer was found a negative *layer* value is returned, or an error is
+* raised if *layer* points to `NULL`. Note that any of the output data can
+* point to `NULL` if it is of no interest. Note also that depending of the
+* set local *range*, an approximation might be used for computing geographic
+* coordinates.
+*
+* __Error codes__
+*
+*    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all data.
+*
+*    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+*/
+enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
+    const double * position, double * latitude, double * longitude,
+    double * altitude, double * ground_elevation, int * layer);
 
 #ifdef __cplusplus
 }

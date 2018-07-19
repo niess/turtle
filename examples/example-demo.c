@@ -21,21 +21,17 @@ void exit_abruptly(
 int main()
 {
         /** First let us initialise the TURTLE library. The `NULL` argument
-         * specifies
-         * that no error handler is used. Most of TURTLE's library functions
-         * return
-         * a `turtle_return` code that could be catched by a user defined error
-         * handler.
-         * But, to start with let us handle explicitly the return codes.
+         * specifies that no error handler is used. Most of TURTLE's library
+         * functions return a `turtle_return` code that could be catched by a
+         * user defined error handler. But, to start with let us handle
+         * explicitly the return codes.
          */
         /* Initialise the TURTLE library. */
         turtle_initialise(NULL);
 
         /** Let us now demonstrate how to load a projection map from the disk
-         * and how
-         * to access its meta-data. So you'll need to run `example-projection`
-         * first if
-         * you don't already have the map.
+         * and how to access its meta-data. So you'll need to run
+         * example-projection` first if you don't already have the map.
          */
         /* Load the RGF93 map dumped by `example-projection`. */
         const char * path = "pdd-30m.png";
@@ -73,8 +69,7 @@ int main()
         free(strproj);
 
         /** For the following, let us attach an error handler to TURTLE such
-         * that we
-         * don't need anymore to explicitly handle return codes.
+         * that we don't need anymore to explicitly handle return codes.
          *
          * *Note* that we could have done so right from the start by passing the
          * error handler as argument to `turtle_initialise`.
@@ -86,8 +81,7 @@ int main()
          * do frame coordinates conversions.
          */
         /*
-         * Convert the local coordinates of the map's origin to
-         * geodetic ones.
+         * Convert the local coordinates of the map's origin to geodetic ones.
          */
         double latitude, longitude;
         turtle_projection_unproject(
@@ -109,20 +103,14 @@ int main()
         turtle_projection_destroy(&utm);
 
         /** Let us show how to access the ASTER-GDEM2 elevation data. That for
-         * we need
-         * to instanciate a geodetic `turtle_datum`. Since we are only
-         * interested in a
-         * single coordinate the stack size for elevation data is set to `1`,
-         * i.e. a
-         * single data file will be loaded and buffered.
+         * we need to instanciate a geodetic `turtle_datum`. Since we are only
+         * interested in a single coordinate the stack size for elevation data
+         * is set to `1`, i.e. a single data file will be loaded and buffered.
          *
          * Having a new `turtle_datum` for ASTER-GDEM2 data, we can request the
-         * origin's
-         * elevation and compare the result to the map's one. *Note* that there
-         * might be
-         * a 1 cm difference between both due to the encoding of the elevation
-         * data over
-         * 16 bits.
+         * origin's elevation and compare the result to the map's one. *Note*
+         * that there might be a 1 cm difference between both due to the
+         * encoding of the elevation data over 16 bits.
          */
         /*
          * Create a new geodetic datum handle to access the ASTER-GDEM2
@@ -133,24 +121,22 @@ int main()
 
         /* Get the orgin's elevation from the datum. */
         double elevation_ASTER;
-        turtle_datum_elevation(datum, latitude, longitude, &elevation_ASTER);
+        turtle_datum_elevation(
+            datum, latitude, longitude, &elevation_ASTER, NULL);
 
         /* Get the same from the map. */
         double elevation_map;
-        turtle_map_elevation(map, box.x0, box.y0, &elevation_map);
+        turtle_map_elevation(map, box.x0, box.y0, &elevation_map, NULL);
 
         printf("o) The origin's elevation is:\n");
         printf("    + ASTER-GDEM2  : %.2lf m\n", elevation_ASTER);
         printf("    + RGF93 map    : %.2lf m\n", elevation_map);
 
         /** Finally, let us express the origin's coordinates in a Cartesian
-         * frame,
-         * i.e. Earth-Centered, Earth-Fixed (ECEF). *Note* that this conversion
-         * doesn't
-         * require access to the ASTER-GDEM2 elevation data, provided that the
-         * elevation
-         * is known from elsewhere. E.g. in this case we use the map's elevation
-         * value.
+         * frame, i.e. Earth-Centered, Earth-Fixed (ECEF). *Note* that this
+         * conversion doesn't require access to the ASTER-GDEM2 elevation data,
+         * provided that the elevation is known from elsewhere. E.g. in this
+         * case we use the map's elevation value.
          */
         double ecef[3];
         turtle_datum_ecef(datum, latitude, longitude, elevation_map, ecef);

@@ -221,15 +221,21 @@ enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
 
 /* Interpolate the elevation at a given location. */
 enum turtle_return turtle_map_elevation(
-    const struct turtle_map * map, double x, double y, double * z)
+    const struct turtle_map * map, double x, double y, double * z, int * inside)
 {
         double hx = (x - map->x0) / map->dx;
         double hy = (y - map->y0) / map->dy;
         int ix = (int)hx;
         int iy = (int)hy;
 
-        if (ix >= map->nx - 1 || hx < 0 || iy >= map->ny - 1 || hy < 0)
-                return TURTLE_ERROR_OUTSIDE_MAP(turtle_map_elevation);
+        if (ix >= map->nx - 1 || hx < 0 || iy >= map->ny - 1 || hy < 0) {
+                if (inside != NULL) {
+                        *inside = 0;
+                        return TURTLE_RETURN_SUCCESS;
+                } else {
+                        return TURTLE_ERROR_OUTSIDE_MAP(turtle_map_elevation);
+                }
+        }
         hx -= ix;
         hy -= iy;
 
@@ -248,6 +254,8 @@ enum turtle_return turtle_map_elevation(
                     zm[(iy + 1) * nx + ix + 1] * hx * hy;
         }
         *z = (*z) * map->dz + map->z0;
+
+        if (inside != NULL) *inside = 1;
         return TURTLE_RETURN_SUCCESS;
 }
 

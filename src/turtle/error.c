@@ -35,7 +35,7 @@ enum turtle_return turtle_error_raise(enum turtle_return rc,
 {
         if ((_handler == NULL) || (rc == TURTLE_RETURN_SUCCESS)) return rc;
 
-                /* Format the error message */
+/* Format the error message */
 #define ERROR_MSG_LENGTH 1024
         char message[ERROR_MSG_LENGTH];
         const int n = snprintf(message, ERROR_MSG_LENGTH,

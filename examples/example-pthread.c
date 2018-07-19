@@ -63,7 +63,7 @@ static void * run_thread(void * args)
                     (i * (params->longitude_1 - params->longitude_0)) / (n - 1);
                 double elevation;
                 turtle_client_elevation(
-                    client, latitude, longitude, &elevation);
+                    client, latitude, longitude, &elevation, NULL);
                 lock();
                 fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n",
                     (long)params->tid, latitude, longitude, elevation);
@@ -98,14 +98,14 @@ int unlock(void)
 /**
  * Finally the threads are spawned in the main function after various
  * initialisation. For this example to work, you'll need to get the
- * ASTER-GDEM2 elevation data for the following 4 tiles:
+ * ASTER-GDEM2 (or SRTM) elevation data for the following 4 tiles:
  *
  * * `ASTGMT2_N45E002_dem.tif`
  * * `ASTGMT2_N45E003_dem.tif`
  * * `ASTGMT2_N46E002_dem.tif`
  * * `ASTGMT2_N46E003_dem.tif`
  *
- * The tiles should be extracted to a folder named ASTGMT2.
+ * The tiles should be extracted to a folder named share/topographie.
  *
  * **Note** that since there are only 4 tiles that can be accessed, setting the
  * datum `stack_size` to 4 or more will result in speed up since then there is

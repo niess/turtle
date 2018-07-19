@@ -3,7 +3,7 @@ DEPS_DIR := deps
 
 CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
-OBJS := client.o datum.o error.o loader.o map.o projection.o turtle.o
+OBJS := client.o datum.o error.o loader.o map.o projection.o stepper.o turtle.o
 INC := -Iinclude -I$(DEPS_DIR)/tinydir
 
 # Flag for PNG files.
@@ -59,7 +59,7 @@ lib/libturtle.so: $(OBJS)
 	@gcc $(CFLAGS) -o $@ -c $<
 
 # Rules for building the examples.
-examples: bin/example-demo bin/example-projection bin/example-pthread
+examples: bin/example-demo bin/example-projection bin/example-pthread bin/example-stepper
 
 bin/example-pthread: examples/example-pthread.c
 	@mkdir -p bin

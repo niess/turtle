@@ -154,7 +154,7 @@ enum loader_format loader_format(const char * path)
                 if (*p == '.') extension = p + 1;
         if (extension == NULL) return LOADER_FORMAT_UNKNOWN;
 
-                /* Check the extension */
+/* Check the extension */
 #ifndef TURTLE_NO_TIFF
         if ((strcmp(extension, "tif") == 0) || (strcmp(extension, "TIF") == 0))
                 return LOADER_FORMAT_GEOTIFF;
