@@ -42,9 +42,8 @@ submodules, e.g. using `git clone --recursive`.
 
 ## Documentation
 
-The API documentation can be found
-[here](https://niess.github.io/turtle/docs/index.html#HEAD), as well as some
-basic examples of usage.
+The API documentation can be found [here](http://niess.github.io/turtle-docs).
+You might directly check the [examples](examples) as well.
 
 ## License
 

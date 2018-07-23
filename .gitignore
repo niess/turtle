@@ -11,3 +11,6 @@ bin
 
 # Ignore shared data
 share
+
+# Ignore the docs
+docs
