@@ -19,27 +19,27 @@
  */
 
 /*
- * Turtle datum handle for access to world-wide elevation data.
+ * Turtle handle for accessing world-wide elevation data.
  */
-#ifndef TURTLE_DATUM_H
-#define TURTLE_DATUM_H
+#ifndef TURTLE_STACK_H
+#define TURTLE_STACK_H
 
 #include "turtle.h"
 
 #include <stdint.h>
 
 /* Callback for accessing elevation data */
-struct datum_tile;
-typedef int16_t datum_tile_cb(struct datum_tile * tile, int ix, int iy);
+struct tile;
+typedef int16_t tile_cb(struct tile * tile, int ix, int iy);
 
 /* Container for a data tile. */
-struct datum_tile {
+struct tile {
         /* Meta data */
-        struct datum_tile *prev, *next;
+        struct tile *prev, *next;
         int clients;
 
         /* Callback for accessing elevation data */
-        datum_tile_cb * z;
+        tile_cb * z;
 
         /* Map data. */
         int nx, ny;
@@ -48,15 +48,15 @@ struct datum_tile {
         int16_t data[];
 };
 
-/* Container for a geodetic datum. */
-struct turtle_datum {
+/* Container for a stack of global topography data. */
+struct turtle_stack {
         /* The stack of loaded tiles. */
-        struct datum_tile * stack;
-        int stack_size, max_size;
+        struct tile * head;
+        int size, max_size;
 
         /* Callbacks for lock handling. */
-        turtle_datum_cb * lock;
-        turtle_datum_cb * unlock;
+        turtle_stack_cb * lock;
+        turtle_stack_cb * unlock;
 
         /* Lookup data for tile's file names. */
         double latitude_0, latitude_delta;
@@ -69,9 +69,9 @@ struct turtle_datum {
 };
 
 /* Tile utility routines. */
-void datum_tile_touch(struct turtle_datum * datum, struct datum_tile * tile);
-void datum_tile_destroy(struct turtle_datum * datum, struct datum_tile * tile);
-enum turtle_return datum_tile_load(
-    struct turtle_datum * datum, double latitude, double longitude);
+void tile_touch(struct turtle_stack * stack, struct tile * tile);
+void tile_destroy(struct turtle_stack * stack, struct tile * tile);
+enum turtle_return tile_load(
+    struct turtle_stack * stack, double latitude, double longitude);
 
 #endif

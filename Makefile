@@ -1,12 +1,13 @@
-# Default compilation flags.
+# Default compilation flags
 DEPS_DIR := deps
 
 CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
-OBJS := client.o datum.o error.o loader.o map.o projection.o stepper.o turtle.o
+OBJS := client.o ecef.o stack.o error.o loader.o map.o projection.o stepper.o  \
+        turtle.o
 INC := -Iinclude -I$(DEPS_DIR)/tinydir
 
-# Flag for PNG files.
+# Flag for PNG files
 TURTLE_USE_PNG := 1
 ifeq ($(TURTLE_USE_PNG),1)
 	PACKAGE := libpng
@@ -18,7 +19,7 @@ else
 	CFLAGS += -DTURTLE_NO_PNG
 endif
 
-# Flag for GEOTIFF files.
+# Flag for GEOTIFF files
 TURTLE_USE_TIFF := 1
 ifeq ($(TURTLE_USE_TIFF),1)
 	LIBS += -ltiff
@@ -27,7 +28,7 @@ else
 	CFLAGS += -DTURTLE_NO_TIFF
 endif
 
-# Flag for HGT files.
+# Flag for HGT files
 TURTLE_USE_HGT := 1
 ifeq ($(TURTLE_USE_HGT),1)
 	OBJS +=  hgt.o
@@ -49,6 +50,9 @@ lib/libturtle.so: $(OBJS)
 %.o: src/turtle/%.c src/turtle/%.h
 	@gcc $(CFLAGS) $(INC) -o $@ -c $<
 
+%.o: src/turtle/%.c
+	@gcc $(CFLAGS) $(INC) -o $@ -c $<
+
 %.o: src/turtle/loader/%.c src/turtle/loader/%.h
 	@gcc $(CFLAGS) $(INC) -o $@ -c $<
 
@@ -58,17 +62,19 @@ lib/libturtle.so: $(OBJS)
 %.o: $(DEPS_DIR)/jsmn/%.c $(DEPS_DIR)/jsmn/%.h
 	@gcc $(CFLAGS) -o $@ -c $<
 
-# Rules for building the examples.
-examples: bin/example-demo bin/example-projection bin/example-pthread bin/example-stepper
+# Rules for building the examples
+examples: bin/example-demo bin/example-projection bin/example-pthread          \
+          bin/example-stepper
 
 bin/example-pthread: examples/example-pthread.c
 	@mkdir -p bin
-	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -Wl,-rpath $(PWD)/lib -lturtle -lpthread
+	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -Wl,-rpath $(PWD)/lib -lturtle    \
+             -lpthread
 
 bin/example-%: examples/example-%.c
 	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) $(INC) $< -Llib -Wl,-rpath $(PWD)/lib -lturtle
 
-# Clean-up rule.
+# Clean-up rule
 clean:
 	@rm -rf bin lib *.o

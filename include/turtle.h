@@ -67,12 +67,12 @@ struct turtle_projection;
 struct turtle_map;
 
 /**
- * Handle for a geodetic datum for worldwide elevation data.
+ * Handle for acessing a stack of global topography data.
  */
-struct turtle_datum;
+struct turtle_stack;
 
 /**
- * Handle to a datum client for multithreaded access to elevation data.
+ * Handle to a stack client for multithreaded access to elevation data.
  */
 struct turtle_client;
 
@@ -125,7 +125,7 @@ typedef void turtle_handler_cb(
  *
  * @return `0` on success, any other value otherwise.
  *
- * For multhithreaded applications with a `turtle_datum` and `turtle_client`s
+ * For multhithreaded applications with a `turtle_stack` and `turtle_client`s
  * the user must supply a `lock` and `unlock` callback providing exclusive
  * access to critical sections, e.g. using a semaphore.
  *
@@ -133,7 +133,7 @@ typedef void turtle_handler_cb(
  *
  * The callback *must* return `0` if the (un)lock was successfull.
  */
-typedef int turtle_datum_cb(void);
+typedef int turtle_stack_cb(void);
 
 /**
  * Initialise the TURTLE library.
@@ -528,20 +528,78 @@ void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
     int * nx, int * ny, double * zmin, double * zmax, int * bit_depth);
 
 /**
- * Create a new geodetic datum.
+* Transform geodetic coordinates to cartesian ECEF ones.
+*
+* @param latitude     The geodetic latitude.
+* @param longitude    The geodetic longitude.
+* @param elevation    The geodetic elevation.
+* @param ecef         The corresponding ECEF coordinates.
+*
+* Transform geodetic coordinates to Cartesian ones in the Earth-Centered,
+* Earth-Fixed (ECEF) frame.
+*/
+void turtle_ecef_from_geodetic(
+    double latitude, double longitude, double elevation, double ecef[3]);
+
+/**
+* Transform cartesian ECEF coordinates to geodetic ones.
+*
+* @param ecef         The ECEF coordinates.
+* @param latitude     The corresponding geodetic latitude.
+* @param longitude    The corresponding geodetic longitude.
+* @param altitude     The corresponding geodetic altitude.
+*
+* Transform Cartesian coordinates in the Earth-Centered, Earth-Fixed (ECEF)
+* frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
+* single iteration.
+*/
+void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
+    double * longitude, double * altitude);
+
+/**
+* Transform horizontal angles to a cartesian direction in ECEF.
+*
+* @param latitude     The geodetic latitude.
+* @param longitude    The geodetic longitude.
+* @param azimuth      The geographic azimuth angle.
+* @param elevation    The geographic elevation angle.
+* @param direction    The corresponding direction in ECEF coordinates.
+*
+* Transform horizontal coordinates to a Cartesian direction in the
+* Earth-Centered, Earth-Fixed (ECEF) frame.
+*/
+void turtle_ecef_from_horizontal(double latitude, double longitude,
+    double azimuth, double elevation, double direction[3]);
+
+/**
+* Transform a cartesian direction in ECEF to horizontal angles.
+*
+* @param latitude     The geodetic latitude.
+* @param longitude    The geodetic longitude.
+* @param direction    The direction vector in ECEF coordinates.
+* @param azimuth      The corresponding geographic azimuth.
+* @param elevation    The corresponding geographic elevation.
+*
+* Transform a Cartesian direction vector in the Earth-Centered, Earth-Fixed
+* (ECEF) frame to horizontal coordinates.
+*/
+void turtle_ecef_to_horizontal(double latitude, double longitude,
+    const double direction[3], double * azimuth, double * elevation);
+
+/**
+ * Create a new stack of global topography data.
  *
- * @param path          The path where elevation data are stored.
+ * @param path          The path where elevation data are stored, or `NULL`.
  * @param stack_size    The number of elevation data tiles kept in memory.
  * @param lock          A callback for locking critical sections, or `NULL`.
  * @param unlock        A callback for unlocking critical sections, or `NULL`.
- * @param datum         A handle to the datum.
+ * @param stack         A handle to the stack.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
- * Allocate memory for a new geodetic datum and initialise it. Use
- * `turtle_datum_destroy` in order to recover any memory allocated subsequently.
- * The datum is initialised with an empty stack. The name of the path folder
- * encodes the data source as detailed below. It doesn't need to actually
+ * Allocate memory for a new stack and initialise it. Use `turtle_stack_destroy`
+ * in order to recover any memory allocated subsequently. The stack is
+ * initialised with an empty stack. The path folder doesn't need to actually
  * store elevation data, e.g. if only geographic transforms are needed.
  *
  * __Warnings__
@@ -551,10 +609,6 @@ void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
  * `sem_post`. Otherwise they can be both set to `NULL`. Note that setting only
  * one to not `NULL` raises a `TURTLE_RETURN_BAD_FORMAT` error.
  *
- * __Supported sources__
- *
- *    ASTGTM2    ASTER-GDEM2 data, e.g. from http://reverb.echo.nasa.gov/reverb.
- *
  * __Error codes__
  *
  *    TURTLE_RETURN_BAD_ADDRESS     The lock and unlock callbacks are
@@ -563,31 +617,31 @@ void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
  *    TURTLE_RETURN_BAD_FORMAT      The format of the elevation data is not
  * supported.
  *
- *    TURTLE_RETURN_MEMORY_ERROR    The datum couldn't be allocated.
+ *    TURTLE_RETURN_MEMORY_ERROR    The stack couldn't be allocated.
  */
-enum turtle_return turtle_datum_create(const char * path, int stack_size,
-    turtle_datum_cb * lock, turtle_datum_cb * unlock,
-    struct turtle_datum ** datum);
+enum turtle_return turtle_stack_create(const char * path, int stack_size,
+    turtle_stack_cb * lock, turtle_stack_cb * unlock,
+    struct turtle_stack ** stack);
 
 /**
- * Destroy a gedodetic datum.
+ * Destroy a stacl of global topography data.
  *
- * @param datum    A handle to the datum.
+ * @param stack    A handle to the stack.
  *
- * Fully destroy a datum and all its allocated elevation data. On return
- * `datum` is set to `NULL`.
+ * Fully destroy a stack and all its allocated elevation data. On return `stack`
+ * is set to `NULL`.
  *
  * __Warnings__
  *
  * This method is not thread safe. All clients should have been destroyed or
  * disabled first.
  */
-void turtle_datum_destroy(struct turtle_datum ** datum);
+void turtle_stack_destroy(struct turtle_stack ** stack);
 
 /**
- * Clear the stack of elevation data.
+ * Clear the stack from topography data.
  *
- * @param datum    A handle to the datum.
+ * @param stack    A handle to the stack.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
@@ -600,12 +654,12 @@ void turtle_datum_destroy(struct turtle_datum ** datum);
  *
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
-enum turtle_return turtle_datum_clear(struct turtle_datum * datum);
+enum turtle_return turtle_stack_clear(struct turtle_stack * stack);
 
 /**
  * Get the elevation at geodetic coordinates.
  *
- * @param datum        A handle to the datum.
+ * @param stack        A handle to the stack.
  * @param latitude     The geodetic latitude.
  * @param longitude    The geodetic longitude.
  * @param elevation    The estimated elevation.
@@ -616,122 +670,52 @@ enum turtle_return turtle_datum_clear(struct turtle_datum * datum);
  * Compute an estimate of the elevation at the given geodetic coordinates. The
  * elevation is linearly interpolated using the 4 nodes that surround the given
  * coordinate. Providing a non `NULL` value for *inside* allows to check if the
- * provided coordinates are inside the datum tiles or not. **Note** that no
+ * provided coordinates are inside the stack tiles or not. **Note** that no
  * bound error is raised in the latter case, when *inside* is not `NULL`.
  *
  * __Warnings__ this function is not thread safe. A `turtle_client` must be
- * used instead for concurrent accesses to the datum elevation data.
+ * used instead for concurrent accesses to the stack data.
  *
  * __Error codes__
  *
  *    TURTLE_RETURN_BAD_PATH    The required elevation data are not in the
- * datum's path.
+ * stack path.
  */
-enum turtle_return turtle_datum_elevation(struct turtle_datum * datum,
+enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
     double latitude, double longitude, double * elevation, int * inside);
 
 /**
- * Transform geodetic coordinates to cartesian ECEF ones.
+ * Create a new client to a stack of global topography data.
  *
- * @param datum        A handle to the datum.
- * @param latitude     The geodetic latitude.
- * @param longitude    The geodetic longitude.
- * @param elevation    The geodetic elevation.
- * @param ecef         The corresponding ECEF coordinates.
- *
- * Transform geodetic coordinates to Cartesian ones in the Earth-Centered,
- * Earth-Fixed (ECEF) frame.
- */
-void turtle_datum_ecef(struct turtle_datum * datum, double latitude,
-    double longitude, double elevation, double ecef[3]);
-
-/**
- * Transform cartesian ECEF coordinates to geodetic ones.
- *
- * @param datum        A handle to the datum.
- * @param ecef         The ECEF coordinates.
- * @param latitude     The corresponding geodetic latitude.
- * @param longitude    The corresponding geodetic longitude.
- * @param altitude     The corresponding geodetic altitude.
- *
- * Transform Cartesian coordinates in the Earth-Centered, Earth-Fixed (ECEF)
- * frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
- * single iteration.
- */
-void turtle_datum_geodetic(struct turtle_datum * datum, const double ecef[3],
-    double * latitude, double * longitude, double * altitude);
-
-/**
- * Transform horizontal coorrdinates to a cartesian direction in ECEF.
- *
- * @param datum        A handle to the datum.
- * @param latitude     The geodetic latitude.
- * @param longitude    The geodetic longitude.
- * @param azimuth      The geographic azimuth angle.
- * @param elevation    The geographic elevation angle.
- * @param direction    The corresponding direction in ECEF coordinates.
- *
- * Transform horizontal coordinates to a Cartesian direction in the
- * Earth-Centered, Earth-Fixed (ECEF) frame.
- */
-void turtle_datum_direction(struct turtle_datum * datum, double latitude,
-    double longitude, double azimuth, double elevation, double direction[3]);
-
-/**
- * Transform a cartesian direction in ECEF to horizontal coorrdinates.
- *
- * @param datum        A handle to the datum.
- * @param latitude     The geodetic latitude.
- * @param longitude    The geodetic longitude.
- * @param direction    The direction vector in ECEF coordinates.
- * @param azimuth      The corresponding geographic azimuth.
- * @param elevation    The corresponding geographic elevation.
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below.
- *
- * Transform a Cartesian direction vector in the Earth-Centered, Earth-Fixed
- * (ECEF) frame to horizontal coordinates.
- *
- * __Error codes__
- *
- *    TURTLE_RETURN_DOMAIN_ERROR   The direction has a null norm.
- */
-enum turtle_return turtle_datum_horizontal(struct turtle_datum * datum,
-    double latitude, double longitude, const double direction[3],
-    double * azimuth, double * elevation);
-
-/**
- * Create a new client for a geodetic datum.
- *
- * @param datum     The master geodetic datum.
+ * @param stack     The serving stack.
  * @param client    A handle to the client.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
  * Allocate memory for a new client for a thread safe access to the elevation
- * data of a geodetic datum. The client is initialised as iddle. Whenever a new
+ * data of a stack. The client is initialised as iddle. Whenever a new
  * elevation value is requested it will book the needed data to its master
- * `turtle_datum` and release any left over ones. Use `turtle_client_clear`in
+ * `turtle_stack` and release any left over ones. Use `turtle_client_clear`in
  * order to force the release of any reserved data or `turtle_client_destroy`
  * in order to fully recover the client's memory.
  *
  * __Error codes__
  *
- *    TURTLE_RETURN_BAD_ADDRESS     The datum is not valid, e.g. has no lock.
+ *    TURTLE_RETURN_BAD_ADDRESS     The stack is not valid, e.g. it has no lock.
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The client couldn't be allocated.
  */
 enum turtle_return turtle_client_create(
-    struct turtle_datum * datum, struct turtle_client ** client);
+    struct turtle_stack * stack, struct turtle_client ** client);
 
 /**
- * Properly clean a client for a geodetic datum.
+ * Properly clean a client for a stack.
  *
  * @param client    A handle to the client.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
- * Attempts to destroy a datum client. Any reserved elevation data are first
+ * Attempts to destroy a stack client. Any reserved elevation data are first
  * freed. On a successfull return `client` is set to `NULL`.
  *
  * __Error codes__
@@ -749,7 +733,7 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client);
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
- * Notify the master datum that any previously reserved elevation data is no
+ * Notify the master stack that any previously reserved elevation data is no
  * more needed.
  *
  * __Error codes__
@@ -761,9 +745,9 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client);
 enum turtle_return turtle_client_clear(struct turtle_client * client);
 
 /**
- * Thread safe access to the elevation data of a geodetic datum.
+ * Thread safe access to the elevation data of a stack.
  *
- * @param datum        A handle to the client.
+ * @param client       A handle to the client.
  * @param latitude     The geodetic latitude.
  * @param longitude    The geodetic longitude.
  * @param elevation    The estimated elevation.
@@ -774,13 +758,13 @@ enum turtle_return turtle_client_clear(struct turtle_client * client);
  * Compute an estimate of the elevation at the given geodetic coordinates. The
  * elevation is linearly interpolated using the 4 nodes that surround the given
  * coordinate. Providing a non `NULL` value for *inside* allows to check if the
- * provided coordinates are inside the datum tiles or not. **Note** that no
+ * provided coordinates are inside the stack tiles or not. **Note** that no
  * bound error is raised in the latter case, when *inside* is not `NULL`.
  *
  * __Error codes__
  *
  *    TURTLE_RETURN_BAD_PATH        The required elevation data are not in the
- * datum's path.
+ * stack path.
  *
  *    TURTLE_RETURN_LOCK_ERROR      The lock couldn't be acquired.
  *
@@ -814,7 +798,7 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper);
  * code is returned as detailed below.
  *
  * Attempts to destroy an ECEF stepper. **Note** that the stepper might have
- * created a `turtle_client` for thread safe access to a datum's elevation.
+ * created a `turtle_client` for thread safe access to stack data.
  * If so, the client is automatically destroyed as well.
  *
  * __Error codes__
@@ -847,17 +831,17 @@ void turtle_stepper_range_set(struct turtle_stepper * stepper, double range);
 double turtle_stepper_range_get(const struct turtle_stepper * stepper);
 
 /**
- * Add a `turtle_datum` data layer to a stepper.
+ * Add a `turtle_stack` data layer to a stepper.
  *
  * @param stepper   A handle to an ECEF stepper.
- * @param datum     The datum to access.
+ * @param stack     The stack to access.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
  * Register a new data layer for the stepper accessing an existing
- * `turtle_datum`. Nore that if the datum supports multithreading, i.e. has
+ * `turtle_stack`. Nore that if the stack supports multithreading, i.e. has
  * a registered lock, then a `turtle_client` is automatically created in order
- * to access the datum.
+ * to access the stack data.
  *
  * **Note** that the last created layer is the top layer, i.e. it has priority
  * over layers beneath.
@@ -868,8 +852,8 @@ double turtle_stepper_range_get(const struct turtle_stepper * stepper);
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
  */
-enum turtle_return turtle_stepper_add_datum(
-    struct turtle_stepper * stepper, struct turtle_datum * datum);
+enum turtle_return turtle_stepper_add_stack(
+    struct turtle_stepper * stepper, struct turtle_stack * stack);
 
 /**
 * Add a `turtle_map` data layer to a stepper.

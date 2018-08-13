@@ -26,7 +26,7 @@
 
 #include <arpa/inet.h>
 
-#include "../datum.h"
+#include "../stack.h"
 #include "turtle.h"
 
 #include "hgt.h"
@@ -77,13 +77,13 @@ void hgt_close(struct hgt_reader * reader)
         }
 }
 
-static int16_t get_z(struct datum_tile * tile, int ix, int iy)
+static int16_t get_z(struct tile * tile, int ix, int iy)
 {
         iy = tile->ny - 1 - iy;
         return ntohs(tile->data[iy * tile->nx + ix]);
 }
 
-int hgt_readinto(struct hgt_reader * reader, struct datum_tile * tile)
+int hgt_readinto(struct hgt_reader * reader, struct tile * tile)
 {
         tile->z = NULL;
 

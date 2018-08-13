@@ -1,6 +1,6 @@
 /**
- * This example shows how to project the global elevation data from ASTER-GDEM2
- * onto a local map dumped to disk.
+ * This example shows how to project data from a Global Digital Elevation Model
+ * (GDEM) onto a local map dumped to disk.
  */
 
 /* C89 standard library. */
@@ -11,18 +11,17 @@
 #include "turtle.h"
 
 /**
- * The geodetic datum and the projection map handles are declared globally.
- * This allows us to define a simple error handler with a gracefull exit to
- * the OS.
+ * The stack and the projection map handles are declared globally. This allows
+ * us to define a simple error handler with a gracefull exit to the OS.
  */
-static struct turtle_datum * datum = NULL;
+static struct turtle_stack * stack = NULL;
 static struct turtle_map * map = NULL;
 
 /* Clean all allocated data and exit to the OS. */
 void exit_gracefully(enum turtle_return rc)
 {
         turtle_map_destroy(&map);
-        turtle_datum_destroy(&datum);
+        turtle_stack_destroy(&stack);
         turtle_finalise();
         exit(rc);
 }
@@ -36,10 +35,10 @@ void error_handler(
 }
 
 /**
- * Let's do the job now. First a `turtle_datum` is created in order to access
+ * Let's do the job now. First a `turtle_stack` is created in order to access
  * the elevation data. Then we create an empty `turtle_map` for the projected
  * elevation data. Following we loop over the map nodes and fill the elevation
- * values from the datum. Finnaly the resulting map is dumped to disk.
+ * values from the GDEM. Finnaly the resulting map is dumped to disk.
  *
  * __Warning__
  *
@@ -51,8 +50,8 @@ int main()
         /* Initialise the TURTLE API */
         turtle_initialise(error_handler);
 
-        /* Create the datum for elevation data. */
-        turtle_datum_create("share/topography", 1, NULL, NULL, &datum);
+        /* Create the stack. */
+        turtle_stack_create("share/topography", 1, NULL, NULL, &stack);
 
         /*
          * Create a RGF93 local projection map, centered on the Auberge des
@@ -64,7 +63,7 @@ int main()
         turtle_map_create("Lambert 93", &box, nx, ny, 500., 1500., 16, &map);
         struct turtle_projection * rgf93 = turtle_map_projection(map);
 
-        /* Fill the local map with the datum elevation data. */
+        /* Fill the local map with the GDEM data. */
         int ix, iy;
         for (ix = 0; ix < nx; ix++)
                 for (iy = 0; iy < ny; iy++) {
@@ -76,8 +75,8 @@ int main()
 
                         /* Fill the elevation. */
                         double elevation;
-                        turtle_datum_elevation(
-                            datum, latitude, longitude, &elevation, NULL);
+                        turtle_stack_elevation(
+                            stack, latitude, longitude, &elevation, NULL);
                         turtle_map_fill(map, ix, iy, elevation);
                 }
 

@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../datum.h"
+#include "../stack.h"
 #include "turtle.h"
 
 #include "geotiff16.h"
@@ -112,13 +112,13 @@ void geotiff16_close(struct geotiff16_reader * reader)
         reader->tiff = NULL;
 }
 
-static int16_t get_z(struct datum_tile * tile, int ix, int iy)
+static int16_t get_z(struct tile * tile, int ix, int iy)
 {
         return tile->data[iy * tile->nx + ix];
 }
 
 int geotiff16_readinto(
-    struct geotiff16_reader * reader, struct datum_tile * tile)
+    struct geotiff16_reader * reader, struct tile * tile)
 {
         tile->z = NULL;
 

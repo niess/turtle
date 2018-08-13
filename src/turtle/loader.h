@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-/* Tile loading functions for a turle_datum. */
+/* Tile loading functions for a turle_stack. */
 #ifndef TURTLE_LOADER_H
 #define TURTLE_LOADER_H
 
@@ -29,7 +29,7 @@ enum loader_format {
 };
 
 enum loader_format loader_format(const char * path);
-enum turtle_return loader_meta(const char * path, struct datum_tile * tile);
-enum turtle_return loader_load(const char * path, struct datum_tile ** tile);
+enum turtle_return loader_meta(const char * path, struct tile * tile);
+enum turtle_return loader_load(const char * path, struct tile ** tile);
 
 #endif

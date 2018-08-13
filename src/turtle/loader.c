@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "datum.h"
+#include "stack.h"
 #include "loader.h"
 #include "turtle.h"
 
@@ -30,7 +30,7 @@
 
 /* Copy the tile meta data. */
 static void copy_geotiff_meta(
-    struct geotiff16_reader * reader, struct datum_tile * tile)
+    struct geotiff16_reader * reader, struct tile * tile)
 {
         tile->nx = reader->width;
         tile->ny = reader->height;
@@ -43,7 +43,7 @@ static void copy_geotiff_meta(
 
 /* Load the geotiff meta data to a tile. */
 static enum turtle_return load_geotiff_meta(
-    const char * path, struct datum_tile * tile)
+    const char * path, struct tile * tile)
 {
         /* Open the geotiff16 file. */
         struct geotiff16_reader reader;
@@ -59,7 +59,7 @@ static enum turtle_return load_geotiff_meta(
 
 /* Load geotiff elevation data to a tile. */
 static enum turtle_return load_geotiff(
-    const char * path, struct datum_tile ** tile)
+    const char * path, struct tile ** tile)
 {
         struct geotiff16_reader reader;
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
@@ -91,7 +91,7 @@ clean_and_exit:
 #include "loader/hgt.h"
 
 /* Copy the tile meta data. */
-static void copy_hgt_meta(struct hgt_reader * reader, struct datum_tile * tile)
+static void copy_hgt_meta(struct hgt_reader * reader, struct tile * tile)
 {
         tile->nx = reader->size;
         tile->ny = reader->size;
@@ -103,7 +103,7 @@ static void copy_hgt_meta(struct hgt_reader * reader, struct datum_tile * tile)
 
 /* Load the hgt meta data to a tile. */
 static enum turtle_return load_hgt_meta(
-    const char * path, struct datum_tile * tile)
+    const char * path, struct tile * tile)
 {
         /* Open the hgt file. */
         struct hgt_reader reader;
@@ -118,7 +118,7 @@ static enum turtle_return load_hgt_meta(
 }
 
 /* Load hgt elevation data to a tile. */
-static enum turtle_return load_hgt(const char * path, struct datum_tile ** tile)
+static enum turtle_return load_hgt(const char * path, struct tile ** tile)
 {
         struct hgt_reader reader;
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
@@ -166,7 +166,7 @@ enum loader_format loader_format(const char * path)
 }
 
 /* Load the tile metadata */
-enum turtle_return loader_meta(const char * path, struct datum_tile * tile)
+enum turtle_return loader_meta(const char * path, struct tile * tile)
 {
         enum loader_format format = loader_format(path);
 #ifndef TURTLE_NO_TIFF
@@ -180,7 +180,7 @@ enum turtle_return loader_meta(const char * path, struct datum_tile * tile)
 }
 
 /* Load the tile data */
-enum turtle_return loader_load(const char * path, struct datum_tile ** tile)
+enum turtle_return loader_load(const char * path, struct tile ** tile)
 {
         enum loader_format format = loader_format(path);
 #ifndef TURTLE_NO_TIFF

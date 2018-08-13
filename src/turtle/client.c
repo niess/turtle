@@ -20,14 +20,14 @@
 
 /*
  * Turtle client for multithreaded access to a elevation data handled by a
- * turtle_datum.
+ * turtle_stack.
  */
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "client.h"
-#include "datum.h"
+#include "stack.h"
 #include "error.h"
 #include "turtle.h"
 
@@ -35,20 +35,20 @@
 static enum turtle_return client_release(
     struct turtle_client * client, int lock);
 
-/* Create a new datum client. */
+/* Create a new stack client. */
 enum turtle_return turtle_client_create(
-    struct turtle_datum * datum, struct turtle_client ** client)
+    struct turtle_stack * stack, struct turtle_client ** client)
 {
-        /* Check that one has a valid datum. */
+        /* Check that one has a valid stack. */
         *client = NULL;
-        if ((datum == NULL) || (datum->lock == NULL))
+        if ((stack == NULL) || (stack->lock == NULL))
                 TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_ADDRESS,
-                    turtle_client_create, "invalid datum or missing lock");
+                    turtle_client_create, "invalid stack or missing lock");
 
         /* Allocate the new client and initialise it. */
         *client = malloc(sizeof(**client));
         if (*client == NULL) return TURTLE_ERROR_MEMORY(turtle_client_create);
-        (*client)->datum = datum;
+        (*client)->stack = stack;
         (*client)->tile = NULL;
         (*client)->index_la = INT_MIN;
         (*client)->index_lo = INT_MIN;
@@ -95,7 +95,7 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
         if (inside != NULL) *inside = 0;
 
         /* Get the proper tile. */
-        struct datum_tile * current = client->tile;
+        struct tile * current = client->tile;
         double hx = 0., hy = 0.; /* Patch a non relevant warning. */
         int ix, iy;
 
@@ -113,20 +113,20 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                         return TURTLE_RETURN_SUCCESS;
                 } else {
                         return TURTLE_ERROR_MISSING_DATA(
-                            turtle_client_elevation, client->datum);
+                            turtle_client_elevation, client->stack);
                 }
         }
 
-        /* Lock the datum. */
-        struct turtle_datum * datum = client->datum;
-        if ((datum->lock != NULL) && (datum->lock() != 0))
+        /* Lock the stack. */
+        struct turtle_stack * stack = client->stack;
+        if ((stack->lock != NULL) && (stack->lock() != 0))
                 return TURTLE_ERROR_LOCK(turtle_client_elevation);
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
 
         /* The requested coordinates are not in the current tile. Let's check
          * the full stack.
          */
-        current = datum->stack;
+        current = stack->head;
         while (current != NULL) {
                 if (current == client->tile) {
                         current = current->prev;
@@ -136,14 +136,14 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                 hy = (latitude - current->y0) / current->dy;
                 if ((hx >= 0.) && (hx <= current->nx) && (hy >= 0.) &&
                     (hy <= current->ny)) {
-                        datum_tile_touch(datum, current);
+                        tile_touch(stack, current);
                         goto update;
                 }
                 current = current->prev;
         }
 
         /* No valid tile was found. Let's try to load it. */
-        if ((rc = datum_tile_load(datum, latitude, longitude)) !=
+        if ((rc = tile_load(stack, latitude, longitude)) !=
             TURTLE_RETURN_SUCCESS) {
                 /* The requested tile is not available. Let's record this.  */
                 client_release(client, 0);
@@ -151,7 +151,7 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                 client->index_lo = (int)longitude;
                 goto unlock;
         }
-        current = datum->stack;
+        current = stack->head;
         hx = (longitude - current->x0) / current->dx;
         hy = (latitude - current->y0) / current->dy;
 
@@ -164,9 +164,9 @@ update:
         client->index_la = INT_MIN;
         client->index_lo = INT_MIN;
 
-/* Unlock the datum. */
+/* Unlock the stack. */
 unlock:
-        if ((datum->unlock != NULL) && (datum->unlock() != 0))
+        if ((stack->unlock != NULL) && (stack->unlock() != 0))
                 return TURTLE_ERROR_UNLOCK(turtle_client_elevation);
         if (rc != TURTLE_RETURN_SUCCESS) {
                 *elevation = 0.;
@@ -175,7 +175,7 @@ unlock:
                                 return TURTLE_RETURN_SUCCESS;
                         } else {
                                 return TURTLE_ERROR_MISSING_DATA(
-                                    turtle_client_elevation, client->datum);
+                                    turtle_client_elevation, client->stack);
                         }
                 } else if (rc == TURTLE_RETURN_LOCK_ERROR) {
                         return TURTLE_ERROR_LOCK(turtle_client_elevation);
@@ -199,8 +199,8 @@ interpolate:
         if (iy < 0) iy = 0;
         int ix1 = (ix >= nx - 1) ? nx - 1 : ix + 1;
         int iy1 = (iy >= ny - 1) ? ny - 1 : iy + 1;
-        struct datum_tile * tile = client->tile;
-        datum_tile_cb * zm = tile->z;
+        struct tile * tile = client->tile;
+        tile_cb * zm = tile->z;
         *elevation = zm(tile, ix, iy) * (1. - hx) * (1. - hy) +
             zm(tile, ix, iy1) * (1. - hx) * hy +
             zm(tile, ix1, iy) * hx * (1. - hy) + zm(tile, ix1, iy1) * hx * hy;
@@ -215,14 +215,14 @@ static enum turtle_return client_release(
 {
         if (client->tile == NULL) return TURTLE_RETURN_SUCCESS;
 
-        /* Lock the datum. */
-        struct turtle_datum * datum = client->datum;
-        if (lock && (datum->lock != NULL) && (datum->lock() != 0))
+        /* Lock the stack. */
+        struct turtle_stack * stack = client->stack;
+        if (lock && (stack->lock != NULL) && (stack->lock() != 0))
                 return TURTLE_RETURN_LOCK_ERROR;
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
 
         /* Update the reference count. */
-        struct datum_tile * tile = client->tile;
+        struct tile * tile = client->tile;
         client->tile = NULL;
         tile->clients--;
         if (tile->clients < 0) {
@@ -232,12 +232,12 @@ static enum turtle_return client_release(
         }
 
         /* Remove the tile if it is unused and if there is a stack overflow. */
-        if ((tile->clients == 0) && (datum->stack_size > datum->max_size))
-                datum_tile_destroy(datum, tile);
+        if ((tile->clients == 0) && (stack->size > stack->max_size))
+                tile_destroy(stack, tile);
 
 /* Unlock and return. */
 unlock:
-        if (lock && (datum->unlock != NULL) && (datum->unlock() != 0))
+        if (lock && (stack->unlock != NULL) && (stack->unlock() != 0))
                 return TURTLE_RETURN_UNLOCK_ERROR;
         return rc;
 }

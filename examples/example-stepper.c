@@ -14,7 +14,7 @@
  * The turtle objects are declared globally. This allows us to define a simple
  * error handler with a gracefull exit to the OS.
  */
-static struct turtle_datum * datum = NULL;
+static struct turtle_stack * stack = NULL;
 static struct turtle_map * map = NULL;
 static struct turtle_stepper * stepper = NULL;
 
@@ -23,7 +23,7 @@ void exit_gracefully(enum turtle_return rc)
 {
         turtle_stepper_destroy(&stepper);
         turtle_map_destroy(&map);
-        turtle_datum_destroy(&datum);
+        turtle_stack_destroy(&stack);
         turtle_finalise();
         exit(rc);
 }
@@ -37,7 +37,7 @@ void error_handler(
 }
 
 /**
- * Let's do the job now. First a `turtle_datum` is created in order to access
+ * Let's do the job now. First a `turtle_stack` is created in order to access
  * the global DEM data. Then we load a `turtle_map` of some projected
  * elevation data. Finally we instanciate a stepper and do some basic stepping.
  *
@@ -51,8 +51,8 @@ int main()
         /* Initialise the TURTLE API */
         turtle_initialise(error_handler);
 
-        /* Create the datum for elevation data. */
-        turtle_datum_create("share/topography", 1, NULL, NULL, &datum);
+        /* Create the stack. */
+        turtle_stack_create("share/topography", 1, NULL, NULL, &stack);
 
         /*
          * Get the RGF93 local projection map, centered on the Auberge des
@@ -64,14 +64,14 @@ int main()
         turtle_stepper_create(&stepper);
         turtle_stepper_range_set(stepper, 100.);
         turtle_stepper_add_flat(stepper, 0.);
-        turtle_stepper_add_datum(stepper, datum);
+        turtle_stepper_add_stack(stepper, stack);
         turtle_stepper_add_map(stepper, map);
 
         /* Do some stepping */
         const double latitude = 45.76415653, longitude = 2.95536402;
         double position[3], direction[3];
-        turtle_datum_ecef(datum, latitude, longitude, 1080.86, position);
-        turtle_datum_direction(datum, latitude, longitude, 26., 5., direction);
+        turtle_ecef_from_geodetic(latitude, longitude, 1080.86, position);
+        turtle_ecef_from_horizontal(latitude, longitude, 26., 5., direction);
 
         double s;
         for (s = 0.; s <= 5E+03; s += 10.) {

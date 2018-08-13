@@ -1,8 +1,8 @@
 /**
  * This example illustrates the usage of a `turtle_client` in a multithreaded
  * application using `pthread` and `mutex`. A set of `N_THREADS` clients
- * concurrently access to the ASTER-GDEM2 elevation data over a 2x2 deg^2
- * angular grid.
+ * concurrently access to Global Digitale Elevation Model (GDEM) data over a
+ * 2x2 deg^2 angular grid.
  */
 
 /* C89 standard library. */
@@ -22,15 +22,15 @@
 /**
  * First let's implements the threaded task and some storage for its input
  * parameters. Each thread's task instanciates its own client in order to
- * concurrently access the datum elevation data. Then the client is used to
+ * concurrently access the GDEM data. Then the client is used to
  * estimate the elevation at successive steps along a line going from
  * `(latitude_0, longitude_0)` to `(latitude_1, longitude_1)`.
  *
- * *Note* that the geodetic datum is declared as a global static variable,
+ * *Note* that the stack handle is declared as a global static variable,
  * to be seen by all threads/clients.
  */
-/* Handle for the datum. */
-struct turtle_datum * datum = NULL;
+/* Handle for the stack. */
+struct turtle_stack * stack = NULL;
 
 /* Storage for the thread input parameters. */
 struct thread_parameters {
@@ -51,7 +51,7 @@ static void * run_thread(void * args)
         /* Unpack arguments and create the client. */
         struct thread_parameters * params = (struct thread_parameters *)args;
         struct turtle_client * client;
-        turtle_client_create(datum, &client);
+        turtle_client_create(stack, &client);
 
         /* Step along the track. */
         const int n = 1001;
@@ -105,10 +105,10 @@ int unlock(void)
  * * `ASTGMT2_N46E002_dem.tif`
  * * `ASTGMT2_N46E003_dem.tif`
  *
- * The tiles should be extracted to a folder named share/topographie.
+ * The tiles should be extracted to a folder named share/topography.
  *
  * **Note** that since there are only 4 tiles that can be accessed, setting the
- * datum `stack_size` to 4 or more will result in speed up since then there is
+ * stack `size` to 4 or more will result in speed up since then there is
  * no need to switch, i.e. unload and reload, tiles between threads.
  */
 /* A basic error handler with an abrupt exit(). */
@@ -125,14 +125,14 @@ static double uniform(void) { return ((double)rand()) / RAND_MAX; }
 /* The main function, spawning the threads. */
 int main()
 {
-        /* Initialise the semaphore, the TURTLE library and the datum. */
+        /* Initialise the semaphore, the TURTLE library and the stack. */
         sem_init(&semaphore, 0, 1);
         turtle_initialise(error_handler);
-        turtle_datum_create(
+        turtle_stack_create(
             "share/topography", /* <= The elevation data folder. */
             4,                  /* <= The stack size for tiles.  */
             lock, unlock,       /* <= The lock/unlock callbacks. */
-            &datum);
+            &stack);
 
         /*
          * Create the client threads and initialise the thread specific data
@@ -164,7 +164,7 @@ int main()
 
 /* Finalise TURTLE and the semaphore. */
 clean_and_exit:
-        turtle_datum_destroy(&datum);
+        turtle_stack_destroy(&stack);
         turtle_finalise();
         sem_destroy(&semaphore);
         pthread_exit(0);

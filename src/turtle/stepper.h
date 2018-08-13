@@ -50,7 +50,7 @@ struct turtle_stepper_layer {
         turtle_stepper_cleaner_t * clean;
         union {
                 struct turtle_client * client;
-                struct turtle_datum * datum;
+                struct turtle_stack * stack;
                 struct turtle_map * map;
                 double ground_level;
         } a;

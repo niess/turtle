@@ -20,21 +20,21 @@
 
 /*
  * Turtle client for multithreaded access to an elevation data handled by a
- * turtle_datum.
+ * turtle_stack.
  */
 #ifndef TURTLE_CLIENT_H
 #define TURTLE_CLIENT_H
 
-/* Container for a datum client. */
+/* Container for a stack client. */
 struct turtle_client {
         /* The currently used tile. */
-        struct datum_tile * tile;
+        struct tile * tile;
 
         /* The last requested indices */
         int index_la, index_lo;
 
-        /* The master datum. */
-        struct turtle_datum * datum;
+        /* The master stack */
+        struct turtle_stack * stack;
 };
 
 #endif

@@ -1,8 +1,8 @@
 /**
  * This example demonstrates various functionalities of the TURTLE library,
- * e.g. handling projection maps, a geodetic datum, and frame coordinates
- * conversions. It also provides a simple example of TURTLE's error handling
- * using a user defined `turtle_handler` callback.
+ * e.g. handling projection maps, a Global Digital Elevation Model (GDEM), and
+ * frame coordinates conversions. It also provides a simple example of TURTLE's
+ * error handling using a user defined `turtle_handler` callback.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,53 +102,50 @@ int main()
         /* We don't need the UTM projection anymore ... */
         turtle_projection_destroy(&utm);
 
-        /** Let us show how to access the ASTER-GDEM2 elevation data. That for
-         * we need to instanciate a geodetic `turtle_datum`. Since we are only
-         * interested in a single coordinate the stack size for elevation data
-         * is set to `1`, i.e. a single data file will be loaded and buffered.
+        /** Let us show how to access the GDEM data. That for we need to
+         * instanciate a `turtle_stack`. Since we are only interested in a
+         * single coordinate the stack size for elevation data is set to `1`,
+         * i.e. a single data file will be loaded and buffered.
          *
-         * Having a new `turtle_datum` for ASTER-GDEM2 data, we can request the
-         * origin's elevation and compare the result to the map's one. *Note*
-         * that there might be a 1 cm difference between both due to the
-         * encoding of the elevation data over 16 bits.
+         * Having a new `turtle_stack` we can request the origin's elevation and
+         * compare the result to the map's one. *Note* that there might be a
+         * 1 cm difference between both due to the encoding of the elevation
+         * data over 16 bits.
          */
-        /*
-         * Create a new geodetic datum handle to access the ASTER-GDEM2
-         * elevation data.
-         */
-        struct turtle_datum * datum;
-        turtle_datum_create("share/topography", 1, NULL, NULL, &datum);
+        /* Create a new stack handle to access elevation data. */
+        struct turtle_stack * stack;
+        turtle_stack_create("share/topography", 1, NULL, NULL, &stack);
 
-        /* Get the orgin's elevation from the datum. */
-        double elevation_ASTER;
-        turtle_datum_elevation(
-            datum, latitude, longitude, &elevation_ASTER, NULL);
+        /* Get the orgin's elevation from the stack. */
+        double elevation_gdem;
+        turtle_stack_elevation(
+            stack, latitude, longitude, &elevation_gdem, NULL);
 
         /* Get the same from the map. */
         double elevation_map;
         turtle_map_elevation(map, box.x0, box.y0, &elevation_map, NULL);
 
         printf("o) The origin's elevation is:\n");
-        printf("    + ASTER-GDEM2  : %.2lf m\n", elevation_ASTER);
+        printf("    + GDEM         : %.2lf m\n", elevation_gdem);
         printf("    + RGF93 map    : %.2lf m\n", elevation_map);
 
         /** Finally, let us express the origin's coordinates in a Cartesian
          * frame, i.e. Earth-Centered, Earth-Fixed (ECEF). *Note* that this
-         * conversion doesn't require access to the ASTER-GDEM2 elevation data,
-         * provided that the elevation is known from elsewhere. E.g. in this
-         * case we use the map's elevation value.
+         * conversion doesn't require access to the GDEM data, provided that
+         * the elevation is known from elsewhere. E.g. in this case we use the
+         * map's elevation value.
          */
         double ecef[3];
-        turtle_datum_ecef(datum, latitude, longitude, elevation_map, ecef);
+        turtle_ecef_from_geodetic(latitude, longitude, elevation_map, ecef);
 
         printf("o) The origin's ECEF coordinates are:\n");
-        printf("    + ASTER-GDEM2  : (%.2lf, %.2lf, %.2lf)\n", ecef[0], ecef[1],
+        printf("    + GDEM         : (%.2lf, %.2lf, %.2lf)\n", ecef[0], ecef[1],
             ecef[2]);
 
         double azimuth = 26., elevation = 20.;
         double direction[3];
-        turtle_datum_direction(
-            datum, latitude, longitude, azimuth, elevation, direction);
+        turtle_ecef_from_horizontal(
+            latitude, longitude, azimuth, elevation, direction);
 
         printf("o) The Puy de Dome summit is along:\n");
         printf(
@@ -158,7 +155,7 @@ int main()
 
         /* Finalise and exit to the OS. */
         turtle_map_destroy(&map);
-        turtle_datum_destroy(&datum);
+        turtle_stack_destroy(&stack);
         turtle_finalise();
         exit(0);
 }

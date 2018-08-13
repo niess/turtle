@@ -23,7 +23,7 @@
  */
 #include "stepper.h"
 #include "client.h"
-#include "datum.h"
+#include "stack.h"
 #include "error.h"
 #include "map.h"
 #include "projection.h"
@@ -38,20 +38,20 @@ typedef enum turtle_return geographic_computer_t(
     struct turtle_stepper_layer * layer, const double * position, int n0,
     double * geographic);
 
-enum turtle_return compute_geodetic(struct turtle_stepper_layer * layer,
+static enum turtle_return compute_geodetic(struct turtle_stepper_layer * layer,
     const double * position, int n0, double * geographic)
 {
-        turtle_datum_geodetic(
-            NULL, position, geographic, geographic + 1, geographic + 2);
+        turtle_ecef_to_geodetic(
+            position, geographic, geographic + 1, geographic + 2);
         return TURTLE_RETURN_SUCCESS;
 }
 
-enum turtle_return compute_geomap(struct turtle_stepper_layer * layer,
+static enum turtle_return compute_geomap(struct turtle_stepper_layer * layer,
     const double * position, int n0, double * geographic)
 {
         if (n0 == 0) {
-                turtle_datum_geodetic(
-                    NULL, position, geographic, geographic + 1, geographic + 2);
+                turtle_ecef_to_geodetic(
+                    position, geographic, geographic + 1, geographic + 2);
         }
         struct turtle_map * map = layer->a.map;
         struct turtle_projection * projection = turtle_map_projection(map);
@@ -144,7 +144,7 @@ static enum turtle_return stepper_step_client(struct turtle_stepper * stepper,
             geographic[1], ground_elevation, inside);
 }
 
-static enum turtle_return stepper_step_datum(struct turtle_stepper * stepper,
+static enum turtle_return stepper_step_stack(struct turtle_stepper * stepper,
     struct turtle_stepper_layer * layer, const double * position,
     int has_geodetic, double * geographic, double * ground_elevation,
     int * inside)
@@ -155,7 +155,7 @@ static enum turtle_return stepper_step_datum(struct turtle_stepper * stepper,
                     0, 3, &compute_geodetic, geographic);
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
         }
-        return turtle_datum_elevation(layer->a.datum, geographic[0],
+        return turtle_stack_elevation(layer->a.stack, geographic[0],
             geographic[1], ground_elevation, inside);
 }
 
@@ -207,14 +207,14 @@ static void add_layer(
         layer->transform.reference_ecef[2] = DBL_MAX;
 }
 
-enum turtle_return turtle_stepper_add_datum(
-    struct turtle_stepper * stepper, struct turtle_datum * datum)
+enum turtle_return turtle_stepper_add_stack(
+    struct turtle_stepper * stepper, struct turtle_stack * stack)
 {
         enum turtle_return rc;
         struct turtle_client * client = NULL;
-        if (datum->lock != NULL) {
-                /* Get a new client for the datum */
-                rc = turtle_client_create(datum, &client);
+        if (stack->lock != NULL) {
+                /* Get a new client for the stack */
+                rc = turtle_client_create(stack, &client);
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
         }
 
@@ -225,16 +225,16 @@ enum turtle_return turtle_stepper_add_datum(
                         rc = turtle_client_destroy(&client);
                         if (rc != TURTLE_RETURN_SUCCESS) return rc;
                 }
-                return TURTLE_ERROR_MEMORY(turtle_stepper_add_datum);
+                return TURTLE_ERROR_MEMORY(turtle_stepper_add_stack);
         }
         if (client != NULL) {
                 layer->step = &stepper_step_client;
                 layer->clean = &stepper_clean_client;
                 layer->a.client = client;
         } else {
-                layer->step = &stepper_step_datum;
+                layer->step = &stepper_step_stack;
                 layer->clean = NULL;
-                layer->a.datum = datum;
+                layer->a.stack = stack;
         }
 
         /* Add the layer to the stepper's stack */

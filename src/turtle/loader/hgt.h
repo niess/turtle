@@ -39,7 +39,7 @@ struct hgt_reader {
 int hgt_open(const char * path, struct hgt_reader * reader);
 void hgt_close(struct hgt_reader * reader);
 
-struct datum_tile;
-int hgt_readinto(struct hgt_reader * reader, struct datum_tile * tile);
+struct tile;
+int hgt_readinto(struct hgt_reader * reader, struct tile * tile);
 
 #endif
