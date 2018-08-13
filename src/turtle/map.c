@@ -327,7 +327,7 @@ static enum turtle_return map_load_png(
         png_structp png_ptr = NULL;
         png_infop info_ptr = NULL;
         int nx = 0, ny = 0;
-        struct turtle_projection projection;
+        struct turtle_projection projection = { .type = PROJECTION_NONE };
         *map = NULL;
         int rc;
 
@@ -410,12 +410,14 @@ static enum turtle_return map_load_png(
                                         0)) {
                                         if (value->type != JSMN_STRING)
                                                 goto error;
+                                        if (value->end > value->start) {
                                         text[value->end] = '\0';
                                         if ((rc = turtle_projection_configure(
                                                  text + value->start,
                                                  &projection)) !=
                                             TURTLE_RETURN_SUCCESS)
                                                 goto error;
+                                        }
                                         rc = TURTLE_RETURN_BAD_JSON;
                                         done[0] = 1;
                                 } else {

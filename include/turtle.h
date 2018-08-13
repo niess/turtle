@@ -386,10 +386,10 @@ void turtle_map_destroy(struct turtle_map ** map);
  * code is returned as detailed below.
  *
  * Load a projection map from a file. The file format is guessed from the
- * filename's extension. Currently only a custom `.png` format is supported.
- * A bouding `box` can be provided in order to load only a rectangular subset
- * of the initial map. The bounding box coordinates must be specified in the
- * initial map frame.
+ * filename's extension. Currently only `.png` and `.grd` (e.g. EGM96) formats
+ * are supported. A bouding `box` can be provided in order to load only a
+ * rectangular subset of the initial map. The bounding box coordinates must be
+ * specified in the initial map frame.
  *
  * __Error codes__
  *
@@ -808,6 +808,30 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper);
  *    TURTLE_RETURN_UNLOCK_ERROR    The client lock couldn't be released.
  */
 enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper);
+
+/**
+ * Set a geoid model for altitude corrections.
+ *
+ * @param stepper    A handle to an ECEF stepper.
+ * @param geoid      A handle to a geoid map.
+ *
+ * Note that by default no geoid undulations corrections are applied. Altitudes
+ * are w.r.t. the WGS84 ellipsoid, not w.r.t. the mean sea level.
+ * For long range stepping this might introduce distortions of the ground
+ * since topography data are ususaly given w.r.t. the mean sea level. Providing
+ * a geoid map allows to correct for this.
+ */
+void turtle_stepper_geoid_set(
+    struct turtle_stepper * stepper, struct turtle_map * geoid);
+
+/**
+ * Get the current geoid map.
+ *
+ * @param stepper    A handle to an ECEF stepper.
+ * @return A handle to the geoid map.
+ */
+struct turtle_map * turtle_stepper_geoid_get(
+    const struct turtle_stepper * stepper);
 
 /**
  * Set the validity range for local approximation to geographic transforms.

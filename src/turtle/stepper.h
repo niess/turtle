@@ -60,6 +60,7 @@ struct turtle_stepper_layer {
 /* Container for an ECEF stepper */
 struct turtle_stepper {
         struct turtle_stepper_layer * layers;
+        struct turtle_map * geoid;
         double local_range;
         double last_position[3];
         double last_geographic[5];

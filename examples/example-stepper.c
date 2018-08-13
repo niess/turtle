@@ -16,12 +16,14 @@
  */
 static struct turtle_stack * stack = NULL;
 static struct turtle_map * map = NULL;
+static struct turtle_map * geoid = NULL;
 static struct turtle_stepper * stepper = NULL;
 
 /* Clean all allocated data and exit to the OS. */
 void exit_gracefully(enum turtle_return rc)
 {
         turtle_stepper_destroy(&stepper);
+        turtle_map_destroy(&geoid);
         turtle_map_destroy(&map);
         turtle_stack_destroy(&stack);
         turtle_finalise();
@@ -60,8 +62,12 @@ int main()
          */
         turtle_map_load("pdd-30m.png", NULL, &map);
 
+        /* Load the EGM96 geoid map */
+        turtle_map_load("share/data/egm96.png", NULL, &geoid);
+
         /* Create the ECEF stepper and configure it. */
         turtle_stepper_create(&stepper);
+        turtle_stepper_geoid_set(stepper, geoid);
         turtle_stepper_range_set(stepper, 100.);
         turtle_stepper_add_flat(stepper, 0.);
         turtle_stepper_add_stack(stepper, stack);
@@ -69,8 +75,10 @@ int main()
 
         /* Do some stepping */
         const double latitude = 45.76415653, longitude = 2.95536402;
-        double position[3], direction[3];
-        turtle_ecef_from_geodetic(latitude, longitude, 1080.86, position);
+        double position[3], direction[3], undulation;
+        turtle_map_elevation(geoid, longitude, latitude, &undulation, NULL);
+        turtle_ecef_from_geodetic(
+            latitude, longitude, 1080.86 + undulation, position);
         turtle_ecef_from_horizontal(latitude, longitude, 26., 5., direction);
 
         double s;

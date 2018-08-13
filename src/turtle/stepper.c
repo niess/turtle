@@ -34,24 +34,38 @@
 #include "stdlib.h"
 #include "string.h"
 
-typedef enum turtle_return geographic_computer_t(
-    struct turtle_stepper_layer * layer, const double * position, int n0,
-    double * geographic);
-
-static enum turtle_return compute_geodetic(struct turtle_stepper_layer * layer,
-    const double * position, int n0, double * geographic)
+static void ecef_to_geodetic(struct turtle_stepper * stepper,
+    const double * position, double * geographic)
 {
         turtle_ecef_to_geodetic(
             position, geographic, geographic + 1, geographic + 2);
+        if (stepper->geoid != NULL) {
+                int inside;
+                double undulation;
+                turtle_map_elevation(stepper->geoid,
+                    geographic[1], geographic[0], &undulation, &inside);
+                if (inside) geographic[2] -= undulation;
+        }
+}
+
+typedef enum turtle_return geographic_computer_t(
+    struct turtle_stepper * stepper, struct turtle_stepper_layer * layer,
+    const double * position, int n0, double * geographic);
+
+static enum turtle_return compute_geodetic(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, const double * position, int n0,
+    double * geographic)
+{
+        ecef_to_geodetic(stepper, position, geographic);
         return TURTLE_RETURN_SUCCESS;
 }
 
-static enum turtle_return compute_geomap(struct turtle_stepper_layer * layer,
-    const double * position, int n0, double * geographic)
+static enum turtle_return compute_geomap(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, const double * position, int n0,
+    double * geographic)
 {
         if (n0 == 0) {
-                turtle_ecef_to_geodetic(
-                    position, geographic, geographic + 1, geographic + 2);
+                ecef_to_geodetic(stepper, position, geographic);
         }
         struct turtle_map * map = layer->a.map;
         struct turtle_projection * projection = turtle_map_projection(map);
@@ -67,7 +81,8 @@ static enum turtle_return get_geographic(struct turtle_stepper * stepper,
                 /* Local transforms are disabled. Let us do the full
                  * computation
                  */
-                return compute_geographic(layer, position, n0, geographic);
+                return compute_geographic(
+                    stepper, layer, position, n0, geographic);
         }
 
         /* 1st let us compute the local coordinates */
@@ -95,7 +110,7 @@ static enum turtle_return get_geographic(struct turtle_stepper * stepper,
 
         /* Compute the geographic coordinates */
         enum turtle_return rc =
-            compute_geographic(layer, position, n0, geographic);
+            compute_geographic(stepper, layer, position, n0, geographic);
         if (rc != TURTLE_RETURN_SUCCESS) return rc;
 
         /* Let us compute the step length in order to check if it is worth
@@ -117,7 +132,8 @@ static enum turtle_return get_geographic(struct turtle_stepper * stepper,
                         double r[3] = { position[0], position[1], position[2] };
                         r[i] += 10.;
                         double geographic1[5];
-                        rc = compute_geographic(layer, r, n0, geographic1);
+                        rc = compute_geographic(
+                            stepper, layer, r, n0, geographic1);
                         if (rc != TURTLE_RETURN_SUCCESS) return rc;
                         int j;
                         for (j = n0; j < n1; j++)
@@ -281,6 +297,7 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper_)
         if (stepper == NULL) return TURTLE_ERROR_MEMORY(turtle_stepper_create);
         *stepper_ = stepper;
         stepper->layers = NULL;
+        stepper->geoid = NULL;
         stepper->local_range = 0.;
         stepper->last_position[0] = DBL_MAX;
         stepper->last_position[1] = DBL_MAX;
@@ -310,9 +327,44 @@ enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper)
         return TURTLE_RETURN_SUCCESS;
 }
 
+static void reset_history(struct turtle_stepper * stepper)
+{
+        stepper->local_range = 0.;
+        stepper->last_position[0] = DBL_MAX;
+        stepper->last_position[1] = DBL_MAX;
+        stepper->last_position[2] = DBL_MAX;
+
+        struct turtle_stepper_layer * layer;
+        for (layer = stepper->layers; layer != NULL; layer = layer->next) {
+                layer->transform.reference_ecef[0] = DBL_MAX;
+                layer->transform.reference_ecef[1] = DBL_MAX;
+                layer->transform.reference_ecef[2] = DBL_MAX;
+        }
+}
+
+void turtle_stepper_geoid_set(
+    struct turtle_stepper * stepper, struct turtle_map * geoid)
+{
+        /* Set the geoid model */
+        stepper->geoid = geoid;
+
+        /* Reset the stepping history */
+        reset_history(stepper);
+}
+
+struct turtle_map * turtle_stepper_geoid_get(
+    const struct turtle_stepper * stepper)
+{
+        return stepper->geoid;
+}
+
 void turtle_stepper_range_set(struct turtle_stepper * stepper, double range)
 {
+        /* Set the range */
         stepper->local_range = range;
+
+        /* Reset the stepping history */
+        reset_history(stepper);
 }
 
 double turtle_stepper_range_get(const struct turtle_stepper * stepper)
