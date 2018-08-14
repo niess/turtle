@@ -24,6 +24,8 @@
 #ifndef TURTLE_PROJECTION_H
 #define TURTLE_PROJECTION_H
 
+#include "turtle.h"
+
 enum projection_type {
         PROJECTION_NONE = -1,
         PROJECTION_LAMBERT,
@@ -42,5 +44,10 @@ struct turtle_projection {
                 int lambert_tag;
         } settings;
 };
+
+struct turtle_error_context;
+enum turtle_return turtle_projection_configure_(const char * name,
+    struct turtle_projection * projection,
+    struct turtle_error_context * error_);
 
 #endif

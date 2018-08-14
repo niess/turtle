@@ -25,10 +25,13 @@
 #ifndef TURTLE_CLIENT_H
 #define TURTLE_CLIENT_H
 
-/* Container for a stack client. */
+#include "turtle.h"
+#include "turtle/map.h"
+
+/* Container for a stack client */
 struct turtle_client {
-        /* The currently used tile. */
-        struct tile * tile;
+        /* The currently used map */
+        struct turtle_map * map;
 
         /* The last requested indices */
         int index_la, index_lo;
@@ -36,5 +39,9 @@ struct turtle_client {
         /* The master stack */
         struct turtle_stack * stack;
 };
+
+struct turtle_error_context;
+enum turtle_return turtle_client_destroy_(
+    struct turtle_client ** client, struct turtle_error_context * error_);
 
 #endif

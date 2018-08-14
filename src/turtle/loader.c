@@ -21,8 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "stack.h"
 #include "loader.h"
+#include "stack.h"
 #include "turtle.h"
 
 #ifndef TURTLE_NO_TIFF
@@ -58,8 +58,7 @@ static enum turtle_return load_geotiff_meta(
 }
 
 /* Load geotiff elevation data to a tile. */
-static enum turtle_return load_geotiff(
-    const char * path, struct tile ** tile)
+static enum turtle_return load_geotiff(const char * path, struct tile ** tile)
 {
         struct geotiff16_reader reader;
         enum turtle_return rc = TURTLE_RETURN_SUCCESS;
@@ -102,8 +101,7 @@ static void copy_hgt_meta(struct hgt_reader * reader, struct tile * tile)
 }
 
 /* Load the hgt meta data to a tile. */
-static enum turtle_return load_hgt_meta(
-    const char * path, struct tile * tile)
+static enum turtle_return load_hgt_meta(const char * path, struct tile * tile)
 {
         /* Open the hgt file. */
         struct hgt_reader reader;

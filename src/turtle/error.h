@@ -28,60 +28,83 @@
 
 #include <stdarg.h>
 
-/* Helper macros for returning an encapsulated error. */
-#define TURTLE_ERROR_MESSAGE(rc, caller, message)                              \
-        turtle_error_raise(                                                    \
-            rc, (turtle_caller_t *)caller, __FILE__, __LINE__, message)
+/* Storage for error data */
+struct turtle_error_context {
+        enum turtle_return code;
+        turtle_function_t * function;
+#define TURTLE_ERROR_MSG_LENGTH 1024
+        char message[TURTLE_ERROR_MSG_LENGTH];
+};
 
-#define TURTLE_ERROR_FORMAT(rc, caller, format, ...)                           \
-        turtle_error_raise(rc, (turtle_caller_t *)caller, __FILE__, __LINE__,  \
-            format, __VA_ARGS__)
+/* Helper macros for managing errors */
+#define TURTLE_ERROR_INITIALISE(caller)                                        \
+        struct turtle_error_context error_data = { .code =                     \
+                                                       TURTLE_RETURN_SUCCESS,  \
+                .function = (turtle_function_t *)caller };                     \
+        struct turtle_error_context * error_ = &error_data;
 
-#define TURTLE_ERROR_LOCK(caller)                                              \
+#define TURTLE_ERROR_MESSAGE(rc, message)                                      \
+        turtle_error_format(error_, rc, __FILE__, __LINE__, message),          \
+            turtle_error_raise(error_)
+
+#define TURTLE_ERROR_FORMAT(rc, format, ...)                                   \
+        turtle_error_format(                                                   \
+            error_, rc, __FILE__, __LINE__, format, __VA_ARGS__),              \
+            turtle_error_raise(error_)
+
+#define TURTLE_ERROR_REGISTER(rc, message)                                     \
+        turtle_error_format(error_, rc, __FILE__, __LINE__, message)
+
+#define TURTLE_ERROR_VREGISTER(rc, format, ...)                                \
+        turtle_error_format(error_, rc, __FILE__, __LINE__, format, __VA_ARGS__)
+
+#define TURTLE_ERROR_RAISE() turtle_error_raise(error_)
+
+#define TURTLE_ERROR_LOCK()                                                    \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_LOCK_ERROR, caller, "could not acquire the lock")
+            TURTLE_RETURN_LOCK_ERROR, "could not acquire the lock")
 
-#define TURTLE_ERROR_UNLOCK(caller)                                            \
+#define TURTLE_ERROR_UNLOCK()                                                  \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_UNLOCK_ERROR, caller, "could not release the lock")
+            TURTLE_RETURN_UNLOCK_ERROR, "could not release the lock")
 
-#define TURTLE_ERROR_MISSING_DATA(caller, datum)                               \
-        TURTLE_ERROR_FORMAT(TURTLE_RETURN_PATH_ERROR, caller,                  \
-            "missing elevation data in `%s`", datum->root);
+#define TURTLE_ERROR_MISSING_DATA(stack)                                       \
+        TURTLE_ERROR_FORMAT(TURTLE_RETURN_PATH_ERROR,                          \
+            "missing elevation data in `%s`", stack->root);
 
-#define TURTLE_ERROR_MEMORY(caller)                                            \
+#define TURTLE_ERROR_MEMORY()                                                  \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_MEMORY_ERROR, caller, "could not allocate memory");
+            TURTLE_RETURN_MEMORY_ERROR, "could not allocate memory");
 
-#define TURTLE_ERROR_EXTENSION(caller, extension)                              \
-        TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_EXTENSION, caller,               \
+#define TURTLE_ERROR_EXTENSION(extension)                                      \
+        TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_EXTENSION,                       \
             "unsuported file format `%s`", extension);
 
-#define TURTLE_ERROR_NO_EXTENSION(caller)                                      \
+#define TURTLE_ERROR_NO_EXTENSION()                                            \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_BAD_EXTENSION, caller, "missing file extension");
+            TURTLE_RETURN_BAD_EXTENSION, "missing file extension");
 
-#define TURTLE_ERROR_PATH(caller, path)                                        \
-        TURTLE_ERROR_FORMAT(TURTLE_RETURN_PATH_ERROR, caller,                  \
-            "could not find file `%s`", path);
+#define TURTLE_ERROR_PATH(path)                                                \
+        TURTLE_ERROR_FORMAT(                                                   \
+            TURTLE_RETURN_PATH_ERROR, "could not find file `%s`", path);
 
-#define TURTLE_ERROR_BOX(caller)                                               \
+#define TURTLE_ERROR_BOX()                                                     \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_DOMAIN_ERROR, caller, "invalid bounding box");
+            TURTLE_RETURN_DOMAIN_ERROR, "invalid bounding box");
 
-#define TURTLE_ERROR_OUTSIDE_MAP(caller)                                       \
+#define TURTLE_ERROR_OUTSIDE_MAP()                                             \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_DOMAIN_ERROR, caller, "point is outside of map");
+            TURTLE_RETURN_DOMAIN_ERROR, "point is outside of map");
 
-#define TURTLE_ERROR_UNEXPECTED(rc, caller)                                    \
-        TURTLE_ERROR_MESSAGE(rc, caller, "an unexpected error occured");
+#define TURTLE_ERROR_UNEXPECTED(rc)                                            \
+        TURTLE_ERROR_MESSAGE(rc, "an unexpected error occured");
 
-/*
- * Utility function for encapsulating `returns` with a user
- * supplied error handler.
- */
-enum turtle_return turtle_error_raise(enum turtle_return rc,
-    void (*caller)(void), const char * file, int line, const char * format,
+/* Generic function for formating an error */
+enum turtle_return turtle_error_format(struct turtle_error_context * error_,
+    enum turtle_return rc, const char * file, int line, const char * format,
     ...);
+
+/* Generic function for handling an error */
+enum turtle_return turtle_error_raise(struct turtle_error_context * error_);
 
 #endif

@@ -29,24 +29,35 @@ static turtle_handler_cb * _handler = NULL;
 /* Setter for the error handler. */
 void turtle_handler(turtle_handler_cb * handler) { _handler = handler; }
 
-/* Utility function for handling errors. */
-enum turtle_return turtle_error_raise(enum turtle_return rc,
-    void (*caller)(void), const char * file, int line, const char * format, ...)
+/* Utility function for formating an error */
+enum turtle_return turtle_error_format(struct turtle_error_context * error_,
+    enum turtle_return rc, const char * file, int line, const char * format,
+    ...)
 {
+        error_->code = rc;
         if ((_handler == NULL) || (rc == TURTLE_RETURN_SUCCESS)) return rc;
 
-/* Format the error message */
-#define ERROR_MSG_LENGTH 1024
-        char message[ERROR_MSG_LENGTH];
-        const int n = snprintf(message, ERROR_MSG_LENGTH,
-            "{ %s [#%d], %s:%d } ", turtle_strfunc(caller), rc, file, line);
-        if (n < ERROR_MSG_LENGTH - 1) {
+        /* Format the error message */
+        const int n = snprintf(error_->message, TURTLE_ERROR_MSG_LENGTH,
+            "{ %s [#%d], %s:%d } ", turtle_strfunc(error_->function), rc, file,
+            line);
+        if (n < TURTLE_ERROR_MSG_LENGTH - 1) {
                 va_list ap;
                 va_start(ap, format);
-                vsnprintf(message + n, ERROR_MSG_LENGTH - n, format, ap);
+                vsnprintf(error_->message + n, TURTLE_ERROR_MSG_LENGTH - n,
+                    format, ap);
                 va_end(ap);
         }
-        _handler(rc, caller, message);
 
         return rc;
+}
+
+/* Utility function for handling an error */
+enum turtle_return turtle_error_raise(struct turtle_error_context * error_)
+{
+        if ((_handler == NULL) || (error_->code == TURTLE_RETURN_SUCCESS))
+                return error_->code;
+
+        _handler(error_->code, error_->function, error_->message);
+        return error_->code;
 }

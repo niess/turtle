@@ -27,217 +27,197 @@
 #include <string.h>
 
 #include "client.h"
-#include "stack.h"
 #include "error.h"
+#include "stack.h"
 #include "turtle.h"
 
-/* Management routine(s). */
-static enum turtle_return client_release(
-    struct turtle_client * client, int lock);
+/* Management routine(s) */
+static enum turtle_return client_release(struct turtle_client * client,
+    int lock, struct turtle_error_context * error_);
 
-/* Create a new stack client. */
+/* Create a new stack client */
 enum turtle_return turtle_client_create(
     struct turtle_stack * stack, struct turtle_client ** client)
 {
-        /* Check that one has a valid stack. */
+        TURTLE_ERROR_INITIALISE(&turtle_client_create);
+
+        /* Check that one has a valid stack */
         *client = NULL;
         if ((stack == NULL) || (stack->lock == NULL))
-                TURTLE_ERROR_MESSAGE(TURTLE_RETURN_BAD_ADDRESS,
-                    turtle_client_create, "invalid stack or missing lock");
+                TURTLE_ERROR_MESSAGE(
+                    TURTLE_RETURN_BAD_ADDRESS, "invalid stack or missing lock");
 
         /* Allocate the new client and initialise it. */
         *client = malloc(sizeof(**client));
-        if (*client == NULL) return TURTLE_ERROR_MEMORY(turtle_client_create);
+        if (*client == NULL) return TURTLE_ERROR_MEMORY();
         (*client)->stack = stack;
-        (*client)->tile = NULL;
+        (*client)->map = NULL;
         (*client)->index_la = INT_MIN;
         (*client)->index_lo = INT_MIN;
 
         return TURTLE_RETURN_SUCCESS;
 }
 
-/* Destroy a client. */
-enum turtle_return turtle_client_destroy(struct turtle_client ** client)
+/* Destroy a client */
+enum turtle_return turtle_client_destroy_(
+    struct turtle_client ** client, struct turtle_error_context * error_)
 {
         /* Check if the client has already been released. */
         if ((client == NULL) || (*client == NULL)) return TURTLE_RETURN_SUCCESS;
 
-        /* Release any active tile. */
-        enum turtle_return rc = client_release(*client, 1);
-        if (rc == TURTLE_RETURN_LOCK_ERROR)
-                return TURTLE_ERROR_LOCK(turtle_client_destroy);
-        else if (rc == TURTLE_RETURN_UNLOCK_ERROR)
-                return TURTLE_ERROR_UNLOCK(turtle_client_destroy);
+        /* Release any active map */
+        if (client_release(*client, 1, error_) != TURTLE_RETURN_SUCCESS)
+                return TURTLE_ERROR_RAISE();
 
-        /* Free the memory and return. */
+        /* Free the memory and return */
         free(*client);
         *client = NULL;
 
         return TURTLE_RETURN_SUCCESS;
 }
 
-/* Clear the client's memory. */
-enum turtle_return turtle_client_clear(struct turtle_client * client)
+enum turtle_return turtle_client_destroy(struct turtle_client ** client)
 {
-        enum turtle_return rc = client_release(client, 1);
-        if (rc == TURTLE_RETURN_LOCK_ERROR)
-                return TURTLE_ERROR_LOCK(turtle_client_clear);
-        else if (rc == TURTLE_RETURN_UNLOCK_ERROR)
-                return TURTLE_ERROR_UNLOCK(turtle_client_clear);
-        else
-                return TURTLE_RETURN_SUCCESS;
+        TURTLE_ERROR_INITIALISE(&turtle_client_destroy);
+        return turtle_client_destroy_(client, error_);
 }
 
-/* Supervised access to the elevation data. */
+/* Clear the client's memory */
+enum turtle_return turtle_client_clear(struct turtle_client * client)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_client_clear);
+        client_release(client, 1, error_);
+        return TURTLE_ERROR_RAISE();
+}
+
+/* Supervised access to the elevation data */
 enum turtle_return turtle_client_elevation(struct turtle_client * client,
     double latitude, double longitude, double * elevation, int * inside)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_client_elevation);
         if (inside != NULL) *inside = 0;
 
-        /* Get the proper tile. */
-        struct tile * current = client->tile;
-        double hx = 0., hy = 0.; /* Patch a non relevant warning. */
-        int ix, iy;
+        /* Get the proper map */
+        struct turtle_map * current = client->map;
+        double hx = 0., hy = 0.; /* Patch a non relevant warning */
 
         if (current != NULL) {
-                /* First let's check the current tile. */
-                hx = (longitude - current->x0) / current->dx;
-                hy = (latitude - current->y0) / current->dy;
+                /* First let's check the current map */
+                hx = (longitude - current->meta.x0) / current->meta.dx;
+                hy = (latitude - current->meta.y0) / current->meta.dy;
 
-                if ((hx >= 0.) && (hx <= current->nx) && (hy >= 0.) &&
-                    (hy <= current->ny))
+                if ((hx >= 0.) && (hx <= current->meta.nx) && (hy >= 0.) &&
+                    (hy <= current->meta.ny))
                         goto interpolate;
         } else if (((int)latitude == client->index_la) &&
             ((int)longitude == client->index_lo)) {
                 if (inside != NULL) {
                         return TURTLE_RETURN_SUCCESS;
                 } else {
-                        return TURTLE_ERROR_MISSING_DATA(
-                            turtle_client_elevation, client->stack);
+                        return TURTLE_ERROR_MISSING_DATA(client->stack);
                 }
         }
 
-        /* Lock the stack. */
+        /* Lock the stack */
         struct turtle_stack * stack = client->stack;
         if ((stack->lock != NULL) && (stack->lock() != 0))
-                return TURTLE_ERROR_LOCK(turtle_client_elevation);
-        enum turtle_return rc = TURTLE_RETURN_SUCCESS;
+                return TURTLE_ERROR_LOCK();
 
-        /* The requested coordinates are not in the current tile. Let's check
-         * the full stack.
+        /* The requested coordinates are not in the current map. Let's check
+         * the full stack
          */
         current = stack->head;
         while (current != NULL) {
-                if (current == client->tile) {
+                if (current == client->map) {
                         current = current->prev;
                         continue;
                 }
-                hx = (longitude - current->x0) / current->dx;
-                hy = (latitude - current->y0) / current->dy;
-                if ((hx >= 0.) && (hx <= current->nx) && (hy >= 0.) &&
-                    (hy <= current->ny)) {
-                        tile_touch(stack, current);
+                hx = (longitude - current->meta.x0) / current->meta.dx;
+                hy = (latitude - current->meta.y0) / current->meta.dy;
+                if ((hx >= 0.) && (hx <= current->meta.nx) && (hy >= 0.) &&
+                    (hy <= current->meta.ny)) {
+                        turtle_stack_touch_(stack, current);
                         goto update;
                 }
                 current = current->prev;
         }
 
-        /* No valid tile was found. Let's try to load it. */
-        if ((rc = tile_load(stack, latitude, longitude)) !=
-            TURTLE_RETURN_SUCCESS) {
-                /* The requested tile is not available. Let's record this.  */
-                client_release(client, 0);
+        /* No valid map was found. Let's try to load it */
+        if (turtle_stack_load_(stack, latitude, longitude, 0, error_)
+            != TURTLE_RETURN_SUCCESS) {
+                /* The requested map is not available. Let's record this */
+                client_release(client, 0, error_);
                 client->index_la = (int)latitude;
                 client->index_lo = (int)longitude;
                 goto unlock;
         }
         current = stack->head;
-        hx = (longitude - current->x0) / current->dx;
-        hy = (latitude - current->y0) / current->dy;
+        hx = (longitude - current->meta.x0) / current->meta.dx;
+        hy = (latitude - current->meta.y0) / current->meta.dy;
 
-/* Update the client. */
+/* Update the client */
 update:
-        if ((rc = client_release(client, 0)) != TURTLE_RETURN_SUCCESS)
-                goto unlock;
+        if (client_release(client, 0, error_) != TURTLE_RETURN_SUCCESS)
+            goto unlock;
         current->clients++;
-        client->tile = current;
+        client->map = current;
         client->index_la = INT_MIN;
         client->index_lo = INT_MIN;
 
 /* Unlock the stack. */
 unlock:
         if ((stack->unlock != NULL) && (stack->unlock() != 0))
-                return TURTLE_ERROR_UNLOCK(turtle_client_elevation);
-        if (rc != TURTLE_RETURN_SUCCESS) {
+                return TURTLE_ERROR_UNLOCK();
+        if (error_->code != TURTLE_RETURN_SUCCESS) {
                 *elevation = 0.;
-                if (rc == TURTLE_RETURN_PATH_ERROR) {
+                if (error_->code == TURTLE_RETURN_PATH_ERROR) {
                         if (inside != NULL) {
+                                error_->code = TURTLE_RETURN_SUCCESS;
                                 return TURTLE_RETURN_SUCCESS;
                         } else {
-                                return TURTLE_ERROR_MISSING_DATA(
-                                    turtle_client_elevation, client->stack);
+                                return TURTLE_ERROR_MISSING_DATA(client->stack);
                         }
-                } else if (rc == TURTLE_RETURN_LOCK_ERROR) {
-                        return TURTLE_ERROR_LOCK(turtle_client_elevation);
-                } else if (rc == TURTLE_RETURN_UNLOCK_ERROR) {
-                        return TURTLE_ERROR_UNLOCK(turtle_client_elevation);
-                } else {
-                        return TURTLE_ERROR_UNEXPECTED(
-                            rc, turtle_client_elevation);
-                }
+                } else
+                        return TURTLE_ERROR_RAISE();
         }
 
-/* Interpolate the elevation. */
+        /* Interpolate the elevation */
 interpolate:
-        ix = (int)hx;
-        iy = (int)hy;
-        hx -= ix;
-        hy -= iy;
-        const int nx = client->tile->nx;
-        const int ny = client->tile->ny;
-        if (ix < 0) ix = 0;
-        if (iy < 0) iy = 0;
-        int ix1 = (ix >= nx - 1) ? nx - 1 : ix + 1;
-        int iy1 = (iy >= ny - 1) ? ny - 1 : iy + 1;
-        struct tile * tile = client->tile;
-        tile_cb * zm = tile->z;
-        *elevation = zm(tile, ix, iy) * (1. - hx) * (1. - hy) +
-            zm(tile, ix, iy1) * (1. - hx) * hy +
-            zm(tile, ix1, iy) * hx * (1. - hy) + zm(tile, ix1, iy1) * hx * hy;
-
-        if (inside != NULL) *inside = 1;
-        return TURTLE_RETURN_SUCCESS;
+        return turtle_map_elevation_(client->map, longitude, latitude,
+            elevation, inside, error_);
 }
 
-/* Release any active tile. */
-static enum turtle_return client_release(
-    struct turtle_client * client, int lock)
+/* Release any active map */
+static enum turtle_return client_release(struct turtle_client * client,
+    int lock, struct turtle_error_context * error_)
 {
-        if (client->tile == NULL) return TURTLE_RETURN_SUCCESS;
+        if (client->map == NULL) return TURTLE_RETURN_SUCCESS;
 
-        /* Lock the stack. */
+        /* Lock the stack */
         struct turtle_stack * stack = client->stack;
         if (lock && (stack->lock != NULL) && (stack->lock() != 0))
-                return TURTLE_RETURN_LOCK_ERROR;
-        enum turtle_return rc = TURTLE_RETURN_SUCCESS;
+                return TURTLE_ERROR_REGISTER(TURTLE_RETURN_LOCK_ERROR,
+                    "could not acquire the lock");
 
-        /* Update the reference count. */
-        struct tile * tile = client->tile;
-        client->tile = NULL;
-        tile->clients--;
-        if (tile->clients < 0) {
-                tile->clients = 0;
-                rc = TURTLE_RETURN_LIBRARY_ERROR;
+        /* Update the reference count */
+        struct turtle_map * map = client->map;
+        client->map = NULL;
+        map->clients--;
+        if (map->clients < 0) {
+                map->clients = 0;
+                TURTLE_ERROR_REGISTER(TURTLE_RETURN_LIBRARY_ERROR,
+                    "an unexpected error occured");
                 goto unlock;
         }
 
-        /* Remove the tile if it is unused and if there is a stack overflow. */
-        if ((tile->clients == 0) && (stack->size > stack->max_size))
-                tile_destroy(stack, tile);
+        /* Remove the map if it is unused and if there is a stack overflow */
+        if ((map->clients == 0) && (stack->size > stack->max_size))
+                turtle_map_destroy(&map);
 
-/* Unlock and return. */
+/* Unlock and return */
 unlock:
         if (lock && (stack->unlock != NULL) && (stack->unlock() != 0))
-                return TURTLE_RETURN_UNLOCK_ERROR;
-        return rc;
+                return TURTLE_ERROR_REGISTER(TURTLE_RETURN_UNLOCK_ERROR,
+                    "could not release the lock");
+        return error_->code;
 }

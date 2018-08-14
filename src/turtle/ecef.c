@@ -37,8 +37,8 @@
 #define WGS84_E 0.081819190842622
 
 /* Compute ECEF coordinates from latitude and longitude. */
-void turtle_ecef_from_geodetic(double latitude, double longitude,
-    double elevation, double ecef[3])
+void turtle_ecef_from_geodetic(
+    double latitude, double longitude, double elevation, double ecef[3])
 {
         /* Get the parameters of the reference ellipsoid. */
         const double a = WGS84_A, e = WGS84_E;

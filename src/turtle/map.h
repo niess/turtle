@@ -24,21 +24,53 @@
 #ifndef TURTLE_MAP_H
 #define TURTLE_MAP_H
 
+/* C89 standard library */
+#include <stdint.h>
+/* Turtle library */
 #include "projection.h"
 
-/* Container for a projection map. */
-struct turtle_map {
-        /* Map data. */
-        int bit_depth;
+/* Callbacks for getting and setting elevation data */
+struct turtle_map;
+typedef double turtle_map_getter_t(
+    const struct turtle_map * map, int ix, int iy);
+typedef void turtle_map_setter_t(
+    struct turtle_map * map, int ix, int iy, double z);
+
+/* Header container for map meta data */
+struct turtle_map_meta {
+        /* Map meta data */
         int nx, ny;
         double x0, y0, z0;
         double dx, dy, dz;
-        void * z;
 
-        /* Projection. */
+        /* Callbacks for getting and setting elevation data */
+        turtle_map_getter_t * get_z;
+        turtle_map_setter_t * set_z;
+
+        /* Data encoding format */
+        char encoding[8];
+
+        /* Projection */
         struct turtle_projection projection;
-
-        char data[]; /* Placeholder for dynamic data. */
 };
+
+/* Container for a map */
+struct turtle_map {
+        /* Meta data */
+        struct turtle_map_meta meta;
+
+        /* Stack data */
+        struct turtle_map * prev;
+        struct turtle_map * next;
+        struct turtle_stack * stack;
+        int clients;
+
+        /* Placeholder for raw elevation data */
+        uint16_t data[];
+};
+
+enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
+    double x, double y, double * z, int * inside,
+    struct turtle_error_context * error_);
 
 #endif

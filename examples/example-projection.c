@@ -28,7 +28,7 @@ void exit_gracefully(enum turtle_return rc)
 
 /* User supplied error handler. */
 void error_handler(
-    enum turtle_return rc, turtle_caller_t * caller, const char * message)
+    enum turtle_return rc, turtle_function_t * caller, const char * message)
 {
         fprintf(stderr, "error: %s.\n", message);
         exit_gracefully(rc);
@@ -60,7 +60,7 @@ int main()
         const int nx = 201;
         const int ny = 201;
         struct turtle_box box = { 696530.7, 6518284.5, 3000., 3000. };
-        turtle_map_create("Lambert 93", &box, nx, ny, 500., 1500., 16, &map);
+        turtle_map_create("Lambert 93", &box, nx, ny, 500., 1500., &map);
         struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Fill the local map with the GDEM data. */

@@ -11,7 +11,7 @@
 
 /* Error handler: dump any error message and exit to the OS. */
 void exit_abruptly(
-    enum turtle_return rc, turtle_caller_t * caller, const char * message)
+    enum turtle_return rc, turtle_function_t * caller, const char * message)
 {
         if (rc != TURTLE_RETURN_SUCCESS)
                 fprintf(stderr, "error: %s.\n", message);
@@ -36,9 +36,9 @@ int main()
         /* Load the RGF93 map dumped by `example-projection`. */
         const char * path = "pdd-30m.png";
         struct turtle_map * map;
-        enum turtle_return rc = turtle_map_load(path, NULL, &map);
+        enum turtle_return rc = turtle_map_load(path, &map);
         if (rc != TURTLE_RETURN_SUCCESS)
-                exit_abruptly(rc, (turtle_caller_t *)turtle_map_load,
+                exit_abruptly(rc, (turtle_function_t *)turtle_map_load,
                     "could not load map");
 
         printf("o) Loaded projection map `%s`\n", path);
@@ -48,19 +48,20 @@ int main()
 
         /* Show the map statistics. */
         struct turtle_box box;
-        int nx, ny, bit_depth;
+        int nx, ny;
         double zmin, zmax;
         char * strproj;
-        turtle_map_info(map, &box, &nx, &ny, &zmin, &zmax, &bit_depth);
+        const char * encoding;
+        turtle_map_info(map, &box, &nx, &ny, &zmin, &zmax, &encoding);
         turtle_projection_info(rgf93, &strproj);
 
         printf("    + projection   :  %s\n", strproj);
         printf("    + origin       :  (%.2lf, %.2lf)\n", box.x0, box.y0);
-        printf("    + size         :  %.2lf x %.2lf m^2\n", box.half_x,
-            box.half_y);
+        printf("    + size         :  %.2lf x %.2lf m^2\n", 2 * box.half_x,
+            2 * box.half_y);
         printf("    + nodes        :  %d x %d\n", nx, ny);
-        printf("    + elevation    :  %.1lf -> %.1lf (%d bits)\n", zmin, zmax,
-            bit_depth);
+        printf("    + elevation    :  %.1lf -> %.1lf\n", zmin, zmax);
+        printf("    + encoding     :  %s\n", encoding);
 
         /*
          * Free the temporary dump of the projection's name since it isn't

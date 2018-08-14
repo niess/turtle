@@ -113,7 +113,7 @@ int unlock(void)
  */
 /* A basic error handler with an abrupt exit(). */
 void error_handler(
-    enum turtle_return rc, turtle_caller_t * caller, const char * message)
+    enum turtle_return rc, turtle_function_t * caller, const char * message)
 {
         fprintf(stderr, "error: %s.\n", message);
         pthread_exit(0);

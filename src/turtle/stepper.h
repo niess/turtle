@@ -27,14 +27,14 @@
 #include "turtle.h"
 
 struct turtle_stepper_layer;
-
 typedef enum turtle_return turtle_stepper_stepper_t(
     struct turtle_stepper * stepper, struct turtle_stepper_layer * layer,
     const double * position, int has_geodetic, double * geographic,
     double * ground_elevation, int * inside);
 
+struct turtle_error_context;
 typedef enum turtle_return turtle_stepper_cleaner_t(
-    struct turtle_stepper_layer * layer);
+    struct turtle_stepper_layer * layer, struct turtle_error_context * error_);
 
 /* Parameters of a local transform */
 struct turtle_stepper_transform {

@@ -32,7 +32,7 @@ void exit_gracefully(enum turtle_return rc)
 
 /* User supplied error handler. */
 void error_handler(
-    enum turtle_return rc, turtle_caller_t * caller, const char * message)
+    enum turtle_return rc, turtle_function_t * caller, const char * message)
 {
         fprintf(stderr, "error: %s.\n", message);
         exit_gracefully(rc);
@@ -60,10 +60,10 @@ int main()
          * Get the RGF93 local projection map, centered on the Auberge des
          * Gros Manaux at Col de Ceyssat, Auvergne, France.
          */
-        turtle_map_load("pdd-30m.png", NULL, &map);
+        turtle_map_load("pdd-30m.png", &map);
 
         /* Load the EGM96 geoid map */
-        turtle_map_load("share/data/egm96.png", NULL, &geoid);
+        turtle_map_load("share/data/egm96.png", &geoid);
 
         /* Create the ECEF stepper and configure it. */
         turtle_stepper_create(&stepper);

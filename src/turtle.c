@@ -25,7 +25,7 @@
 #include "turtle.h"
 #include "turtle/loader/geotiff16.h"
 
-/* Initialise the TURTLE interface. */
+/* Initialise the TURTLE library */
 void turtle_initialise(turtle_handler_cb * handler)
 {
         /* Set any user supplied error handler. */
@@ -33,19 +33,18 @@ void turtle_initialise(turtle_handler_cb * handler)
 
 #ifndef TURTLE_NO_TIFF
         /* Register the geotiff16 tags. */
-        geotiff16_register();
+        /* DEBUG geotiff16_register(); */
 #endif
 }
 
-/* Clear the TURTLE interface.
- */
+/* Clear the TURTLE library */
 void turtle_finalise(void) {}
 
-/* Get a library function name as a string. */
-const char * turtle_strfunc(turtle_caller_t * caller)
+/* Get a library function name as a string */
+const char * turtle_strfunc(turtle_function_t * caller)
 {
 #define TOSTRING(function)                                                     \
-        if (caller == (turtle_caller_t *)function) return #function;
+        if (caller == (turtle_function_t *)function) return #function;
 
         TOSTRING(turtle_projection_create)
         TOSTRING(turtle_projection_configure)

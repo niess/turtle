@@ -23,10 +23,10 @@
  */
 #include "stepper.h"
 #include "client.h"
-#include "stack.h"
 #include "error.h"
 #include "map.h"
 #include "projection.h"
+#include "stack.h"
 #include "turtle.h"
 /* C89 standard library */
 #include "float.h"
@@ -42,8 +42,8 @@ static void ecef_to_geodetic(struct turtle_stepper * stepper,
         if (stepper->geoid != NULL) {
                 int inside;
                 double undulation;
-                turtle_map_elevation(stepper->geoid,
-                    geographic[1], geographic[0], &undulation, &inside);
+                turtle_map_elevation(stepper->geoid, geographic[1],
+                    geographic[0], &undulation, &inside);
                 if (inside) geographic[2] -= undulation;
         }
 }
@@ -64,9 +64,7 @@ static enum turtle_return compute_geomap(struct turtle_stepper * stepper,
     struct turtle_stepper_layer * layer, const double * position, int n0,
     double * geographic)
 {
-        if (n0 == 0) {
-                ecef_to_geodetic(stepper, position, geographic);
-        }
+        if (n0 == 0) { ecef_to_geodetic(stepper, position, geographic); }
         struct turtle_map * map = layer->a.map;
         struct turtle_projection * projection = turtle_map_projection(map);
         return turtle_projection_project(projection, geographic[0],
@@ -205,9 +203,9 @@ static enum turtle_return stepper_step_flat(struct turtle_stepper * stepper,
 }
 
 static enum turtle_return stepper_clean_client(
-    struct turtle_stepper_layer * layer)
+    struct turtle_stepper_layer * layer, struct turtle_error_context * error_)
 {
-        return turtle_client_destroy(&layer->a.client);
+        return turtle_client_destroy_(&layer->a.client, error_);
 }
 
 static void add_layer(
@@ -226,6 +224,8 @@ static void add_layer(
 enum turtle_return turtle_stepper_add_stack(
     struct turtle_stepper * stepper, struct turtle_stack * stack)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_add_stack);
+
         enum turtle_return rc;
         struct turtle_client * client = NULL;
         if (stack->lock != NULL) {
@@ -241,7 +241,7 @@ enum turtle_return turtle_stepper_add_stack(
                         rc = turtle_client_destroy(&client);
                         if (rc != TURTLE_RETURN_SUCCESS) return rc;
                 }
-                return TURTLE_ERROR_MEMORY(turtle_stepper_add_stack);
+                return TURTLE_ERROR_MEMORY();
         }
         if (client != NULL) {
                 layer->step = &stepper_step_client;
@@ -262,9 +262,11 @@ enum turtle_return turtle_stepper_add_stack(
 enum turtle_return turtle_stepper_add_map(
     struct turtle_stepper * stepper, struct turtle_map * map)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_add_map);
+
         /* Allocate the layer */
         struct turtle_stepper_layer * layer = malloc(sizeof(*layer));
-        if (layer == NULL) return TURTLE_ERROR_MEMORY(turtle_stepper_add_map);
+        if (layer == NULL) return TURTLE_ERROR_MEMORY();
         layer->step = &stepper_step_map;
         layer->clean = NULL;
         layer->a.map = map;
@@ -278,9 +280,11 @@ enum turtle_return turtle_stepper_add_map(
 enum turtle_return turtle_stepper_add_flat(
     struct turtle_stepper * stepper, double ground_level)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_add_flat);
+
         /* Allocate the layer */
         struct turtle_stepper_layer * layer = malloc(sizeof(*layer));
-        if (layer == NULL) return TURTLE_ERROR_MEMORY(turtle_stepper_add_flat);
+        if (layer == NULL) return TURTLE_ERROR_MEMORY();
         layer->step = &stepper_step_flat;
         layer->clean = NULL;
         layer->a.ground_level = ground_level;
@@ -293,8 +297,10 @@ enum turtle_return turtle_stepper_add_flat(
 
 enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper_)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_create);
+
         struct turtle_stepper * stepper = malloc(sizeof(*stepper));
-        if (stepper == NULL) return TURTLE_ERROR_MEMORY(turtle_stepper_create);
+        if (stepper == NULL) return TURTLE_ERROR_MEMORY();
         *stepper_ = stepper;
         stepper->layers = NULL;
         stepper->geoid = NULL;
@@ -308,13 +314,14 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper_)
 
 enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_destroy);
         if ((stepper == NULL) || (*stepper == NULL))
                 return TURTLE_RETURN_SUCCESS;
 
         struct turtle_stepper_layer * layer = (*stepper)->layers;
         while (layer != NULL) {
                 if (layer->clean != NULL) {
-                        enum turtle_return rc = layer->clean(layer);
+                        enum turtle_return rc = layer->clean(layer, error_);
                         if (rc != TURTLE_RETURN_SUCCESS) return rc;
                 }
                 struct turtle_stepper_layer * previous = layer->previous;
@@ -387,6 +394,8 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
     const double * position, double * latitude, double * longitude,
     double * altitude, double * ground_elevation, int * layer_depth)
 {
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_step);
+
         /* 1st let us check the history */
         if ((position[0] == stepper->last_position[0]) &&
             (position[1] == stepper->last_position[1]) &&
@@ -400,8 +409,8 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
                 if (layer_depth != NULL) {
                         *layer_depth = stepper->last_layer;
                 } else if (stepper->last_layer < 0) {
-                        return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
-                            turtle_stepper_step, "no valid layer");
+                        return TURTLE_ERROR_MESSAGE(
+                            TURTLE_RETURN_DOMAIN_ERROR, "no valid layer");
                 }
                 return TURTLE_RETURN_SUCCESS;
         }
@@ -438,7 +447,7 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         if (layer_depth != NULL) {
                 return TURTLE_RETURN_SUCCESS;
         } else {
-                return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
-                    turtle_stepper_step, "no valid layer");
+                return TURTLE_ERROR_MESSAGE(
+                    TURTLE_RETURN_DOMAIN_ERROR, "no valid layer");
         }
 }

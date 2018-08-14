@@ -22,6 +22,8 @@
 #ifndef TURTLE_LOADER_H
 #define TURTLE_LOADER_H
 
+#include "turtle.h"
+
 enum loader_format {
         LOADER_FORMAT_UNKNOWN = 0,
         LOADER_FORMAT_GEOTIFF,
@@ -29,6 +31,7 @@ enum loader_format {
 };
 
 enum loader_format loader_format(const char * path);
+struct tile;
 enum turtle_return loader_meta(const char * path, struct tile * tile);
 enum turtle_return loader_load(const char * path, struct tile ** tile);
 

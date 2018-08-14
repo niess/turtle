@@ -101,7 +101,7 @@ struct turtle_box {
  * This is a generic function pointer used to identify the library functions,
  * e.g. for error handling.
  */
-typedef void turtle_caller_t(void);
+typedef void turtle_function_t(void);
 
 /**
  * Callback for error handling.
@@ -118,7 +118,7 @@ typedef void turtle_caller_t(void);
  * This callback *must* be thread safe if a `turtle_client` is used.
  */
 typedef void turtle_handler_cb(
-    enum turtle_return rc, turtle_caller_t * caller, const char * message);
+    enum turtle_return rc, turtle_function_t * caller, const char * message);
 
 /**
  * Callback for locking or unlocking critical sections.
@@ -166,7 +166,7 @@ void turtle_finalise(void);
  * This function is meant for verbosing when handling errors. It is thread
  * safe.
  */
-const char * turtle_strfunc(turtle_caller_t * function);
+const char * turtle_strfunc(turtle_function_t * function);
 
 /**
  * Setter for the library error handler.
@@ -339,7 +339,6 @@ enum turtle_return turtle_projection_unproject(
  * @param ny            The number of nodes along the Y-axis.
  * @param zmin          The minimum elevation value.
  * @param zmax          The maximum elevation value.
- * @param bit_depth     The number of bits for storing elevation values.
  * @param map           A handle to the map.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
@@ -348,10 +347,10 @@ enum turtle_return turtle_projection_unproject(
  * `turtle_map_destroy` in order to recover the allocated memory. The map is
  * initialised as flat with `nx x ny` static nodes of elevation `zmin`. The
  * nodes are distributed over a regular grid defined by `box`. The elevation
- * values are stored over `bit_depth` bits between `zmin` and `zmax`. If
- * `projection` is not `NULL` the map is initialised with a geographic
- * projection handle. See `turtle_projection_create` for a list of valid
- * projections and their names.
+ * values are stored over 16 bits between `zmin` and `zmax`. If `projection`
+ * is not `NULL` the map is initialised with a geographic projection handle.
+ * See `turtle_projection_create` for a list of valid projections and their
+ * names.
  *
  * __Error codes__
  *
@@ -364,7 +363,7 @@ enum turtle_return turtle_projection_unproject(
  */
 enum turtle_return turtle_map_create(const char * projection,
     const struct turtle_box * box, int nx, int ny, double zmin, double zmax,
-    int bit_depth, struct turtle_map ** map);
+    struct turtle_map ** map);
 
 /**
  * Destroy a projection map.
@@ -377,19 +376,16 @@ enum turtle_return turtle_map_create(const char * projection,
 void turtle_map_destroy(struct turtle_map ** map);
 
 /**
- * Load a projection map.
+ * Load a map.
  *
  * @param path    The path to the map file.
- * @param box     A bouding box for the map or `NULL`.
  * @param map     A handle to the map.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
- * Load a projection map from a file. The file format is guessed from the
- * filename's extension. Currently only `.png` and `.grd` (e.g. EGM96) formats
- * are supported. A bouding `box` can be provided in order to load only a
- * rectangular subset of the initial map. The bounding box coordinates must be
- * specified in the initial map frame.
+ * Load a map from a file. The file format is guessed from the filename
+ * extension. Currently only `.png` and `.grd` (e.g. EGM96) formats are
+ * supported.
  *
  * __Error codes__
  *
@@ -397,15 +393,12 @@ void turtle_map_destroy(struct turtle_map ** map);
  *
  *    TURTLE_RETURN_BAD_PATH         The file wasn't found.
  *
- *    TURTLE_RETURN_DOMAIN_ERROR     The bouding box is invalid.
- *
  *    TURTLE_RETURN_MEMORY_ERROR     The map couldn't be allocated.
  *
  *    TURTLE_RETURN_JSON_ERROR       The JSON metadata are invalid (.png file).
  *
  */
-enum turtle_return turtle_map_load(
-    const char * path, const struct turtle_box * box, struct turtle_map ** map);
+enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map);
 
 /**
  * Dump a projection map to a file.
@@ -445,9 +438,8 @@ enum turtle_return turtle_map_dump(
  *
  * Fill the elevation value of the map node of coordinates `(ix, iy)`. The
  * elevation value must be in the range `[zmin, zmax]` of the `map`. **Note**
- * that depending on the map's `bit_depth` the actual node elevation can
- * differ from the input value by `(zmax-zmin)/(2**(bit_depth)-1)`, e.g 1.5 cm
- * for a 1 km altitude span and a 16 bit resolution.
+ * that due to digitization the actual node elevation can differ from the input
+ * value by `(zmax-zmin)/65535`, e.g 1.5 cm for a 1 km altitude span.
  *
  * __Error codes__
  *
@@ -519,13 +511,13 @@ struct turtle_projection * turtle_map_projection(struct turtle_map * map);
  * @param ny           The number of nodes along the Y-axis.
  * @param zmin         The minimum allowed elevation value.
  * @param zmax         The maximum allowed elevation value.
- * @param bit_depth    The number of bits for storing elevation values.
+ * @param encoding     The data encoding format.
  *
  * Get some basic information on a projection map. Note that any output
  * parameter can be set to NULL if the corresponding property is not needed.
  */
 void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
-    int * nx, int * ny, double * zmin, double * zmax, int * bit_depth);
+    int * nx, int * ny, double * zmin, double * zmax, const char ** encoding);
 
 /**
 * Transform geodetic coordinates to cartesian ECEF ones.
