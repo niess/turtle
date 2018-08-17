@@ -30,7 +30,7 @@ static turtle_handler_cb * _handler = NULL;
 void turtle_handler(turtle_handler_cb * handler) { _handler = handler; }
 
 /* Utility function for formating an error */
-enum turtle_return turtle_error_format(struct turtle_error_context * error_,
+enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
     enum turtle_return rc, const char * file, int line, const char * format,
     ...)
 {
@@ -53,7 +53,7 @@ enum turtle_return turtle_error_format(struct turtle_error_context * error_,
 }
 
 /* Utility function for handling an error */
-enum turtle_return turtle_error_raise(struct turtle_error_context * error_)
+enum turtle_return turtle_error_raise_(struct turtle_error_context * error_)
 {
         if ((_handler == NULL) || (error_->code == TURTLE_RETURN_SUCCESS))
                 return error_->code;

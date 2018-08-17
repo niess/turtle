@@ -44,21 +44,22 @@ struct turtle_error_context {
         struct turtle_error_context * error_ = &error_data;
 
 #define TURTLE_ERROR_MESSAGE(rc, message)                                      \
-        turtle_error_format(error_, rc, __FILE__, __LINE__, message),          \
-            turtle_error_raise(error_)
+        turtle_error_format_(error_, rc, __FILE__, __LINE__, message),         \
+            turtle_error_raise_(error_)
 
 #define TURTLE_ERROR_FORMAT(rc, format, ...)                                   \
-        turtle_error_format(                                                   \
+        turtle_error_format_(                                                  \
             error_, rc, __FILE__, __LINE__, format, __VA_ARGS__),              \
-            turtle_error_raise(error_)
+            turtle_error_raise_(error_)
 
 #define TURTLE_ERROR_REGISTER(rc, message)                                     \
-        turtle_error_format(error_, rc, __FILE__, __LINE__, message)
+        turtle_error_format_(error_, rc, __FILE__, __LINE__, message)
 
 #define TURTLE_ERROR_VREGISTER(rc, format, ...)                                \
-        turtle_error_format(error_, rc, __FILE__, __LINE__, format, __VA_ARGS__)
+        turtle_error_format_(error_, rc, __FILE__, __LINE__, format,           \
+            __VA_ARGS__)
 
-#define TURTLE_ERROR_RAISE() turtle_error_raise(error_)
+#define TURTLE_ERROR_RAISE() turtle_error_raise_(error_)
 
 #define TURTLE_ERROR_LOCK()                                                    \
         TURTLE_ERROR_MESSAGE(                                                  \
@@ -100,11 +101,11 @@ struct turtle_error_context {
         TURTLE_ERROR_MESSAGE(rc, "an unexpected error occured");
 
 /* Generic function for formating an error */
-enum turtle_return turtle_error_format(struct turtle_error_context * error_,
+enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
     enum turtle_return rc, const char * file, int line, const char * format,
     ...);
 
 /* Generic function for handling an error */
-enum turtle_return turtle_error_raise(struct turtle_error_context * error_);
+enum turtle_return turtle_error_raise_(struct turtle_error_context * error_);
 
 #endif

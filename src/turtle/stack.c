@@ -197,7 +197,7 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
 }
 
 /* Low level routine for cleaning the stack */
-void stack_clear(struct turtle_stack * stack, int force)
+static void stack_clear(struct turtle_stack * stack, int force)
 {
         struct turtle_map * map = stack->head;
         while (map != NULL) {
