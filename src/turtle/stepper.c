@@ -336,7 +336,6 @@ enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper)
 
 static void reset_history(struct turtle_stepper * stepper)
 {
-        stepper->local_range = 0.;
         stepper->last_position[0] = DBL_MAX;
         stepper->last_position[1] = DBL_MAX;
         stepper->last_position[2] = DBL_MAX;
