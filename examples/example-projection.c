@@ -51,7 +51,7 @@ int main()
         turtle_initialise(error_handler);
 
         /* Create the stack. */
-        turtle_stack_create("share/topography", 1, NULL, NULL, &stack);
+        turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
 
         /*
          * Create a RGF93 local projection map, centered on the Auberge des
@@ -59,8 +59,10 @@ int main()
          */
         const int nx = 201;
         const int ny = 201;
-        struct turtle_box box = { 696530.7, 6518284.5, 3000., 3000. };
-        turtle_map_create("Lambert 93", &box, nx, ny, 500., 1500., &map);
+        struct turtle_map_info info = { .nx = 201, .ny = 201,
+            .x = { 693530.7, 699530.7 }, .y = { 6515284.5, 6521284.5 },
+            .z = { 500., 1500. }};
+        turtle_map_create(&map, &info, "Lambert 93");
         struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Fill the local map with the GDEM data. */

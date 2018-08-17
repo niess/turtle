@@ -24,35 +24,40 @@
 extern "C" {
 #endif
 
+/* TURTLE API functions prefix */
+#ifndef TURTLE_API
+#define TURTLE_API
+#endif
+
 /**
- * Return Codes used by TURTLE.
+ * Return Codes used by TURTLE
  */
 enum turtle_return {
-        /** The operation succeeded. */
+        /** The operation succeeded */
         TURTLE_RETURN_SUCCESS = 0,
-        /** A wrong pointer address was provided, e.g. NULL. */
+        /** A wrong pointer address was provided, e.g. NULL */
         TURTLE_RETURN_BAD_ADDRESS,
-        /** A provided file extension is not supported or recognised. */
+        /** A provided file extension is not supported or recognised */
         TURTLE_RETURN_BAD_EXTENSION,
-        /** A provided file or string has a wrong format. */
+        /** A provided file or string has a wrong format */
         TURTLE_RETURN_BAD_FORMAT,
-        /** A provided `turtle_projection` is not supported. */
+        /** A provided `turtle_projection` is not supported */
         TURTLE_RETURN_BAD_PROJECTION,
-        /** Some JSON metadata couldn't be understood. */
+        /** Some JSON metadata couldn't be understood */
         TURTLE_RETURN_BAD_JSON,
-        /** Some input parameters are out of their validity range. */
+        /** Some input parameters are out of their validity range */
         TURTLE_RETURN_DOMAIN_ERROR,
-        /** An TURTLE low level library error occured. */
+        /** An TURTLE low level library error occured */
         TURTLE_RETURN_LIBRARY_ERROR,
-        /** A lock couldn't be acquired. */
+        /** A lock couldn't be acquired */
         TURTLE_RETURN_LOCK_ERROR,
-        /** Some meory couldn't be allocated. */
+        /** Some meory couldn't be allocated */
         TURTLE_RETURN_MEMORY_ERROR,
-        /** A provided path wasn't found. */
+        /** A provided path wasn't found */
         TURTLE_RETURN_PATH_ERROR,
-        /** A lock couldn't be released. */
+        /** A lock couldn't be released */
         TURTLE_RETURN_UNLOCK_ERROR,
-        /** The number of TURTLE error codes. */
+        /** The number of TURTLE error codes */
         N_TURTLE_RETURNS
 };
 
@@ -82,17 +87,21 @@ struct turtle_client;
 struct turtle_stepper;
 
 /**
- * Bounding box for projection maps.
+ * Meta data for maps
  */
-struct turtle_box {
-        /** Origin's X coordinate. */
-        double x0;
-        /** Origin's Y coordinate. */
-        double y0;
-        /** Half width along the X-axis. */
-        double half_x;
-        /** Half width along the Y-axis. */
-        double half_y;
+struct turtle_map_info {
+        /* Number of grid nodes along X */
+        int nx;
+        /* Number of grid nodes along Y */
+        int ny;
+        /** X coordinate range (min, max) */
+        double x[2];
+        /** Y coordinate range (min, max) */
+        double y[2];
+        /** Z coordinate range (min, max) */
+        double z[2];
+        /** Data encoding format */
+        const char * encoding;
 };
 
 /**
@@ -147,7 +156,7 @@ typedef int turtle_stack_cb(void);
  *
  * This function is not thread safe.
  */
-void turtle_initialise(turtle_handler_cb * handler);
+TURTLE_API void turtle_initialise(turtle_handler_cb * handler);
 
 /**
  * Finalise the TURTLE library.
@@ -158,7 +167,7 @@ void turtle_initialise(turtle_handler_cb * handler);
  *
  * This function is not thread safe.
  */
-void turtle_finalise(void);
+TURTLE_API void turtle_finalise(void);
 
 /**
  * Return a string describing a TURTLE library function.
@@ -166,7 +175,7 @@ void turtle_finalise(void);
  * This function is meant for verbosing when handling errors. It is thread
  * safe.
  */
-const char * turtle_strfunc(turtle_function_t * function);
+TURTLE_API const char * turtle_strfunc(turtle_function_t * function);
 
 /**
  * Setter for the library error handler.
@@ -177,13 +186,13 @@ const char * turtle_strfunc(turtle_function_t * function);
  * handler can be set at a time for all threads. It is not thread safe
  * to modify it.
  */
-void turtle_handler(turtle_handler_cb * handler);
+TURTLE_API void turtle_handler(turtle_handler_cb * handler);
 
 /**
  * Create a new geographic projection.
  *
- * @param name          The name of the projection.
  * @param projection    A handle to the projection.
+ * @param name          The name of the projection.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
@@ -218,8 +227,8 @@ void turtle_handler(turtle_handler_cb * handler);
  *
  *    TURTLE_RETURN_MEMORY_ERROR      The projection couldnt be allocated.
  */
-enum turtle_return turtle_projection_create(
-    const char * name, struct turtle_projection ** projection);
+TURTLE_API enum turtle_return turtle_projection_create(
+    struct turtle_projection ** projection, const char * name);
 
 /**
  * Destroy a geographic projection.
@@ -235,7 +244,8 @@ enum turtle_return turtle_projection_create(
  * `turtle_map`. Instead one must call `turtle_map_destroy` to get rid of
  * both the map and its projection.
  */
-void turtle_projection_destroy(struct turtle_projection ** projection);
+TURTLE_API void turtle_projection_destroy(
+    struct turtle_projection ** projection);
 
 /**
  * (Re-)configure a geographic projection.
@@ -252,35 +262,22 @@ void turtle_projection_destroy(struct turtle_projection ** projection);
  *
  *    TURTLE_RETURN_BAD_PROJECTION    The projection isn't supported.
  */
-enum turtle_return turtle_projection_configure(
+TURTLE_API enum turtle_return turtle_projection_configure(
     const char * name, struct turtle_projection * projection);
 
 /**
- * Information on a geographic projection.
+ * Get the name tag of the geographic projection
  *
  * @param projection    A handle to the projection.
- * @param name          The name of the projection.
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below.
+ * @return The projection name tag or `ǸULL`.
  *
- * This function fills in the provided `name` string with the projection
- * details. The resulting name conforms to the inputs to
- * `turtle_projection_configure` or `turtle_projection_create`, e.g. `UTM 31N`.
- * See the later for a detailed description.
- *
- * __Warnings__
- *
- * This function allocates the `name` string. It is the user's responsability
- * to free it when no more needed.
- *
- * __Error codes__
- *
- *    TURTLE_RETURN_BAD_PROJECTION    The projection isn't supported.
- *
- *    TURTLE_RETURN_MEMORY_ERROR      The name string couldn't be allocated.
+ * This function returns a `name` tag encoding the projection details. The
+ * resulting name conforms to the inputs to `turtle_projection_configure`
+ * or `turtle_projection_create`, e.g. `UTM 31N`. See the later for a
+ * detailed description.
  */
-enum turtle_return turtle_projection_info(
-    const struct turtle_projection * projection, char ** name);
+TURTLE_API const char * turtle_projection_name(
+    const struct turtle_projection * projection);
 
 /**
  * Apply a geographic projection to geodetic coordinates.
@@ -302,7 +299,7 @@ enum turtle_return turtle_projection_info(
  *
  *    TURTLE_RETURN_BAD_PROJECTION    The projection isn't supported.
  */
-enum turtle_return turtle_projection_project(
+TURTLE_API enum turtle_return turtle_projection_project(
     const struct turtle_projection * projection, double latitude,
     double longitude, double * x, double * y);
 
@@ -326,31 +323,27 @@ enum turtle_return turtle_projection_project(
  *
  *    TURTLE_RETURN_BAD_PROJECTION    The provided projection isn't supported.
  */
-enum turtle_return turtle_projection_unproject(
+TURTLE_API enum turtle_return turtle_projection_unproject(
     const struct turtle_projection * projection, double x, double y,
     double * latitude, double * longitude);
 
 /**
  * Create a new projection map.
  *
- * @param projection    The name of the projection or `NULL`.
- * @param box           A bouding box for the map.
- * @param nx            The number of nodes along the X-axis.
- * @param ny            The number of nodes along the Y-axis.
- * @param zmin          The minimum elevation value.
- * @param zmax          The maximum elevation value.
  * @param map           A handle to the map.
+ * @param info          THe map meta data.
+ * @param projection    The geographic projection, or `NULL`.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
- * Allocate memory for a new projection map and initialise it. Use
- * `turtle_map_destroy` in order to recover the allocated memory. The map is
- * initialised as flat with `nx x ny` static nodes of elevation `zmin`. The
- * nodes are distributed over a regular grid defined by `box`. The elevation
- * values are stored over 16 bits between `zmin` and `zmax`. If `projection`
- * is not `NULL` the map is initialised with a geographic projection handle.
- * See `turtle_projection_create` for a list of valid projections and their
- * names.
+ * Allocate memory for a new map and initialise it. Use `turtle_map_destroy`
+ * in order to recover the allocated memory. The map is initialised as flat
+ * with `info:nx x info:ny` static nodes of elevation `zmin`. The nodes are
+ * distributed over a regular grid defined by `info`. The elevation
+ * values are stored over 16 bits between `info:z[0]` and `info:z[1]`. If
+ * `projection` is not `NULL` the map is initialised with a geographic
+ * projection handle. See `turtle_projection_create` for a list of valid
+ * projections and their names.
  *
  * __Error codes__
  *
@@ -361,9 +354,8 @@ enum turtle_return turtle_projection_unproject(
  *
  *    TURTLE_RETURN_MEMORY_ERROR      The map couldn't be allocated.
  */
-enum turtle_return turtle_map_create(const char * projection,
-    const struct turtle_box * box, int nx, int ny, double zmin, double zmax,
-    struct turtle_map ** map);
+TURTLE_API enum turtle_return turtle_map_create(struct turtle_map ** map,
+    const struct turtle_map_info * info, const char * projection);
 
 /**
  * Destroy a projection map.
@@ -373,7 +365,7 @@ enum turtle_return turtle_map_create(const char * projection,
  * Fully destroy a projection map and recover the memory previously allocated
  * by `turtle_projection_create`. On return `map` is set to `NULL`.
  */
-void turtle_map_destroy(struct turtle_map ** map);
+TURTLE_API void turtle_map_destroy(struct turtle_map ** map);
 
 /**
  * Load a map.
@@ -398,7 +390,8 @@ void turtle_map_destroy(struct turtle_map ** map);
  *    TURTLE_RETURN_JSON_ERROR       The JSON metadata are invalid (.png file).
  *
  */
-enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map);
+TURTLE_API enum turtle_return turtle_map_load(
+    const char * path, struct turtle_map ** map);
 
 /**
  * Dump a projection map to a file.
@@ -423,7 +416,7 @@ enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map);
  *    TURTLE_RETURN_MEMORY_ERROR     Some temporary memory couldn't be
  * allocated.
  */
-enum turtle_return turtle_map_dump(
+TURTLE_API enum turtle_return turtle_map_dump(
     const struct turtle_map * map, const char * path);
 
 /**
@@ -445,7 +438,7 @@ enum turtle_return turtle_map_dump(
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    Some input parameter isn't valid.
  */
-enum turtle_return turtle_map_fill(
+TURTLE_API enum turtle_return turtle_map_fill(
     struct turtle_map * map, int ix, int iy, double elevation);
 
 /**
@@ -463,8 +456,8 @@ enum turtle_return turtle_map_fill(
  * Get the properties of a map node, i.e. its geographic coordinates and
  * elevation value.
  */
-enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
-    double * x, double * y, double * elevation);
+TURTLE_API enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
+    int iy, double * x, double * y, double * elevation);
 
 /**
  * Get the map elevation at a geographic coordinate.
@@ -488,8 +481,9 @@ enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    The coordinates are not valid.
  */
-enum turtle_return turtle_map_elevation(const struct turtle_map * map, double x,
-    double y, double * elevation, int * inside);
+TURTLE_API enum turtle_return turtle_map_elevation(
+    const struct turtle_map * map, double x, double y, double * elevation,
+    int * inside);
 
 /**
  * Get a handle to the map's projection.
@@ -500,99 +494,96 @@ enum turtle_return turtle_map_elevation(const struct turtle_map * map, double x,
  * **Note** The provided projection handle allows to set and modify the map's
  * projection, e.g. using `turtle_projection_configure`.
  */
-struct turtle_projection * turtle_map_projection(struct turtle_map * map);
+TURTLE_API struct turtle_projection * turtle_map_projection(
+    struct turtle_map * map);
 
 /**
  * Get basic information on a projection map.
  *
  * @param map          A handle to the map.
- * @param box          The map bounding box in X-Y.
- * @param nx           The number of nodes along the X-axis.
- * @param ny           The number of nodes along the Y-axis.
- * @param zmin         The minimum allowed elevation value.
- * @param zmax         The maximum allowed elevation value.
- * @param encoding     The data encoding format.
+ * @param info         A pointer to a `turtle_map_info` structure
+ * @param projection   A pointer for returning the projection, or `NULL`
  *
- * Get some basic information on a projection map. Note that any output
- * parameter can be set to NULL if the corresponding property is not needed.
+ * Get some basic information on a map. The meta data are filled
+ * to the provided *info* structure. If *projection* is non `NULL` it
+ * points to the map projection at return.
  */
-void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
-    int * nx, int * ny, double * zmin, double * zmax, const char ** encoding);
+TURTLE_API void turtle_map_meta(const struct turtle_map * map,
+    struct turtle_map_info * info, const char ** projection);
 
 /**
-* Transform geodetic coordinates to cartesian ECEF ones.
-*
-* @param latitude     The geodetic latitude.
-* @param longitude    The geodetic longitude.
-* @param elevation    The geodetic elevation.
-* @param ecef         The corresponding ECEF coordinates.
-*
-* Transform geodetic coordinates to Cartesian ones in the Earth-Centered,
-* Earth-Fixed (ECEF) frame.
-*/
-void turtle_ecef_from_geodetic(
+ * Transform geodetic coordinates to cartesian ECEF ones.
+ *
+ * @param latitude     The geodetic latitude.
+ * @param longitude    The geodetic longitude.
+ * @param elevation    The geodetic elevation.
+ * @param ecef         The corresponding ECEF coordinates.
+ *
+ * Transform geodetic coordinates to Cartesian ones in the Earth-Centered,
+ * Earth-Fixed (ECEF) frame.
+ */
+TURTLE_API void turtle_ecef_from_geodetic(
     double latitude, double longitude, double elevation, double ecef[3]);
 
 /**
-* Transform cartesian ECEF coordinates to geodetic ones.
-*
-* @param ecef         The ECEF coordinates.
-* @param latitude     The corresponding geodetic latitude.
-* @param longitude    The corresponding geodetic longitude.
-* @param altitude     The corresponding geodetic altitude.
-*
-* Transform Cartesian coordinates in the Earth-Centered, Earth-Fixed (ECEF)
-* frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
-* single iteration.
-*/
-void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
+ * Transform cartesian ECEF coordinates to geodetic ones.
+ *
+ * @param ecef         The ECEF coordinates.
+ * @param latitude     The corresponding geodetic latitude.
+ * @param longitude    The corresponding geodetic longitude.
+ * @param altitude     The corresponding geodetic altitude.
+ *
+ * Transform Cartesian coordinates in the Earth-Centered, Earth-Fixed (ECEF)
+ * frame to geodetic ones. B. R. Bowring's (1985) algorithm's is used with a
+ * single iteration.
+ */
+TURTLE_API void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
     double * longitude, double * altitude);
 
 /**
-* Transform horizontal angles to a cartesian direction in ECEF.
-*
-* @param latitude     The geodetic latitude.
-* @param longitude    The geodetic longitude.
-* @param azimuth      The geographic azimuth angle.
-* @param elevation    The geographic elevation angle.
-* @param direction    The corresponding direction in ECEF coordinates.
-*
-* Transform horizontal coordinates to a Cartesian direction in the
-* Earth-Centered, Earth-Fixed (ECEF) frame.
-*/
-void turtle_ecef_from_horizontal(double latitude, double longitude,
+ * Transform horizontal angles to a cartesian direction in ECEF.
+ *
+ * @param latitude     The geodetic latitude.
+ * @param longitude    The geodetic longitude.
+ * @param azimuth      The geographic azimuth angle.
+ * @param elevation    The geographic elevation angle.
+ * @param direction    The corresponding direction in ECEF coordinates.
+ *
+ * Transform horizontal coordinates to a Cartesian direction in the
+ * Earth-Centered, Earth-Fixed (ECEF) frame.
+ */
+TURTLE_API void turtle_ecef_from_horizontal(double latitude, double longitude,
     double azimuth, double elevation, double direction[3]);
 
 /**
-* Transform a cartesian direction in ECEF to horizontal angles.
-*
-* @param latitude     The geodetic latitude.
-* @param longitude    The geodetic longitude.
-* @param direction    The direction vector in ECEF coordinates.
-* @param azimuth      The corresponding geographic azimuth.
-* @param elevation    The corresponding geographic elevation.
-*
-* Transform a Cartesian direction vector in the Earth-Centered, Earth-Fixed
-* (ECEF) frame to horizontal coordinates.
-*/
-void turtle_ecef_to_horizontal(double latitude, double longitude,
+ * Transform a cartesian direction in ECEF to horizontal angles.
+ *
+ * @param latitude     The geodetic latitude.
+ * @param longitude    The geodetic longitude.
+ * @param direction    The direction vector in ECEF coordinates.
+ * @param azimuth      The corresponding geographic azimuth.
+ * @param elevation    The corresponding geographic elevation.
+ *
+ * Transform a Cartesian direction vector in the Earth-Centered, Earth-Fixed
+ * (ECEF) frame to horizontal coordinates.
+ */
+TURTLE_API void turtle_ecef_to_horizontal(double latitude, double longitude,
     const double direction[3], double * azimuth, double * elevation);
 
 /**
  * Create a new stack of global topography data.
  *
+ * @param stack         A handle to the stack.
  * @param path          The path where elevation data are stored, or `NULL`.
- * @param stack_size    The number of elevation data tiles kept in memory.
+ * @param size          The number of elevation maps kept in memory.
  * @param lock          A callback for locking critical sections, or `NULL`.
  * @param unlock        A callback for unlocking critical sections, or `NULL`.
- * @param stack         A handle to the stack.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
  * Allocate memory for a new stack and initialise it. Use `turtle_stack_destroy`
  * in order to recover any memory allocated subsequently. The stack is
- * initialised with an empty stack. The path folder doesn't need to actually
- * store elevation data, e.g. if only geographic transforms are needed.
+ * initialised as empty.
  *
  * __Warnings__
  *
@@ -611,9 +602,9 @@ void turtle_ecef_to_horizontal(double latitude, double longitude,
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The stack couldn't be allocated.
  */
-enum turtle_return turtle_stack_create(const char * path, int stack_size,
-    turtle_stack_cb * lock, turtle_stack_cb * unlock,
-    struct turtle_stack ** stack);
+TURTLE_API enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
+    const char * path, int stack_size, turtle_stack_cb * lock,
+    turtle_stack_cb * unlock);
 
 /**
  * Destroy a stacl of global topography data.
@@ -628,7 +619,7 @@ enum turtle_return turtle_stack_create(const char * path, int stack_size,
  * This method is not thread safe. All clients should have been destroyed or
  * disabled first.
  */
-void turtle_stack_destroy(struct turtle_stack ** stack);
+TURTLE_API void turtle_stack_destroy(struct turtle_stack ** stack);
 
 /**
  * Clear the stack from topography data.
@@ -646,7 +637,7 @@ void turtle_stack_destroy(struct turtle_stack ** stack);
  *
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
-enum turtle_return turtle_stack_clear(struct turtle_stack * stack);
+TURTLE_API enum turtle_return turtle_stack_clear(struct turtle_stack * stack);
 
 /**
  * Get the elevation at geodetic coordinates.
@@ -673,14 +664,15 @@ enum turtle_return turtle_stack_clear(struct turtle_stack * stack);
  *    TURTLE_RETURN_BAD_PATH    The required elevation data are not in the
  * stack path.
  */
-enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
-    double latitude, double longitude, double * elevation, int * inside);
+TURTLE_API enum turtle_return turtle_stack_elevation(
+    struct turtle_stack * stack, double latitude, double longitude,
+    double * elevation, int * inside);
 
 /**
  * Create a new client to a stack of global topography data.
  *
- * @param stack     The serving stack.
  * @param client    A handle to the client.
+ * @param stack     The serving stack.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
@@ -697,8 +689,8 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The client couldn't be allocated.
  */
-enum turtle_return turtle_client_create(
-    struct turtle_stack * stack, struct turtle_client ** client);
+TURTLE_API enum turtle_return turtle_client_create(
+    struct turtle_client ** client, struct turtle_stack * stack);
 
 /**
  * Properly clean a client for a stack.
@@ -716,7 +708,8 @@ enum turtle_return turtle_client_create(
  *
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
-enum turtle_return turtle_client_destroy(struct turtle_client ** client);
+TURTLE_API enum turtle_return turtle_client_destroy(
+    struct turtle_client ** client);
 
 /**
  * Unbook any reserved elevation data.
@@ -734,7 +727,8 @@ enum turtle_return turtle_client_destroy(struct turtle_client ** client);
  *
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
-enum turtle_return turtle_client_clear(struct turtle_client * client);
+TURTLE_API enum turtle_return turtle_client_clear(
+    struct turtle_client * client);
 
 /**
  * Thread safe access to the elevation data of a stack.
@@ -762,25 +756,27 @@ enum turtle_return turtle_client_clear(struct turtle_client * client);
  *
  *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released.
  */
-enum turtle_return turtle_client_elevation(struct turtle_client * client,
-    double latitude, double longitude, double * elevation, int * inside);
+TURTLE_API enum turtle_return turtle_client_elevation(
+    struct turtle_client * client, double latitude, double longitude,
+    double * elevation, int * inside);
 
 /**
-* Create a new ECEF stepper.
-*
-* @param stepper   A handle to an ECEF stepper.
-* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
-* code is returned as detailed below.
-*
-* Allocate memory for a new stepper providing smart access to geodetic and
-* elevation data given ECEF coordinates. Call `turtle_stepper_destroy`
-* in order to properly recover any allocated memory.
-*
-* __Error codes__
-*
-*    TURTLE_RETURN_MEMORY_ERROR    The stepper couldn't be allocated.
-*/
-enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper);
+ * Create a new ECEF stepper.
+ *
+ * @param stepper   A handle to an ECEF stepper.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Allocate memory for a new stepper providing smart access to geodetic and
+ * elevation data given ECEF coordinates. Call `turtle_stepper_destroy`
+ * in order to properly recover any allocated memory.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_MEMORY_ERROR    The stepper couldn't be allocated.
+ */
+TURTLE_API enum turtle_return turtle_stepper_create(
+    struct turtle_stepper ** stepper);
 
 /**
  * Properly clean an ECEf stepper.
@@ -799,7 +795,8 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper);
  *
  *    TURTLE_RETURN_UNLOCK_ERROR    The client lock couldn't be released.
  */
-enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper);
+TURTLE_API enum turtle_return turtle_stepper_destroy(
+    struct turtle_stepper ** stepper);
 
 /**
  * Set a geoid model for altitude corrections.
@@ -813,7 +810,7 @@ enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper);
  * since topography data are ususaly given w.r.t. the mean sea level. Providing
  * a geoid map allows to correct for this.
  */
-void turtle_stepper_geoid_set(
+TURTLE_API void turtle_stepper_geoid_set(
     struct turtle_stepper * stepper, struct turtle_map * geoid);
 
 /**
@@ -822,7 +819,7 @@ void turtle_stepper_geoid_set(
  * @param stepper    A handle to an ECEF stepper.
  * @return A handle to the geoid map.
  */
-struct turtle_map * turtle_stepper_geoid_get(
+TURTLE_API struct turtle_map * turtle_stepper_geoid_get(
     const struct turtle_stepper * stepper);
 
 /**
@@ -836,7 +833,8 @@ struct turtle_map * turtle_stepper_geoid_get(
  * this feature is disabled. A typical range value is 100 m, resulting in Less
  * than 1 cm distortions.
  */
-void turtle_stepper_range_set(struct turtle_stepper * stepper, double range);
+TURTLE_API void turtle_stepper_range_set(
+    struct turtle_stepper * stepper, double range);
 
 /**
  * Get the validity range for local approximation to geographic transforms.
@@ -844,7 +842,8 @@ void turtle_stepper_range_set(struct turtle_stepper * stepper, double range);
  * @param stepper    A handle to an ECEF stepper.
  * @return The approximation range, in m.
  */
-double turtle_stepper_range_get(const struct turtle_stepper * stepper);
+TURTLE_API double turtle_stepper_range_get(
+    const struct turtle_stepper * stepper);
 
 /**
  * Add a `turtle_stack` data layer to a stepper.
@@ -868,79 +867,81 @@ double turtle_stepper_range_get(const struct turtle_stepper * stepper);
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
  */
-enum turtle_return turtle_stepper_add_stack(
+TURTLE_API enum turtle_return turtle_stepper_add_stack(
     struct turtle_stepper * stepper, struct turtle_stack * stack);
 
 /**
-* Add a `turtle_map` data layer to a stepper.
-*
-* @param stepper   A handle to an ECEF stepper.
-* @param map       The map to access.
-* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
-* code is returned as detailed below.
-*
-* Register a new data layer for the stepper accessing an existing
-* `turtle_map`.
-*
-* **Note** that the last created layer is the top layer, i.e. it has priority
-* over layers beneath.
-*
-* __Error codes__
-*
-*    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
-*/
-enum turtle_return turtle_stepper_add_map(
+ * Add a `turtle_map` data layer to a stepper.
+ *
+ * @param stepper   A handle to an ECEF stepper.
+ * @param map       The map to access.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Register a new data layer for the stepper accessing an existing
+ * `turtle_map`.
+ *
+ * **Note** that the last created layer is the top layer, i.e. it has priority
+ * over layers beneath.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+ */
+TURTLE_API enum turtle_return turtle_stepper_add_map(
     struct turtle_stepper * stepper, struct turtle_map * map);
 
 /**
-* Add a flat data layer to a stepper.
-*
-* @param stepper         A handle to an ECEF stepper.
-* @param ground_level    The uniform ground level.
-* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
-* code is returned as detailed below.
-*
-* Register a new data layer for the stepper providing a flat ground.
-*
-* **Note** that the last created layer is the top layer, i.e. it has priority
-* over layers beneath.
-*
-* __Error codes__
-*
-*    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
-*/
-enum turtle_return turtle_stepper_add_flat(
+ * Add a flat data layer to a stepper.
+ *
+ * @param stepper         A handle to an ECEF stepper.
+ * @param ground_level    The uniform ground level.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Register a new data layer for the stepper providing a flat ground.
+ *
+ * **Note** that the last created layer is the top layer, i.e. it has priority
+ * over layers beneath.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+ */
+TURTLE_API enum turtle_return turtle_stepper_add_flat(
     struct turtle_stepper * stepper, double ground_level);
 
 /**
-* Access geography data from ECEF, step by step.
-*
-* @param stepper              A handle to an ECEF stepper.
-* @param position             The ECEF position of interest.
-* @param latitude             The corresponding geodetic latitude.
-* @param longitude            The corresponding geodetic longitude.
-* @param altitude             The corresponding geodetic altitude.
-* @param ground_elevation     The corresponding ground elevation.
-* @param layer                The selected data layer.
-* @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
-* code is returned as detailed below.
-*
-* Inspect the stepper's data stack and provide the top most valid one. If no
-* valid layer was found a negative *layer* value is returned, or an error is
-* raised if *layer* points to `NULL`. Note that any of the output data can
-* point to `NULL` if it is of no interest. Note also that depending of the
-* set local *range*, an approximation might be used for computing geographic
-* coordinates.
-*
-* __Error codes__
-*
-*    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all data.
-*
-*    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
-*/
-enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
-    const double * position, double * latitude, double * longitude,
-    double * altitude, double * ground_elevation, int * layer);
+ * Access geography data from ECEF, step by step.
+ *
+ * @param stepper              A handle to an ECEF stepper.
+ * @param position             The ECEF position of interest.
+ * @param latitude             The corresponding geodetic latitude.
+ * @param longitude            The corresponding geodetic longitude.
+ * @param altitude             The corresponding geodetic altitude.
+ * @param ground_elevation     The corresponding ground elevation.
+ * @param layer                The selected data layer.
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below.
+ *
+ * Inspect the stepper's data stack and provide the top most valid one. If no
+ * valid layer was found a negative *layer* value is returned, or an error is
+ * raised if *layer* points to `NULL`. Note that any of the output data can
+ * point to `NULL` if it is of no interest. Note also that depending of the
+ * set local *range*, an approximation might be used for computing geographic
+ * coordinates.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
+ * data.
+ *
+ *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+ */
+TURTLE_API enum turtle_return turtle_stepper_step(
+    struct turtle_stepper * stepper, const double * position, double * latitude,
+    double * longitude, double * altitude, double * ground_elevation,
+    int * layer);
 
 #ifdef __cplusplus
 }

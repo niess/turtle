@@ -1,7 +1,7 @@
 # Default compilation flags
 DEPS_DIR := deps
 
-CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC -Wfatal-errors
+CFLAGS := -O0 -g -std=c99 -pedantic -Wall -fPIC -Wfatal-errors
 LIBS := -lm
 OBJS := client.o ecef.o error.o map.o projection.o reader.o stack.o stepper.o  \
 	turtle.o

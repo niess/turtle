@@ -62,7 +62,7 @@ static struct reader_info info[] = {
 };
 
 /* Generic reader allocator, given a file name */
-enum turtle_return turtle_reader_create(struct turtle_reader ** reader,
+enum turtle_return turtle_reader_create_(struct turtle_reader ** reader,
     const char * path, struct turtle_error_context * error_)
 {
         /* Get the file extension */

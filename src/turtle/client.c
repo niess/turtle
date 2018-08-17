@@ -37,7 +37,7 @@ static enum turtle_return client_release(struct turtle_client * client,
 
 /* Create a new stack client */
 enum turtle_return turtle_client_create(
-    struct turtle_stack * stack, struct turtle_client ** client)
+    struct turtle_client ** client, struct turtle_stack * stack)
 {
         TURTLE_ERROR_INITIALISE(&turtle_client_create);
 
@@ -143,8 +143,8 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
         }
 
         /* No valid map was found. Let's try to load it */
-        if (turtle_stack_load_(stack, latitude, longitude, 0, error_)
-            != TURTLE_RETURN_SUCCESS) {
+        if (turtle_stack_load_(stack, latitude, longitude, inside, error_) !=
+            TURTLE_RETURN_SUCCESS) {
                 /* The requested map is not available. Let's record this */
                 client_release(client, 0, error_);
                 client->index_la = (int)latitude;
@@ -158,7 +158,7 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
 /* Update the client */
 update:
         if (client_release(client, 0, error_) != TURTLE_RETURN_SUCCESS)
-            goto unlock;
+                goto unlock;
         current->clients++;
         client->map = current;
         client->index_la = INT_MIN;
@@ -168,23 +168,16 @@ update:
 unlock:
         if ((stack->unlock != NULL) && (stack->unlock() != 0))
                 return TURTLE_ERROR_UNLOCK();
-        if (error_->code != TURTLE_RETURN_SUCCESS) {
+        if ((error_->code != TURTLE_RETURN_SUCCESS) ||
+            ((inside != NULL) && (*inside == 0))) {
                 *elevation = 0.;
-                if (error_->code == TURTLE_RETURN_PATH_ERROR) {
-                        if (inside != NULL) {
-                                error_->code = TURTLE_RETURN_SUCCESS;
-                                return TURTLE_RETURN_SUCCESS;
-                        } else {
-                                return TURTLE_ERROR_MISSING_DATA(client->stack);
-                        }
-                } else
-                        return TURTLE_ERROR_RAISE();
+                return TURTLE_ERROR_RAISE();
         }
 
         /* Interpolate the elevation */
 interpolate:
-        return turtle_map_elevation_(client->map, longitude, latitude,
-            elevation, inside, error_);
+        return turtle_map_elevation_(
+            client->map, longitude, latitude, elevation, inside, error_);
 }
 
 /* Release any active map */
@@ -196,8 +189,8 @@ static enum turtle_return client_release(struct turtle_client * client,
         /* Lock the stack */
         struct turtle_stack * stack = client->stack;
         if (lock && (stack->lock != NULL) && (stack->lock() != 0))
-                return TURTLE_ERROR_REGISTER(TURTLE_RETURN_LOCK_ERROR,
-                    "could not acquire the lock");
+                return TURTLE_ERROR_REGISTER(
+                    TURTLE_RETURN_LOCK_ERROR, "could not acquire the lock");
 
         /* Update the reference count */
         struct turtle_map * map = client->map;
@@ -205,8 +198,8 @@ static enum turtle_return client_release(struct turtle_client * client,
         map->clients--;
         if (map->clients < 0) {
                 map->clients = 0;
-                TURTLE_ERROR_REGISTER(TURTLE_RETURN_LIBRARY_ERROR,
-                    "an unexpected error occured");
+                TURTLE_ERROR_REGISTER(
+                    TURTLE_RETURN_LIBRARY_ERROR, "an unexpected error occured");
                 goto unlock;
         }
 
@@ -217,7 +210,7 @@ static enum turtle_return client_release(struct turtle_client * client,
 /* Unlock and return */
 unlock:
         if (lock && (stack->unlock != NULL) && (stack->unlock() != 0))
-                return TURTLE_ERROR_REGISTER(TURTLE_RETURN_UNLOCK_ERROR,
-                    "could not release the lock");
+                return TURTLE_ERROR_REGISTER(
+                    TURTLE_RETURN_UNLOCK_ERROR, "could not release the lock");
         return error_->code;
 }

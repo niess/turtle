@@ -230,7 +230,7 @@ enum turtle_return turtle_stepper_add_stack(
         struct turtle_client * client = NULL;
         if (stack->lock != NULL) {
                 /* Get a new client for the stack */
-                rc = turtle_client_create(stack, &client);
+                rc = turtle_client_create(&client, stack);
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
         }
 

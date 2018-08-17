@@ -19,7 +19,7 @@
  */
 
 /*
- * Turtle projection handle for dealing with geographic projections.
+ * Turtle projection handle for dealing with geographic projections
  */
 #ifndef TURTLE_PROJECTION_H
 #define TURTLE_PROJECTION_H
@@ -43,6 +43,7 @@ struct turtle_projection {
                 } utm;
                 int lambert_tag;
         } settings;
+        char tag[64];
 };
 
 struct turtle_error_context;

@@ -22,18 +22,21 @@
  * General purpose routines for the Turtle C library.
  */
 
+/* C89 strandard library */
+#include <stdlib.h>
+/* TURTLE library */
 #include "turtle.h"
-#include "turtle/loader/geotiff16.h"
 
 /* Initialise the TURTLE library */
 void turtle_initialise(turtle_handler_cb * handler)
 {
-        /* Set any user supplied error handler. */
+        /* Set any user supplied error handler */
+        /* TODO: migrate the following if no initialisation needed */
         turtle_handler(handler);
 
 #ifndef TURTLE_NO_TIFF
-        /* Register the geotiff16 tags. */
-        /* DEBUG geotiff16_register(); */
+        /* Register the geotiff16 tags */
+        /* TODO: geotiff16_register(); */
 #endif
 }
 
@@ -48,7 +51,7 @@ const char * turtle_strfunc(turtle_function_t * caller)
 
         TOSTRING(turtle_projection_create)
         TOSTRING(turtle_projection_configure)
-        TOSTRING(turtle_projection_info)
+        TOSTRING(turtle_projection_name)
         TOSTRING(turtle_projection_project)
         TOSTRING(turtle_projection_unproject)
         TOSTRING(turtle_map_create)
@@ -57,6 +60,7 @@ const char * turtle_strfunc(turtle_function_t * caller)
         TOSTRING(turtle_map_fill)
         TOSTRING(turtle_map_node)
         TOSTRING(turtle_map_elevation)
+        TOSTRING(turtle_map_meta)
         TOSTRING(turtle_stack_create)
         TOSTRING(turtle_stack_destroy)
         TOSTRING(turtle_stack_clear)

@@ -51,7 +51,7 @@ static void * run_thread(void * args)
         /* Unpack arguments and create the client. */
         struct thread_parameters * params = (struct thread_parameters *)args;
         struct turtle_client * client;
-        turtle_client_create(stack, &client);
+        turtle_client_create(&client, stack);
 
         /* Step along the track. */
         const int n = 1001;
@@ -129,10 +129,10 @@ int main()
         sem_init(&semaphore, 0, 1);
         turtle_initialise(error_handler);
         turtle_stack_create(
+            &stack,
             "share/topography", /* <= The elevation data folder. */
             4,                  /* <= The stack size for tiles.  */
-            lock, unlock,       /* <= The lock/unlock callbacks. */
-            &stack);
+            lock, unlock);      /* <= The lock/unlock callbacks. */
 
         /*
          * Create the client threads and initialise the thread specific data

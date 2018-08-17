@@ -47,27 +47,20 @@ int main()
         struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Show the map statistics. */
-        struct turtle_box box;
-        int nx, ny;
-        double zmin, zmax;
-        char * strproj;
-        const char * encoding;
-        turtle_map_info(map, &box, &nx, &ny, &zmin, &zmax, &encoding);
-        turtle_projection_info(rgf93, &strproj);
+        struct turtle_map_info info;
+        const char * strproj;
+        turtle_map_meta(map, &info, &strproj);
 
+        const double dx = info.x[1] - info.x[0];
+        const double dy = info.y[1] - info.y[0];
+        const double x0 = info.x[0] + 0.5 * dx;
+        const double y0 = info.y[0] + 0.5 * dy;
         printf("    + projection   :  %s\n", strproj);
-        printf("    + origin       :  (%.2lf, %.2lf)\n", box.x0, box.y0);
-        printf("    + size         :  %.2lf x %.2lf m^2\n", 2 * box.half_x,
-            2 * box.half_y);
-        printf("    + nodes        :  %d x %d\n", nx, ny);
-        printf("    + elevation    :  %.1lf -> %.1lf\n", zmin, zmax);
-        printf("    + encoding     :  %s\n", encoding);
-
-        /*
-         * Free the temporary dump of the projection's name since it isn't
-         * furtrher required.
-         */
-        free(strproj);
+        printf("    + origin       :  (%.2lf, %.2lf)\n", x0, y0);
+        printf("    + size         :  %.2lf x %.2lf m^2\n", dx, dy);
+        printf("    + nodes        :  %d x %d\n", info.nx, info.ny);
+        printf("    + elevation    :  %.1lf -> %.1lf\n", info.z[0], info.z[1]);
+        printf("    + encoding     :  %s\n", info.encoding);
 
         /** For the following, let us attach an error handler to TURTLE such
          * that we don't need anymore to explicitly handle return codes.
@@ -86,12 +79,12 @@ int main()
          */
         double latitude, longitude;
         turtle_projection_unproject(
-            rgf93, box.x0, box.y0, &latitude, &longitude);
+            rgf93, x0, y0, &latitude, &longitude);
 
         /* Convert the coordinates to UTM. */
         const char * strutm = "UTM 31N";
         struct turtle_projection * utm;
-        turtle_projection_create(strutm, &utm);
+        turtle_projection_create(&utm, strutm);
 
         double xUTM, yUTM;
         turtle_projection_project(utm, latitude, longitude, &xUTM, &yUTM);
@@ -115,7 +108,7 @@ int main()
          */
         /* Create a new stack handle to access elevation data. */
         struct turtle_stack * stack;
-        turtle_stack_create("share/topography", 1, NULL, NULL, &stack);
+        turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
 
         /* Get the orgin's elevation from the stack. */
         double elevation_gdem;
@@ -124,7 +117,7 @@ int main()
 
         /* Get the same from the map. */
         double elevation_map;
-        turtle_map_elevation(map, box.x0, box.y0, &elevation_map, NULL);
+        turtle_map_elevation(map, x0, y0, &elevation_map, NULL);
 
         printf("o) The origin's elevation is:\n");
         printf("    + GDEM         : %.2lf m\n", elevation_gdem);

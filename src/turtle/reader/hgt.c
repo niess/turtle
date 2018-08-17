@@ -50,8 +50,10 @@ static enum turtle_return hgt_open(struct turtle_reader * reader,
 
         /* Initialise the reader object */
         reader->meta.nx = reader->meta.ny = 0;
-        reader->meta.x0 = reader->meta.y0 = reader->meta.z0 = 0.;
+        reader->meta.x0 = reader->meta.y0 = 0.;
         reader->meta.dx = reader->meta.dy = reader->meta.dz = 0.;
+        reader->meta.z0 = -32767.;
+        reader->meta.dz = 1.;
         reader->meta.projection.type = PROJECTION_NONE;
         hgt->path = NULL;
 
@@ -64,20 +66,22 @@ static enum turtle_return hgt_open(struct turtle_reader * reader,
 
         const char * fmtmsg = "invalid hgt filename for `%s'";
         if (strlen(filename) < 8) {
-                return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
-                    fmtmsg, path);
+                return TURTLE_ERROR_VREGISTER(
+                    TURTLE_RETURN_BAD_FORMAT, fmtmsg, path);
         }
         reader->meta.x0 = atoi(filename + 4);
-        if (filename[3] == 'W') reader->meta.x0 = -reader->meta.x0;
+        if (filename[3] == 'W')
+                reader->meta.x0 = -reader->meta.x0;
         else if (filename[3] != 'E') {
-            return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
-                    fmtmsg, path);
+                return TURTLE_ERROR_VREGISTER(
+                    TURTLE_RETURN_BAD_FORMAT, fmtmsg, path);
         }
         reader->meta.y0 = atoi(filename + 1);
-        if (filename[0] == 'S') reader->meta.y0 = -reader->meta.y0;
+        if (filename[0] == 'S')
+                reader->meta.y0 = -reader->meta.y0;
         else if (filename[0] != 'N') {
-            return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
-                    fmtmsg, path);
+                return TURTLE_ERROR_VREGISTER(
+                    TURTLE_RETURN_BAD_FORMAT, fmtmsg, path);
         }
 
         const char * ext = NULL;
@@ -116,6 +120,7 @@ static void hgt_close(struct turtle_reader * reader)
 
 static double get_z(const struct turtle_map * map, int ix, int iy)
 {
+        /* TODO: check this ... */
         iy = map->meta.ny - 1 - iy;
         return (int16_t)ntohs(map->data[iy * map->meta.nx + ix]);
 }

@@ -19,7 +19,7 @@
  */
 
 /*
- * Turtle projection handle for dealing with geographic projections.
+ * Turtle projection handle for dealing with geographic projections
  */
 #include <float.h>
 #include <math.h>
@@ -27,16 +27,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "error.h"
-#include "projection.h"
 #include "turtle.h"
+#include "turtle/error.h"
+#include "turtle/projection.h"
 
 #ifndef M_PI
-/* Define pi, if unknown. */
+/* Define pi, if unknown */
 #define M_PI 3.14159265358979323846
 #endif
 
-/* Routines for map projections. */
+/* Routines for map projections */
 static enum turtle_return project_lambert(
     const struct turtle_projection * projection, double latitude,
     double longitude, double * x, double * y);
@@ -50,29 +50,29 @@ static enum turtle_return unproject_utm(
     const struct turtle_projection * projection, double x, double y,
     double * latitude, double * longitude);
 
-/* Allocate a new projection handle. */
+/* Allocate a new projection handle */
 enum turtle_return turtle_projection_create(
-    const char * name, struct turtle_projection ** projection)
+    struct turtle_projection ** projection, const char * name)
 {
         TURTLE_ERROR_INITIALISE(&turtle_projection_create);
 
-        /* Parse the config from the name string. */
+        /* Parse the config from the name string */
         *projection = NULL;
         struct turtle_projection tmp;
-        enum turtle_return rc =
-            turtle_projection_configure_(name, &tmp, error_);
-        if (rc != TURTLE_RETURN_SUCCESS) return TURTLE_ERROR_RAISE();
+        if (turtle_projection_configure_(name, &tmp, error_) !=
+            TURTLE_RETURN_SUCCESS)
+                return TURTLE_ERROR_RAISE();
 
-        /* Allocate memory for the new handle. */
+        /* Allocate memory for the new handle */
         *projection = malloc(sizeof(**projection));
         if (*projection == NULL) return TURTLE_ERROR_MEMORY();
 
-        /* Copy the config and return. */
+        /* Copy the config and return */
         memcpy(*projection, &tmp, sizeof(tmp));
         return TURTLE_RETURN_SUCCESS;
 }
 
-/* Release the projection memory. */
+/* Release the projection memory */
 void turtle_projection_destroy(struct turtle_projection ** projection)
 {
         if ((projection == NULL) || (*projection == NULL)) return;
@@ -80,7 +80,7 @@ void turtle_projection_destroy(struct turtle_projection ** projection)
         *projection = NULL;
 }
 
-/* Helper function to strip a word in a sentence. */
+/* Helper function to strip a word in a sentence */
 static int locate_word(const char ** str)
 {
         const char * p = *str;
@@ -94,24 +94,27 @@ static int locate_word(const char ** str)
         return n;
 }
 
-/* Configure a projection from a name string. */
+/* Configure a projection from a name string */
 enum turtle_return turtle_projection_configure_(const char * name,
     struct turtle_projection * projection, struct turtle_error_context * error_)
 {
         projection->type = PROJECTION_NONE;
-        if (name == NULL) return TURTLE_RETURN_SUCCESS;
+        if (name == NULL) {
+                *projection->tag = 0x0;
+                return TURTLE_RETURN_SUCCESS;
+        }
 
-        /* Locate the 1st word. */
+        /* Locate the 1st word */
         const char * p = name;
         int n = locate_word(&p);
 
         if (n == 0) {
-                /* No projection has been defined. */
+                /* No projection has been defined */
                 return TURTLE_ERROR_REGISTER(TURTLE_RETURN_BAD_PROJECTION,
                     "missing projection specifier");
         } else if (strncmp(p, "Lambert", n) == 0) {
                 /* This is a Lambert projection. Let's parse the parameters
-                 * set.
+                 * set
                  */
                 projection->type = PROJECTION_LAMBERT;
                 p += n;
@@ -121,13 +124,11 @@ enum turtle_return turtle_projection_configure_(const char * name,
                 for (i = 0; i < 6; i++) {
                         if (strncmp(p, tag[i], n) == 0) {
                                 projection->settings.lambert_tag = i;
-                                return TURTLE_RETURN_SUCCESS;
+                                goto exit;
                         }
                 }
         } else if (strncmp(p, "UTM", n) == 0) {
-                /* This is a UTM projection. Let's parse the parameters
-                 * set.
-                 */
+                /* This is a UTM projection. Let's parse its parameters */
                 projection->type = PROJECTION_UTM;
                 p += n;
                 int zone;
@@ -157,11 +158,16 @@ enum turtle_return turtle_projection_configure_(const char * name,
                             TURTLE_RETURN_BAD_PROJECTION,
                             "invalid UTM hemisphere `%c`", hemisphere);
                 }
-                return TURTLE_RETURN_SUCCESS;
+                goto exit;
         }
 
+        /* The projection tag is not valid */
         return TURTLE_ERROR_VREGISTER(
             TURTLE_RETURN_BAD_PROJECTION, "invalid projection `%s`", p);
+exit:
+        /* Copy the tag and return */
+        strcpy(projection->tag, name);
+        return TURTLE_RETURN_SUCCESS;
 }
 
 enum turtle_return turtle_projection_configure(
@@ -172,62 +178,13 @@ enum turtle_return turtle_projection_configure(
         return TURTLE_ERROR_RAISE();
 }
 
-/* Get the name string corresponding to the projection configuration. */
-enum turtle_return turtle_projection_info(
-    const struct turtle_projection * projection, char ** name)
+/* Get the name tag corresponding to the projection */
+const char * turtle_projection_name(const struct turtle_projection * projection)
 {
-        TURTLE_ERROR_INITIALISE(&turtle_projection_info);
-
-        *name = NULL;
-        if ((projection == NULL) || (projection->type == PROJECTION_NONE))
-                return TURTLE_RETURN_SUCCESS;
-
-        int size, nw = 0;
-        for (size = 128;; size += 128) {
-                char * tmp = realloc(*name, size);
-                if (tmp == NULL) {
-                        TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
-                            "could not allocate memory");
-                        goto error;
-                }
-                *name = tmp;
-
-                if (projection->type == PROJECTION_LAMBERT) {
-                        const char * tag[6] = { "I", "II", "IIe", "III", "IV",
-                                "93" };
-                        nw = snprintf(*name, size, "Lambert %s",
-                            tag[projection->settings.lambert_tag]);
-                        if (nw < size) break;
-                } else if (projection->type == PROJECTION_UTM) {
-                        char hemisphere =
-                            (projection->settings.utm.hemisphere > 0) ? 'N' :
-                                                                        'S';
-                        double tmp =
-                            (projection->settings.utm.longitude_0 + 183.) / 6.;
-                        int zone = (int)tmp;
-                        if (fabs(tmp - zone) <= FLT_EPSILON)
-                                nw = snprintf(
-                                    *name, size, "UTM %d%c", zone, hemisphere);
-                        else
-                                nw = snprintf(*name, size, "UTM %.12lg%c",
-                                    projection->settings.utm.longitude_0,
-                                    hemisphere);
-                        if (nw < size) break;
-                } else {
-                        TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_PROJECTION,
-                            "invalid projection type `%d`", projection->type);
-                        goto error;
-                }
-        }
-
-        nw++;
-        if (nw < size) *name = realloc(*name, nw);
-        return TURTLE_RETURN_SUCCESS;
-
-error:
-        free(*name);
-        *name = NULL;
-        return TURTLE_ERROR_RAISE();
+        if (projection->type == PROJECTION_NONE)
+                return NULL;
+        else
+                return projection->tag;
 }
 
 /* Project geodetic coordinates to flat ones. */

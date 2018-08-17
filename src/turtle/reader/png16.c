@@ -23,6 +23,7 @@
  */
 
 /* C89 standard library */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,7 +124,7 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
         reader->meta.ny = png_get_image_height(png16->png_ptr, png16->info_ptr);
         png_read_update_info(png16->png_ptr, png16->info_ptr);
 
-        /* Parse the JSON meta data. */
+        /* Parse the JSON meta data */
         png_textp text_ptr;
         int num_text;
         unsigned n_chunks =
@@ -161,6 +162,7 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                         }
 
                         /* Parse the topography fields */
+                        double x1, y1, z1;
                         int j, done[N_FIELDS];
                         jsmntok_t *key, *value;
                         memset(done, 0x0, sizeof(done));
@@ -217,22 +219,19 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                                                     &reader->meta.z0);
                                                 done[3] = 1;
                                         } else if (!done[4] &&
-                                            (json_strcmp(text, key, "dx") ==
+                                            (json_strcmp(text, key, "x1") ==
                                                 0)) {
-                                                json_sscanf(text, value,
-                                                    &reader->meta.dx);
+                                                json_sscanf(text, value, &x1);
                                                 done[4] = 1;
                                         } else if (!done[5] &&
-                                            (json_strcmp(text, key, "dy") ==
+                                            (json_strcmp(text, key, "y1") ==
                                                 0)) {
-                                                json_sscanf(text, value,
-                                                    &reader->meta.dy);
+                                                json_sscanf(text, value, &y1);
                                                 done[5] = 1;
                                         } else if (!done[6] &&
-                                            (json_strcmp(text, key, "dz") ==
+                                            (json_strcmp(text, key, "z1") ==
                                                 0)) {
-                                                json_sscanf(text, value,
-                                                    &reader->meta.dz);
+                                                json_sscanf(text, value, &z1);
                                                 done[6] = 1;
                                         } else {
                                                 TURTLE_ERROR_VREGISTER(
@@ -244,6 +243,11 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                                         }
                                 }
                         }
+                        reader->meta.dx =
+                            (x1 - reader->meta.x0) / reader->meta.nx;
+                        reader->meta.dy =
+                            (y1 - reader->meta.y0) / reader->meta.ny;
+                        reader->meta.dz = (z1 - reader->meta.z0) / 65535;
 #undef N_FIELDS
 #undef N_TOKENS
                 }
@@ -275,14 +279,14 @@ static void png16_close(struct turtle_reader * reader)
 static double get_z(const struct turtle_map * map, int ix, int iy)
 {
         iy = map->meta.ny - 1 - iy;
-        return map->meta.z0 +
-            map->meta.dz * ntohs(map->data[iy * map->meta.nx + ix]);
+        const uint16_t iz = (uint16_t)ntohs(map->data[iy * map->meta.nx + ix]);
+        return map->meta.z0 + iz * map->meta.dz;
 }
 
 static void set_z(struct turtle_map * map, int ix, int iy, double z)
 {
+        const double d = round((z - map->meta.z0) / map->meta.dz);
         iy = map->meta.ny - 1 - iy;
-        const double d = (z - map->meta.z0) / map->meta.dz;
         map->data[iy * map->meta.nx + ix] = (uint16_t)htons(d);
 }
 

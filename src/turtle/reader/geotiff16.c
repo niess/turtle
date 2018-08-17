@@ -56,8 +56,7 @@ struct geotiff16_reader {
 static enum turtle_return geotiff16_open(struct turtle_reader * reader,
     const char * path, struct turtle_error_context * error_)
 {
-        struct geotiff16_reader * geotiff16 =
-            (struct geotiff16_reader *)reader;
+        struct geotiff16_reader * geotiff16 = (struct geotiff16_reader *)reader;
         if (geotiff16->tiff == NULL) reader->close(reader);
 
         /* Initialise the reader object */
@@ -94,6 +93,7 @@ static enum turtle_return geotiff16_open(struct turtle_reader * reader,
                     data[4] + (1. - reader->meta.ny) * reader->meta.dy;
                 reader->meta.z0 = data[5];
         }
+        /* TODO: check range in z */
 
         geotiff16->path = path;
         return TURTLE_RETURN_SUCCESS;
@@ -101,8 +101,7 @@ static enum turtle_return geotiff16_open(struct turtle_reader * reader,
 
 static void geotiff16_close(struct turtle_reader * reader)
 {
-        struct geotiff16_reader * geotiff16 =
-            (struct geotiff16_reader *)reader;
+        struct geotiff16_reader * geotiff16 = (struct geotiff16_reader *)reader;
         if (geotiff16->tiff != NULL) {
                 TIFFClose(geotiff16->tiff);
                 geotiff16->tiff = NULL;
@@ -123,8 +122,7 @@ static void set_z(struct turtle_map * map, int ix, int iy, double z)
 static enum turtle_return geotiff16_read(struct turtle_reader * reader,
     struct turtle_map * map, struct turtle_error_context * error_)
 {
-        struct geotiff16_reader * geotiff16 =
-            (struct geotiff16_reader *)reader;
+        struct geotiff16_reader * geotiff16 = (struct geotiff16_reader *)reader;
 
         /* Unpack the data */
         uint16_t * buffer = map->data;

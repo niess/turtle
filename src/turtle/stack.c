@@ -41,9 +41,9 @@
 #endif
 
 /* Create a new stack of maps */
-enum turtle_return turtle_stack_create(const char * path, int size,
-    turtle_stack_cb * lock, turtle_stack_cb * unlock,
-    struct turtle_stack ** stack)
+enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
+    const char * path, int size, turtle_stack_cb * lock,
+    turtle_stack_cb * unlock)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stack_create);
         *stack = NULL;
@@ -71,13 +71,14 @@ enum turtle_return turtle_stack_create(const char * path, int size,
                 /* Get the map meta-data */
                 enum turtle_return trc;
                 struct turtle_reader * reader;
-                if ((trc = turtle_reader_create(&reader, file.path, error_)) ==
+                if ((trc = turtle_reader_create_(&reader, file.path, error_)) ==
                     TURTLE_RETURN_BAD_EXTENSION) {
                         error_->code = TURTLE_RETURN_SUCCESS;
                         continue;
                 } else if (trc != TURTLE_RETURN_SUCCESS)
                         goto error;
-                if (reader->open(reader, file.path, error_) != TURTLE_RETURN_SUCCESS)
+                if (reader->open(reader, file.path, error_) !=
+                    TURTLE_RETURN_SUCCESS)
                         goto error;
 
                 /* Update the lookup data */
@@ -108,7 +109,7 @@ enum turtle_return turtle_stack_create(const char * path, int size,
                 reader->close(reader);
                 free(reader);
                 continue;
-error:
+        error:
                 if (reader != NULL) {
                         reader->close(reader);
                         free(reader);
@@ -170,7 +171,7 @@ error:
 
                 /* Check the format. */
                 struct turtle_reader * reader;
-                if (turtle_reader_create(&reader, file.path, error_) !=
+                if (turtle_reader_create_(&reader, file.path, error_) !=
                     TURTLE_RETURN_SUCCESS) {
                         error_->code = TURTLE_RETURN_SUCCESS;
                         continue;
@@ -280,8 +281,12 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
         if (load) {
                 /* No valid map was found. Let's try to load it */
                 enum turtle_return rc = turtle_stack_load_(
-                    stack, latitude, longitude, inside != NULL, error_);
-                if (rc != TURTLE_RETURN_SUCCESS) TURTLE_ERROR_RAISE();
+                    stack, latitude, longitude, inside, error_);
+                if ((rc != TURTLE_RETURN_SUCCESS) ||
+                    ((inside != NULL) && (*inside == 0))) {
+                        *elevation = 0.;
+                        return TURTLE_ERROR_RAISE();
+                }
 
                 struct turtle_map * head = stack->head;
                 hx = (longitude - head->meta.x0) / head->meta.dx;
@@ -308,27 +313,31 @@ void turtle_stack_touch_(struct turtle_stack * stack, struct turtle_map * map)
 
 /* Load a new map and manage the stack */
 enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
-    double latitude, double longitude, int inside,
+    double latitude, double longitude, int * inside,
     struct turtle_error_context * error_)
 {
+#define RETURN_OR_RAISE()                                                      \
+        {                                                                      \
+                if (inside != NULL) {                                          \
+                        *inside = 0;                                           \
+                        return TURTLE_RETURN_SUCCESS;                          \
+                } else {                                                       \
+                        return TURTLE_ERROR_MISSING_DATA(stack);               \
+                }                                                              \
+        }
+
         /* Lookup the requested file */
         if ((longitude < stack->longitude_0) || (latitude < stack->latitude_0))
-                return inside ? TURTLE_RETURN_SUCCESS :
-                                TURTLE_ERROR_MISSING_DATA(stack);
+                RETURN_OR_RAISE()
         const int ix =
             (int)((longitude - stack->longitude_0) / stack->longitude_delta);
-        if (ix >= stack->longitude_n)
-                return inside ? TURTLE_RETURN_SUCCESS :
-                                TURTLE_ERROR_MISSING_DATA(stack);
+        if (ix >= stack->longitude_n) RETURN_OR_RAISE()
         const int iy =
             (int)((latitude - stack->latitude_0) / stack->latitude_delta);
-        if (iy >= stack->latitude_n)
-                return inside ? TURTLE_RETURN_SUCCESS :
-                                TURTLE_ERROR_MISSING_DATA(stack);
+        if (iy >= stack->latitude_n) RETURN_OR_RAISE()
         const int index = iy * stack->longitude_n + ix;
-        if (stack->path[index] == NULL)
-                return inside ? TURTLE_RETURN_SUCCESS :
-                                TURTLE_ERROR_MISSING_DATA(stack);
+        if (stack->path[index] == NULL) RETURN_OR_RAISE()
+#undef RETURN_OR_RAISE
 
         /* Load the map data according to the format */
         struct turtle_map * map;
@@ -342,8 +351,7 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
                 while ((last != NULL) && (stack->size >= stack->max_size)) {
                         struct turtle_map * current = last;
                         last = last->next;
-                        if (current->clients == 0)
-                                turtle_map_destroy(&current);
+                        if (current->clients == 0) turtle_map_destroy(&current);
                 }
         }
 

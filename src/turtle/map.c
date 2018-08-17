@@ -51,56 +51,57 @@ static enum turtle_return map_dump_png(
 /* Default data getter */
 static double get_default_z(const struct turtle_map * map, int ix, int iy)
 {
-        return map->meta.z0 +
-            map->data[iy * map->meta.nx + ix] * map->meta.dz;
+        return map->meta.z0 + map->data[iy * map->meta.nx + ix] * map->meta.dz;
 }
 
 /* Default data setter */
 static void set_default_z(struct turtle_map * map, int ix, int iy, double z)
 {
-        const double d = (z - map->meta.z0) / map->meta.dz;
+        const double d = round((z - map->meta.z0) / map->meta.dz);
         map->data[iy * map->meta.nx + ix] = (uint16_t)d;
 }
 
-/* Create a handle to a new empty map. */
-enum turtle_return turtle_map_create(const char * projection,
-    const struct turtle_box * box, int nx, int ny, double zmin, double zmax,
-    struct turtle_map ** map)
+/* Create a handle to a new empty map */
+enum turtle_return turtle_map_create(struct turtle_map ** map,
+    const struct turtle_map_info * info, const char * projection)
 {
         TURTLE_ERROR_INITIALISE(&turtle_map_create);
         *map = NULL;
 
         /* Check the input arguments. */
-        if ((nx <= 0) || (ny <= 0) || (zmin > zmax))
+        if ((info->nx <= 0) || (info->ny <= 0) || (info->z[0] == info->z[1]))
                 return TURTLE_ERROR_MESSAGE(
                     TURTLE_RETURN_DOMAIN_ERROR, "invalid input parameter(s)");
 
         struct turtle_projection proj;
-        enum turtle_return rc =
-            turtle_projection_configure_(projection, &proj, error_);
-        if (rc != TURTLE_RETURN_SUCCESS) return TURTLE_ERROR_RAISE();
+        if (turtle_projection_configure_(projection, &proj, error_) !=
+            TURTLE_RETURN_SUCCESS)
+                return TURTLE_ERROR_RAISE();
 
         /* Allocate the map memory */
-        *map = malloc(sizeof(*map) + nx * ny * sizeof(*(*map)->data));
+        *map =
+            malloc(sizeof(**map) + info->nx * info->ny * sizeof(*(*map)->data));
         if (*map == NULL) return TURTLE_ERROR_MEMORY();
 
         /* Fill the identifiers */
-        (*map)->meta.nx = nx;
-        (*map)->meta.ny = ny;
-        (*map)->meta.x0 = box->x0 - fabs(box->half_x);
-        (*map)->meta.y0 = box->y0 - fabs(box->half_y);
-        (*map)->meta.z0 = zmin;
-        (*map)->meta.dx = (nx > 1) ? 2. * fabs(box->half_x) / (nx - 1) : 0.;
-        (*map)->meta.dy = (ny > 1) ? 2. * fabs(box->half_y) / (ny - 1) : 0.;
-        (*map)->meta.dz = (zmax - zmin) / 65535;
-        memcpy(&(*map)->meta.projection, projection,
-            sizeof((*map)->meta.projection));
-        memset((*map)->data, 0x0, sizeof(*(*map)->data) * nx * ny);
+        (*map)->meta.nx = info->nx;
+        (*map)->meta.ny = info->ny;
+        (*map)->meta.x0 = info->x[0];
+        (*map)->meta.y0 = info->y[0];
+        (*map)->meta.z0 = info->z[0];
+        (*map)->meta.dx =
+            (info->nx > 1) ? (info->x[1] - info->x[0]) / (info->nx - 1) : 0.;
+        (*map)->meta.dy =
+            (info->ny > 1) ? (info->y[1] - info->y[0]) / (info->ny - 1) : 0.;
+        (*map)->meta.dz = (info->z[1] - info->z[0]) / 65535;
+        memcpy(
+            &(*map)->meta.projection, &proj, sizeof((*map)->meta.projection));
+        memset((*map)->data, 0x0, sizeof(*(*map)->data) * info->nx * info->ny);
 
         (*map)->meta.get_z = &get_default_z;
         (*map)->meta.set_z = &set_default_z;
         strcpy((*map)->meta.encoding, "none");
-        
+
         (*map)->stack = NULL;
         (*map)->prev = (*map)->next = NULL;
         (*map)->clients = 0;
@@ -144,7 +145,7 @@ enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map)
 
         /* Get a reader for the file */
         struct turtle_reader * reader;
-        if (turtle_reader_create(&reader, path, error_) !=
+        if (turtle_reader_create_(&reader, path, error_) !=
             TURTLE_RETURN_SUCCESS)
                 goto exit;
 
@@ -160,7 +161,7 @@ enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map)
                     "could not allocate memory for map `%s'", path);
                 goto exit;
         }
-        
+
         /* Initialise the map data */
         memcpy(&(*map)->meta, &reader->meta, sizeof((*map)->meta));
         (*map)->stack = NULL;
@@ -181,7 +182,7 @@ exit:
         return TURTLE_ERROR_RAISE();
 }
 
-/* Save the map to disk. */
+/* Save the map to disk */
 enum turtle_return turtle_map_dump(
     const struct turtle_map * map, const char * path)
 {
@@ -214,7 +215,7 @@ enum turtle_return turtle_map_dump(
 #endif
 }
 
-/* Fill in a map node with an elevation value. */
+/* Fill in a map node with an elevation value */
 enum turtle_return turtle_map_fill(
     struct turtle_map * map, int ix, int iy, double elevation)
 {
@@ -230,18 +231,16 @@ enum turtle_return turtle_map_fill(
         if ((map->meta.dz <= 0.) && (elevation != map->meta.z0))
                 return TURTLE_ERROR_MESSAGE(
                     TURTLE_RETURN_DOMAIN_ERROR, "inconsistent elevation value");
-        const int iz = (int)((elevation - map->meta.z0) / map->meta.dz + 0.5 -
-            FLT_EPSILON);
-        const int nz = 65536;
-        if ((iz < 0) || (iz >= nz))
+        if ((elevation < map->meta.z0) ||
+            (elevation >= map->meta.z0 + 65535 * map->meta.dz))
                 return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
                     "elevation is outside of map span");
-        map->meta.set_z(map, ix, iy, (uint16_t)iz);
+        map->meta.set_z(map, ix, iy, elevation);
 
         return TURTLE_RETURN_SUCCESS;
 }
 
-/* Get the properties of a map node. */
+/* Get the properties of a map node */
 enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
     double * x, double * y, double * elevation)
 {
@@ -298,8 +297,8 @@ enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
         return TURTLE_RETURN_SUCCESS;
 }
 
-enum turtle_return turtle_map_elevation(const struct turtle_map * map,
-    double x, double y, double * z, int * inside)
+enum turtle_return turtle_map_elevation(
+    const struct turtle_map * map, double x, double y, double * z, int * inside)
 {
         TURTLE_ERROR_INITIALISE(&turtle_map_elevation);
         return turtle_map_elevation_(map, x, y, z, inside, error_);
@@ -311,26 +310,30 @@ struct turtle_projection * turtle_map_projection(struct turtle_map * map)
         return &map->meta.projection;
 }
 
-/* Get some basic information on a map. */
-void turtle_map_info(const struct turtle_map * map, struct turtle_box * box,
-    int * nx, int * ny, double * zmin, double * zmax, const char ** encoding)
+/* Get the map meta data */
+void turtle_map_meta(const struct turtle_map * map,
+    struct turtle_map_info * info, const char ** projection)
 {
-        if (box != NULL) {
-                box->half_x = 0.5 * (map->meta.nx - 1) * map->meta.dx;
-                box->half_y = 0.5 * (map->meta.ny - 1) * map->meta.dy;
-                box->x0 = map->meta.x0 + box->half_x;
-                box->y0 = map->meta.y0 + box->half_y;
+        if (info != NULL) {
+                info->nx = map->meta.nx;
+                info->ny = map->meta.ny;
+                info->x[0] = map->meta.x0;
+                info->x[1] = map->meta.x0 + (map->meta.nx - 1) * map->meta.dx;
+                info->y[0] = map->meta.y0;
+                info->y[1] = map->meta.y0 + (map->meta.ny - 1) * map->meta.dy;
+                info->z[0] = map->meta.z0;
+                info->z[1] = map->meta.z0 + 65535 * map->meta.dz;
+                info->encoding = map->meta.encoding;
         }
-        if (nx != NULL) *nx = map->meta.nx;
-        if (ny != NULL) *ny = map->meta.ny;
-        if (zmin != NULL) *zmin = map->meta.z0;
-        if (zmax != NULL) *zmax = map->meta.z0 + 65535 * map->meta.dz;
-        if (encoding != NULL) *encoding = map->meta.encoding;
+
+        if (projection != NULL) {
+                *projection = turtle_projection_name(&map->meta.projection);
+        }
 }
 
 #ifndef TURTLE_NO_PNG
 
-/* Dump a map in png format. */
+/* Dump a map in png format */
 static enum turtle_return map_dump_png(
     const struct turtle_map * map, const char * path)
 {
@@ -342,7 +345,7 @@ static enum turtle_return map_dump_png(
         char * header = NULL;
         enum turtle_return rc;
 
-        /* Initialise the file and the PNG pointers. */
+        /* Initialise the file and the PNG pointers */
         rc = TURTLE_RETURN_PATH_ERROR;
         fid = fopen(path, "wb+");
         if (fid == NULL) goto exit;
@@ -362,9 +365,8 @@ static enum turtle_return map_dump_png(
             PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
             PNG_FILTER_TYPE_BASE);
         const char * tmp;
-        char * projection_tag;
         const struct turtle_projection * projection = &map->meta.projection;
-        turtle_projection_info(projection, &projection_tag);
+        const char * projection_tag = turtle_projection_name(projection);
         if (projection_tag == NULL)
                 tmp = "";
         else
@@ -373,16 +375,18 @@ static enum turtle_return map_dump_png(
                 char * new = realloc(header, header_size);
                 if (new == NULL) goto exit;
                 header = new;
+                const double x1 = map->meta.x0 + map->meta.dx * map->meta.nx;
+                const double y1 = map->meta.y0 + map->meta.dy * map->meta.ny;
+                const double z1 = map->meta.z0 + map->meta.dz * 65535;
                 if (snprintf(header, header_size,
-                        "{\"topography\" : {\"x0\" : %.3lf, \"y0\" : %.3lf, "
-                        "\"z0\" : %.3lf, \"dx\" : %.3lf, \"dy\" : %.3lf, "
-                        "\"dz\" : %.5e, \"projection\" : \"%s\"}}",
-                        map->meta.x0, map->meta.y0, map->meta.z0, map->meta.dx,
-                        map->meta.dy, map->meta.dz, tmp) < header_size)
+                        "{\"topography\" : {\"x0\" : %.5lf, \"y0\" : %.5lf, "
+                        "\"z0\" : %.5lf, \"x1\" : %.5lf, \"y1\" : %.5lf, "
+                        "\"z1\" : %.5lf, \"projection\" : \"%s\"}}",
+                        map->meta.x0, map->meta.y0, map->meta.z0, x1, y1, z1,
+                        tmp) < header_size)
                         break;
                 header_size += 2048;
         }
-        free(projection_tag);
         png_text text[] = { { PNG_TEXT_COMPRESSION_NONE, "Comment", header,
             strlen(header) } };
         png_set_text(png_ptr, info_ptr, text, sizeof(text) / sizeof(text[0]));
@@ -393,22 +397,24 @@ static enum turtle_return map_dump_png(
         /* Write the data */
         row_pointers = (png_bytep *)calloc(ny, sizeof(png_bytep));
         if (row_pointers == NULL) goto exit;
-        int i = 0;
-        for (; i < ny; i++) {
-                row_pointers[i] = (png_byte *)malloc(2 * nx * sizeof(char));
+        int i;
+        for (i = 0; i < ny; i++) {
+                row_pointers[i] = (png_byte *)malloc(nx * sizeof(uint16_t));
                 if (row_pointers[i] == NULL) goto exit;
                 uint16_t * ptr = (uint16_t *)row_pointers[i];
-                int j = 0;
-                for (; j < nx; j++) {
-                        *ptr = (uint16_t)htons(
-                            map->meta.get_z(map, j, ny - i - 1));
+                int j;
+                for (j = 0; j < nx; j++) {
+                        const double d =
+                            round((map->meta.get_z(map, j, ny - 1 - i) -
+                                      map->meta.z0) /
+                                map->meta.dz);
+                        *ptr = (uint16_t)htons(d);
                         ptr++;
                 }
         }
         png_write_image(png_ptr, row_pointers);
         png_write_end(png_ptr, NULL);
         rc = TURTLE_RETURN_SUCCESS;
-
 exit:
         free(header);
         if (fid != NULL) fclose(fid);

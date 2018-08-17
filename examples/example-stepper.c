@@ -54,7 +54,7 @@ int main()
         turtle_initialise(error_handler);
 
         /* Create the stack. */
-        turtle_stack_create("share/topography", 1, NULL, NULL, &stack);
+        turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
 
         /*
          * Get the RGF93 local projection map, centered on the Auberge des

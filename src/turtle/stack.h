@@ -51,7 +51,7 @@ struct turtle_stack {
 void turtle_stack_touch_(struct turtle_stack * stack, struct turtle_map * map);
 struct turtle_error_context;
 enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
-    double latitude, double longitude, int inside,
+    double latitude, double longitude, int * inside,
     struct turtle_error_context * error_);
 
 #endif
