@@ -1,9 +1,9 @@
 # Default compilation flags
 DEPS_DIR := deps
 
-CFLAGS := -O0 -g -std=c99 -pedantic -Wall -fPIC -Wfatal-errors
+CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC -Wfatal-errors
 LIBS := -lm
-OBJS := client.o ecef.o error.o map.o projection.o reader.o stack.o stepper.o  \
+OBJS := client.o ecef.o error.o io.o map.o projection.o stack.o stepper.o      \
 	turtle.o
 INCLUDES := -Iinclude -Isrc -I$(DEPS_DIR)/tinydir
 
@@ -53,10 +53,7 @@ lib/libturtle.so: $(OBJS)
 %.o: src/turtle/%.c
 	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-%.o: src/turtle/loader/%.c src/turtle/loader/%.h
-	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
-
-%.o: src/turtle/reader/%.c
+%.o: src/turtle/io/%.c
 	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
 %.o: src/%.c include/%.h

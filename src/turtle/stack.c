@@ -32,7 +32,7 @@
 /* TURTLE library */
 #include "turtle.h"
 #include "turtle/error.h"
-#include "turtle/reader.h"
+#include "turtle/io.h"
 #include "turtle/stack.h"
 
 #ifndef M_PI
@@ -70,20 +70,20 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
 
                 /* Get the map meta-data */
                 enum turtle_return trc;
-                struct turtle_reader * reader;
-                if ((trc = turtle_reader_create_(&reader, file.path, error_)) ==
+                struct turtle_io * io;
+                if ((trc = turtle_io_create_(&io, file.path, error_)) ==
                     TURTLE_RETURN_BAD_EXTENSION) {
                         error_->code = TURTLE_RETURN_SUCCESS;
                         continue;
                 } else if (trc != TURTLE_RETURN_SUCCESS)
                         goto error;
-                if (reader->open(reader, file.path, error_) !=
+                if (io->open(io, file.path, "rb", error_) !=
                     TURTLE_RETURN_SUCCESS)
                         goto error;
 
                 /* Update the lookup data */
-                const double dx = reader->meta.dx * (reader->meta.nx - 1);
-                const double dy = reader->meta.dy * (reader->meta.ny - 1);
+                const double dx = io->meta.dx * (io->meta.nx - 1);
+                const double dy = io->meta.dy * (io->meta.ny - 1);
                 if (long_delta == 0.)
                         long_delta = dx;
                 else if (long_delta != dx) {
@@ -98,21 +98,21 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
                             "inconsistent latitude span");
                         goto error;
                 }
-                if (reader->meta.x0 < long_min) long_min = reader->meta.x0;
-                if (reader->meta.y0 < lat_min) lat_min = reader->meta.y0;
-                const double x1 = reader->meta.x0 + dx;
+                if (io->meta.x0 < long_min) long_min = io->meta.x0;
+                if (io->meta.y0 < lat_min) lat_min = io->meta.y0;
+                const double x1 = io->meta.x0 + dx;
                 if (x1 > long_max) long_max = x1;
-                const double y1 = reader->meta.y0 + dy;
+                const double y1 = io->meta.y0 + dy;
                 if (y1 > lat_max) lat_max = y1;
                 data_size += strlen(file.path) + 1;
 
-                reader->close(reader);
-                free(reader);
+                io->close(io);
+                free(io);
                 continue;
         error:
-                if (reader != NULL) {
-                        reader->close(reader);
-                        free(reader);
+                if (io != NULL) {
+                        io->close(io);
+                        free(io);
                 }
                 tinydir_close(&dir);
                 return TURTLE_ERROR_RAISE();
@@ -170,20 +170,20 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
                 if (file.is_dir) continue;
 
                 /* Check the format. */
-                struct turtle_reader * reader;
-                if (turtle_reader_create_(&reader, file.path, error_) !=
+                struct turtle_io * io;
+                if (turtle_io_create_(&io, file.path, error_) !=
                     TURTLE_RETURN_SUCCESS) {
                         error_->code = TURTLE_RETURN_SUCCESS;
                         continue;
                 }
-                reader->open(reader, file.path, error_);
+                io->open(io, file.path, "rb", error_);
 
                 /* Compute the lookup index */
-                const int ix = (int)((reader->meta.x0 - long_min) / long_delta);
-                const int iy = (int)((reader->meta.y0 - lat_min) / lat_delta);
+                const int ix = (int)((io->meta.x0 - long_min) / long_delta);
+                const int iy = (int)((io->meta.y0 - lat_min) / lat_delta);
                 i = iy * long_n + ix;
-                reader->close(reader);
-                free(reader);
+                io->close(io);
+                free(io);
 
                 /* Copy the path name */
                 const int n = strlen(file.path) + 1;

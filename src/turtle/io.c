@@ -18,55 +18,55 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-/* Generic map reader for the TURTLE library */
+/* Generic read/write for the TURTLE library */
 
 /* C89 standard library */
 #include <stdlib.h>
 #include <string.h>
 /* TURTLE library */
-#include "turtle/reader.h"
+#include "turtle/io.h"
 
 /* Generic reader constructor type */
-typedef enum turtle_return reader_creator_t(
-    struct turtle_reader ** reader, struct turtle_error_context * error_);
+typedef enum turtle_return io_creator_t(
+    struct turtle_io ** io, struct turtle_error_context * error_);
 
-struct reader_info {
+struct io_info {
         const char * extension;
-        reader_creator_t * create;
+        io_creator_t * create;
 };
 
-/* List of available readers */
+/* List of available formats */
 #ifndef TURTLE_NO_PNG
-extern enum turtle_return turtle_reader_png16_create(
-    struct turtle_reader ** reader, struct turtle_error_context * error_);
+extern enum turtle_return turtle_io_png16_create_(
+    struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
 #ifndef TURTLE_NO_HGT
-extern enum turtle_return turtle_reader_hgt_create(
-    struct turtle_reader ** reader, struct turtle_error_context * error_);
+extern enum turtle_return turtle_io_hgt_create_(
+    struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
 #ifndef TURTLE_NO_TIFF
-extern enum turtle_return turtle_reader_geotiff16_create(
-    struct turtle_reader ** reader, struct turtle_error_context * error_);
+extern enum turtle_return turtle_io_geotiff16_create_(
+    struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
 
-static struct reader_info info[] = {
+static struct io_info info[] = {
 #ifndef TURTLE_NO_PNG
-        { "png", &turtle_reader_png16_create },
+        { "png", &turtle_io_png16_create_ },
 #endif
 #ifndef TURTLE_NO_HGT
-        { "hgt", &turtle_reader_hgt_create },
+        { "hgt", &turtle_io_hgt_create_ },
 #endif
 #ifndef TURTLE_NO_TIFF
-        { "tif", &turtle_reader_geotiff16_create },
+        { "tif", &turtle_io_geotiff16_create_ },
 #endif
 };
 
-/* Generic reader allocator, given a file name */
-enum turtle_return turtle_reader_create_(struct turtle_reader ** reader,
-    const char * path, struct turtle_error_context * error_)
+/* Generic io allocator, given a file name */
+enum turtle_return turtle_io_create_(struct turtle_io ** io, const char * path,
+    struct turtle_error_context * error_)
 {
         /* Get the file extension */
-        *reader = NULL;
+        *io = NULL;
         const char * extension = strrchr(path, '.');
         if (extension != NULL)
                 extension++;
@@ -78,13 +78,13 @@ enum turtle_return turtle_reader_create_(struct turtle_reader ** reader,
         int i;
         for (i = 0; i < n; i++) {
                 if (strcmp(info[i].extension, extension) == 0) {
-                        enum turtle_return rc = info[i].create(reader, error_);
+                        enum turtle_return rc = info[i].create(io, error_);
                         if (rc == TURTLE_RETURN_SUCCESS)
-                                strcpy((*reader)->meta.encoding, extension);
+                                strcpy((*io)->meta.encoding, extension);
                         return rc;
                 }
         }
 error:
         return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_EXTENSION,
-            "no valid reader for file `%s` ", path);
+            "no valid format for file `%s` ", path);
 }

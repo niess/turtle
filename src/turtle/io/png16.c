@@ -19,7 +19,7 @@
  */
 
 /*
- * Interface to png files providing a reader for 16b/grayscale data
+ * I/O's to png files providing a read/write for 16b/grayscale data
  */
 
 /* C89 standard library */
@@ -34,14 +34,15 @@
 /* JSON library */
 #include "jsmn.h"
 /* TURTLE library */
-#include "turtle/reader.h"
+#include "turtle/io.h"
 
 /* Data for reading a png file */
-struct png16_reader {
-        /* Base reader object */
-        struct turtle_reader base;
+struct png16_io {
+        /* Base io object */
+        struct turtle_io base;
 
-        /* Internal data for the reader */
+        /* Internal data for the io */
+        int read;
         FILE * fid;
         png_structp png_ptr;
         png_infop info_ptr;
@@ -58,24 +59,30 @@ static int json_sscanf(const char * json, jsmntok_t * token, double * value)
         return sscanf(json + token->start, "%lf", value);
 }
 
-static enum turtle_return png16_open(struct turtle_reader * reader,
-    const char * path, struct turtle_error_context * error_)
+static enum turtle_return png16_open(struct turtle_io * io, const char * path,
+    const char * mode, struct turtle_error_context * error_)
 {
-        struct png16_reader * png16 = (struct png16_reader *)reader;
-        if (png16->fid != NULL) reader->close(reader);
-
-        /* Initialise the reader object */
-        reader->meta.nx = reader->meta.ny = 0;
-        reader->meta.x0 = reader->meta.y0 = reader->meta.z0 = 0.;
-        reader->meta.dx = reader->meta.dy = reader->meta.dz = 0.;
-        reader->meta.projection.type = PROJECTION_NONE;
+        struct png16_io * png16 = (struct png16_io *)io;
+        if (png16->fid != NULL) io->close(io);
 
         /* Open the file and check the format */
-        png16->fid = fopen(path, "rb");
+        png16->fid = fopen(path, mode);
         if (png16->fid == NULL) {
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_PATH_ERROR, "could not open file `%s'", path);
         }
+
+        if (mode[0] != 'r') {
+                png16->read = 0;
+                return TURTLE_RETURN_SUCCESS;
+        } else
+                png16->read = 1;
+
+        /* Initialise the meta data */
+        io->meta.nx = io->meta.ny = 0;
+        io->meta.x0 = io->meta.y0 = io->meta.z0 = 0.;
+        io->meta.dx = io->meta.dy = io->meta.dz = 0.;
+        io->meta.projection.type = PROJECTION_NONE;
 
         char header[8];
         if ((fread(header, 1, 8, png16->fid) != 8) ||
@@ -89,12 +96,12 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
             png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
         if (png16->png_ptr == NULL) {
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
-                    "could not create png reader for file `%s'", path);
+                    "could not create png proxy for file `%s'", path);
         }
         png16->info_ptr = png_create_info_struct(png16->png_ptr);
         if (png16->info_ptr == NULL) {
                 TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
-                    "could not create png info reader for file `%s'", path);
+                    "could not create png info for file `%s'", path);
                 goto error;
         }
         if (setjmp(png_jmpbuf(png16->png_ptr))) {
@@ -120,8 +127,8 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                     path);
                 goto error;
         }
-        reader->meta.nx = png_get_image_width(png16->png_ptr, png16->info_ptr);
-        reader->meta.ny = png_get_image_height(png16->png_ptr, png16->info_ptr);
+        io->meta.nx = png_get_image_width(png16->png_ptr, png16->info_ptr);
+        io->meta.ny = png_get_image_height(png16->png_ptr, png16->info_ptr);
         png_read_update_info(png16->png_ptr, png16->info_ptr);
 
         /* Parse the JSON meta data */
@@ -183,8 +190,7 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                                                 text[value->end] = '\0';
                                                 if (turtle_projection_configure_(
                                                         text + value->start,
-                                                        &reader->meta
-                                                             .projection,
+                                                        &io->meta.projection,
                                                         error_) !=
                                                     TURTLE_RETURN_SUCCESS)
                                                         goto error;
@@ -203,20 +209,20 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                                         if (!done[1] &&
                                             (json_strcmp(text, key, "x0") ==
                                                 0)) {
-                                                json_sscanf(text, value,
-                                                    &reader->meta.x0);
+                                                json_sscanf(
+                                                    text, value, &io->meta.x0);
                                                 done[1] = 1;
                                         } else if (!done[2] &&
                                             (json_strcmp(text, key, "y0") ==
                                                 0)) {
-                                                json_sscanf(text, value,
-                                                    &reader->meta.y0);
+                                                json_sscanf(
+                                                    text, value, &io->meta.y0);
                                                 done[2] = 1;
                                         } else if (!done[3] &&
                                             (json_strcmp(text, key, "z0") ==
                                                 0)) {
-                                                json_sscanf(text, value,
-                                                    &reader->meta.z0);
+                                                json_sscanf(
+                                                    text, value, &io->meta.z0);
                                                 done[3] = 1;
                                         } else if (!done[4] &&
                                             (json_strcmp(text, key, "x1") ==
@@ -243,11 +249,9 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
                                         }
                                 }
                         }
-                        reader->meta.dx =
-                            (x1 - reader->meta.x0) / reader->meta.nx;
-                        reader->meta.dy =
-                            (y1 - reader->meta.y0) / reader->meta.ny;
-                        reader->meta.dz = (z1 - reader->meta.z0) / 65535;
+                        io->meta.dx = (x1 - io->meta.x0) / io->meta.nx;
+                        io->meta.dy = (y1 - io->meta.y0) / io->meta.ny;
+                        io->meta.dz = (z1 - io->meta.z0) / 65535;
 #undef N_FIELDS
 #undef N_TOKENS
                 }
@@ -256,13 +260,13 @@ static enum turtle_return png16_open(struct turtle_reader * reader,
         return TURTLE_RETURN_SUCCESS;
 error:
         /* Close and return if an error occurred */
-        reader->close(reader);
+        io->close(io);
         return error_->code;
 }
 
-static void png16_close(struct turtle_reader * reader)
+static void png16_close(struct turtle_io * io)
 {
-        struct png16_reader * png16 = (struct png16_reader *)reader;
+        struct png16_io * png16 = (struct png16_io *)io;
         if (png16->fid != NULL) {
                 fclose(png16->fid);
                 png16->fid = NULL;
@@ -270,7 +274,10 @@ static void png16_close(struct turtle_reader * reader)
                     (png16->png_ptr != NULL) ? &png16->png_ptr : NULL;
                 png_infopp pp_i =
                     (png16->info_ptr != NULL) ? &png16->info_ptr : NULL;
-                png_destroy_read_struct(pp_p, pp_i, NULL);
+                if (png16->read)
+                        png_destroy_read_struct(pp_p, pp_i, NULL);
+                else
+                        png_destroy_write_struct(pp_p, pp_i);
                 png16->png_ptr = NULL;
                 png16->info_ptr = NULL;
         }
@@ -290,10 +297,10 @@ static void set_z(struct turtle_map * map, int ix, int iy, double z)
         map->data[iy * map->meta.nx + ix] = (uint16_t)htons(d);
 }
 
-static enum turtle_return png16_read(struct turtle_reader * reader,
+static enum turtle_return png16_read(struct turtle_io * io,
     struct turtle_map * map, struct turtle_error_context * error_)
 {
-        struct png16_reader * png16 = (struct png16_reader *)reader;
+        struct png16_io * png16 = (struct png16_io *)io;
 
         /* Load the data */
         png_bytep * row_pointers = calloc(map->meta.ny, sizeof(png_bytep));
@@ -326,18 +333,110 @@ exit:
         return error_->code;
 }
 
-enum turtle_return turtle_reader_png16_create(
-    struct turtle_reader ** reader_p, struct turtle_error_context * error_)
+/* Dump a map in png format */
+static enum turtle_return png16_write(struct turtle_io * io,
+    const struct turtle_map * map, struct turtle_error_context * error_)
 {
-        /* Allocate the png16 reader */
-        struct png16_reader * png16 = malloc(sizeof(*png16));
+        png_bytep * row_pointers = NULL;
+        int header_size = 2048;
+        char * header = NULL;
+
+        struct png16_io * png16 = (struct png16_io *)io;
+        png16->png_ptr =
+            png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+        if (png16->png_ptr == NULL) {
+                TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
+                    "could not allocate memory for png proxy");
+                goto exit;
+        }
+        png16->info_ptr = png_create_info_struct(png16->png_ptr);
+        if (png16->info_ptr == NULL) {
+                TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
+                    "could not allocate memory for png info");
+                goto exit;
+        }
+        if (setjmp(png_jmpbuf(png16->png_ptr))) goto exit;
+        png_init_io(png16->png_ptr, png16->fid);
+
+        /* Write the header */
+        const int nx = map->meta.nx, ny = map->meta.ny;
+        png_set_IHDR(png16->png_ptr, png16->info_ptr, nx, ny, 16,
+            PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
+            PNG_FILTER_TYPE_BASE);
+        const char * tmp;
+        const struct turtle_projection * projection = &map->meta.projection;
+        const char * projection_tag = turtle_projection_name(projection);
+        if (projection_tag == NULL)
+                tmp = "";
+        else
+                tmp = projection_tag;
+        for (;;) {
+                char * new = realloc(header, header_size);
+                if (new == NULL) goto exit;
+                header = new;
+                const double x1 = map->meta.x0 + map->meta.dx * map->meta.nx;
+                const double y1 = map->meta.y0 + map->meta.dy * map->meta.ny;
+                const double z1 = map->meta.z0 + map->meta.dz * 65535;
+                if (snprintf(header, header_size,
+                        "{\"topography\" : {\"x0\" : %.5lf, \"y0\" : %.5lf, "
+                        "\"z0\" : %.5lf, \"x1\" : %.5lf, \"y1\" : %.5lf, "
+                        "\"z1\" : %.5lf, \"projection\" : \"%s\"}}",
+                        map->meta.x0, map->meta.y0, map->meta.z0, x1, y1, z1,
+                        tmp) < header_size)
+                        break;
+                header_size += 2048;
+        }
+        png_text text[] = { { PNG_TEXT_COMPRESSION_NONE, "Comment", header,
+            strlen(header) } };
+        png_set_text(png16->png_ptr, png16->info_ptr, text,
+            sizeof(text) / sizeof(text[0]));
+        png_write_info(png16->png_ptr, png16->info_ptr);
+        free(header);
+        header = NULL;
+
+        /* Write the data */
+        row_pointers = (png_bytep *)calloc(ny, sizeof(png_bytep));
+        if (row_pointers == NULL) goto exit;
+        int i;
+        for (i = 0; i < ny; i++) {
+                row_pointers[i] = (png_byte *)malloc(nx * sizeof(uint16_t));
+                if (row_pointers[i] == NULL) goto exit;
+                uint16_t * ptr = (uint16_t *)row_pointers[i];
+                int j;
+                for (j = 0; j < nx; j++) {
+                        const double d =
+                            round((map->meta.get_z(map, j, ny - 1 - i) -
+                                      map->meta.z0) /
+                                map->meta.dz);
+                        *(ptr++) = (uint16_t)htons(d);
+                }
+        }
+        png_write_image(png16->png_ptr, row_pointers);
+        png_write_end(png16->png_ptr, NULL);
+
+exit:
+        /* Clean and return */
+        free(header);
+        if (row_pointers != NULL) {
+                int i;
+                for (i = 0; i < ny; i++) free(row_pointers[i]);
+                free(row_pointers);
+        }
+        return error_->code;
+}
+
+enum turtle_return turtle_io_png16_create_(
+    struct turtle_io ** io_p, struct turtle_error_context * error_)
+{
+        /* Allocate the png16 io manager */
+        struct png16_io * png16 = malloc(sizeof(*png16));
         if (png16 == NULL) {
                 return TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
-                    "could not allocate memory for png16 reader");
+                    "could not allocate memory for png16 format");
         }
-        *reader_p = &png16->base;
+        *io_p = &png16->base;
 
-        /* Initialise the reader object */
+        /* Initialise the io object */
         memset(png16, 0x0, sizeof(*png16));
         png16->fid = NULL;
         png16->png_ptr = NULL;
@@ -347,6 +446,7 @@ enum turtle_return turtle_reader_png16_create(
         png16->base.open = &png16_open;
         png16->base.close = &png16_close;
         png16->base.read = &png16_read;
+        png16->base.write = &png16_write;
 
         png16->base.meta.get_z = &get_z;
         png16->base.meta.set_z = &set_z;

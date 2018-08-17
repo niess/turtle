@@ -28,25 +28,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef TURTLE_NO_PNG
-/* For byte order */
-#include <arpa/inet.h>
-/* PNG library */
-#include <png.h>
-#endif
 /* TURTLE library */
 #include "turtle.h"
 #include "turtle/error.h"
+#include "turtle/io.h"
 #include "turtle/map.h"
 #include "turtle/projection.h"
-#include "turtle/reader.h"
 #include "turtle/stack.h"
-
-/* Low level data loaders/dumpers. */
-#ifndef TURTLE_NO_PNG
-static enum turtle_return map_dump_png(
-    const struct turtle_map * map, const char * path);
-#endif
 
 /* Default data getter */
 static double get_default_z(const struct turtle_map * map, int ix, int iy)
@@ -130,32 +118,23 @@ void turtle_map_destroy(struct turtle_map ** map)
         *map = NULL;
 }
 
-/* Get the file extension in a path. */
-static const char * path_extension(const char * path)
-{
-        const char * ext = strrchr(path, '.');
-        if (ext != NULL) ext++;
-        return ext;
-}
-
 /* Load a map from a data file. */
 enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map)
 {
         TURTLE_ERROR_INITIALISE(&turtle_map_load);
 
-        /* Get a reader for the file */
-        struct turtle_reader * reader;
-        if (turtle_reader_create_(&reader, path, error_) !=
-            TURTLE_RETURN_SUCCESS)
+        /* Get an io manager for the file */
+        struct turtle_io * io;
+        if (turtle_io_create_(&io, path, error_) != TURTLE_RETURN_SUCCESS)
                 goto exit;
 
         /* Load the meta data */
-        if (reader->open(reader, path, error_) != TURTLE_RETURN_SUCCESS)
+        if (io->open(io, path, "rb", error_) != TURTLE_RETURN_SUCCESS)
                 goto exit;
 
         /* Allocate the map */
-        *map = malloc(sizeof(**map) +
-            reader->meta.nx * reader->meta.ny * sizeof(*(*map)->data));
+        *map = malloc(
+            sizeof(**map) + io->meta.nx * io->meta.ny * sizeof(*(*map)->data));
         if (*map == NULL) {
                 TURTLE_ERROR_VREGISTER(TURTLE_RETURN_MEMORY_ERROR,
                     "could not allocate memory for map `%s'", path);
@@ -163,22 +142,22 @@ enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map)
         }
 
         /* Initialise the map data */
-        memcpy(&(*map)->meta, &reader->meta, sizeof((*map)->meta));
+        memcpy(&(*map)->meta, &io->meta, sizeof((*map)->meta));
         (*map)->stack = NULL;
         (*map)->prev = (*map)->next = NULL;
         (*map)->clients = 0;
 
         /* Load the topography data */
-        if (reader->read(reader, *map, error_) != TURTLE_RETURN_SUCCESS) {
+        if (io->read(io, *map, error_) != TURTLE_RETURN_SUCCESS) {
                 free(*map);
                 *map = NULL;
                 goto exit;
         }
 
-        /* Finalise the reader */
-        reader->close(reader);
+        /* Finalise the io manager */
+        io->close(io);
 exit:
-        free(reader);
+        free(io);
         return TURTLE_ERROR_RAISE();
 }
 
@@ -187,32 +166,17 @@ enum turtle_return turtle_map_dump(
     const struct turtle_map * map, const char * path)
 {
         TURTLE_ERROR_INITIALISE(&turtle_map_dump);
-
-        /* Check the file extension. */
-        const char * ext = path_extension(path);
-        if (ext == NULL) return TURTLE_ERROR_NO_EXTENSION();
-
-#ifndef TURTLE_NO_PNG
-        if (strcmp(ext, "png") == 0) {
-                enum turtle_return rc = map_dump_png(map, path);
-                if (rc == TURTLE_RETURN_SUCCESS) {
-                        return TURTLE_RETURN_SUCCESS;
-                } else if (rc == TURTLE_RETURN_PATH_ERROR) {
-                        return TURTLE_ERROR_PATH(path);
-                } else if (rc == TURTLE_RETURN_BAD_FORMAT) {
-                        return TURTLE_ERROR_MESSAGE(
-                            TURTLE_RETURN_BAD_FORMAT, "invalid data format");
-                } else if (rc == TURTLE_RETURN_MEMORY_ERROR) {
-                        return TURTLE_ERROR_MEMORY();
-                } else {
-                        return TURTLE_ERROR_UNEXPECTED(rc);
-                }
-        } else {
-                return TURTLE_ERROR_EXTENSION(ext);
+        struct turtle_io * io;
+        if (turtle_io_create_(&io, path, error_) != TURTLE_RETURN_SUCCESS)
+                return TURTLE_ERROR_RAISE();
+        if (io->open(io, path, "wb+", error_) != TURTLE_RETURN_SUCCESS) {
+                free(io);
+                return TURTLE_ERROR_RAISE();
         }
-#else
-        return TURTLE_ERROR_EXTENSION(ext);
-#endif
+        io->write(io, map, error_);
+        io->close(io);
+        free(io);
+        return TURTLE_ERROR_RAISE();
 }
 
 /* Fill in a map node with an elevation value */
@@ -330,103 +294,3 @@ void turtle_map_meta(const struct turtle_map * map,
                 *projection = turtle_projection_name(&map->meta.projection);
         }
 }
-
-#ifndef TURTLE_NO_PNG
-
-/* Dump a map in png format */
-static enum turtle_return map_dump_png(
-    const struct turtle_map * map, const char * path)
-{
-        FILE * fid = NULL;
-        png_bytep * row_pointers = NULL;
-        png_structp png_ptr = NULL;
-        png_infop info_ptr = NULL;
-        int header_size = 2048;
-        char * header = NULL;
-        enum turtle_return rc;
-
-        /* Initialise the file and the PNG pointers */
-        rc = TURTLE_RETURN_PATH_ERROR;
-        fid = fopen(path, "wb+");
-        if (fid == NULL) goto exit;
-
-        rc = TURTLE_RETURN_MEMORY_ERROR;
-        png_ptr =
-            png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-        if (png_ptr == NULL) goto exit;
-        info_ptr = png_create_info_struct(png_ptr);
-        if (info_ptr == NULL) goto exit;
-        if (setjmp(png_jmpbuf(png_ptr))) goto exit;
-        png_init_io(png_ptr, fid);
-
-        /* Write the header. */
-        const int nx = map->meta.nx, ny = map->meta.ny;
-        png_set_IHDR(png_ptr, info_ptr, nx, ny, 16, PNG_COLOR_TYPE_GRAY,
-            PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
-            PNG_FILTER_TYPE_BASE);
-        const char * tmp;
-        const struct turtle_projection * projection = &map->meta.projection;
-        const char * projection_tag = turtle_projection_name(projection);
-        if (projection_tag == NULL)
-                tmp = "";
-        else
-                tmp = projection_tag;
-        for (;;) {
-                char * new = realloc(header, header_size);
-                if (new == NULL) goto exit;
-                header = new;
-                const double x1 = map->meta.x0 + map->meta.dx * map->meta.nx;
-                const double y1 = map->meta.y0 + map->meta.dy * map->meta.ny;
-                const double z1 = map->meta.z0 + map->meta.dz * 65535;
-                if (snprintf(header, header_size,
-                        "{\"topography\" : {\"x0\" : %.5lf, \"y0\" : %.5lf, "
-                        "\"z0\" : %.5lf, \"x1\" : %.5lf, \"y1\" : %.5lf, "
-                        "\"z1\" : %.5lf, \"projection\" : \"%s\"}}",
-                        map->meta.x0, map->meta.y0, map->meta.z0, x1, y1, z1,
-                        tmp) < header_size)
-                        break;
-                header_size += 2048;
-        }
-        png_text text[] = { { PNG_TEXT_COMPRESSION_NONE, "Comment", header,
-            strlen(header) } };
-        png_set_text(png_ptr, info_ptr, text, sizeof(text) / sizeof(text[0]));
-        png_write_info(png_ptr, info_ptr);
-        free(header);
-        header = NULL;
-
-        /* Write the data */
-        row_pointers = (png_bytep *)calloc(ny, sizeof(png_bytep));
-        if (row_pointers == NULL) goto exit;
-        int i;
-        for (i = 0; i < ny; i++) {
-                row_pointers[i] = (png_byte *)malloc(nx * sizeof(uint16_t));
-                if (row_pointers[i] == NULL) goto exit;
-                uint16_t * ptr = (uint16_t *)row_pointers[i];
-                int j;
-                for (j = 0; j < nx; j++) {
-                        const double d =
-                            round((map->meta.get_z(map, j, ny - 1 - i) -
-                                      map->meta.z0) /
-                                map->meta.dz);
-                        *ptr = (uint16_t)htons(d);
-                        ptr++;
-                }
-        }
-        png_write_image(png_ptr, row_pointers);
-        png_write_end(png_ptr, NULL);
-        rc = TURTLE_RETURN_SUCCESS;
-exit:
-        free(header);
-        if (fid != NULL) fclose(fid);
-        if (row_pointers != NULL) {
-                int i;
-                for (i = 0; i < ny; i++) free(row_pointers[i]);
-                free(row_pointers);
-        }
-        png_structpp pp_p = (png_ptr != NULL) ? &png_ptr : NULL;
-        png_infopp pp_i = (info_ptr != NULL) ? &info_ptr : NULL;
-        png_destroy_write_struct(pp_p, pp_i);
-
-        return rc;
-}
-#endif

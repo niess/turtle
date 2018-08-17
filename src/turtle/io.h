@@ -18,34 +18,37 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-/* Generic map reader for the TURTLE library */
-#ifndef TURTLE_READER_H
-#define TURTLE_READER_H
+/* Generic read/write for the TURTLE library */
+#ifndef TURTLE_IO_H
+#define TURTLE_IO_H
 
 /* TURTLE library */
 #include "turtle.h"
 #include "turtle/error.h"
 #include "turtle/map.h"
 
-struct turtle_reader;
-typedef enum turtle_return turtle_reader_opener_t(struct turtle_reader * reader,
-    const char * path, struct turtle_error_context * error_);
-typedef void turtle_reader_closer_t(struct turtle_reader * reader);
-typedef enum turtle_return turtle_reader_t(struct turtle_reader * reader,
+struct turtle_io;
+typedef enum turtle_return turtle_io_opener_t(struct turtle_io * io,
+    const char * path, const char * mode, struct turtle_error_context * error_);
+typedef void turtle_io_closer_t(struct turtle_io * io);
+typedef enum turtle_return turtle_io_reader_t(struct turtle_io * io,
     struct turtle_map * map, struct turtle_error_context * error_);
+typedef enum turtle_return turtle_io_writer_t(struct turtle_io * io,
+    const struct turtle_map * map, struct turtle_error_context * error_);
 
-struct turtle_reader {
+struct turtle_io {
         /* Meta data for the map */
         struct turtle_map_meta meta;
 
-        /* Generic reader methods */
-        turtle_reader_opener_t * open;
-        turtle_reader_closer_t * close;
-        turtle_reader_t * read;
+        /* Generic io methods */
+        turtle_io_opener_t * open;
+        turtle_io_closer_t * close;
+        turtle_io_reader_t * read;
+        turtle_io_writer_t * write;
 };
 
-/* Generic reader allocator, given a file name */
-enum turtle_return turtle_reader_create_(struct turtle_reader ** reader,
-    const char * path, struct turtle_error_context * error_);
+/* Generic io allocator, given a file name */
+enum turtle_return turtle_io_create_(struct turtle_io ** io, const char * path,
+    struct turtle_error_context * error_);
 
 #endif
