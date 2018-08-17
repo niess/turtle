@@ -368,10 +368,10 @@ TURTLE_API enum turtle_return turtle_map_create(struct turtle_map ** map,
 TURTLE_API void turtle_map_destroy(struct turtle_map ** map);
 
 /**
- * Load a map.
+ * Load a map
  *
- * @param path    The path to the map file.
- * @param map     A handle to the map.
+ * @param map     A handle to the map
+ * @param path    The path to the map file
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below.
  *
@@ -391,7 +391,7 @@ TURTLE_API void turtle_map_destroy(struct turtle_map ** map);
  *
  */
 TURTLE_API enum turtle_return turtle_map_load(
-    const char * path, struct turtle_map ** map);
+    struct turtle_map ** map, const char * path);
 
 /**
  * Dump a projection map to a file.

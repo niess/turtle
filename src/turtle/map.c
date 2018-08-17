@@ -118,11 +118,10 @@ void turtle_map_destroy(struct turtle_map ** map)
         *map = NULL;
 }
 
-/* Load a map from a data file. */
-enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map)
+/* Load a map from a data file */
+enum turtle_return turtle_map_load_(struct turtle_map ** map, const char * path,
+    struct turtle_error_context * error_)
 {
-        TURTLE_ERROR_INITIALISE(&turtle_map_load);
-
         /* Get an io manager for the file */
         struct turtle_io * io;
         if (turtle_io_create_(&io, path, error_) != TURTLE_RETURN_SUCCESS)
@@ -158,6 +157,13 @@ enum turtle_return turtle_map_load(const char * path, struct turtle_map ** map)
         io->close(io);
 exit:
         free(io);
+        return error_->code;
+}
+
+enum turtle_return turtle_map_load(struct turtle_map ** map, const char * path)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_map_load);
+        turtle_map_load_(map, path, error_);
         return TURTLE_ERROR_RAISE();
 }
 

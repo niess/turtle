@@ -73,4 +73,7 @@ enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
     double x, double y, double * z, int * inside,
     struct turtle_error_context * error_);
 
+enum turtle_return turtle_map_load_(struct turtle_map ** map, const char * path,
+    struct turtle_error_context * error_);
+
 #endif

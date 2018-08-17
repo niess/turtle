@@ -7,9 +7,34 @@ OBJS := client.o ecef.o error.o io.o map.o projection.o stack.o stepper.o      \
 	turtle.o
 INCLUDES := -Iinclude -Isrc -I$(DEPS_DIR)/tinydir
 
+# Flag for GEOTIFF files
+TURTLE_USE_TIFF := 1
+ifeq ($(TURTLE_USE_TIFF), 1)
+	LIBS += -ltiff
+	OBJS += geotiff16.o
+else
+	CFLAGS += -DTURTLE_NO_TIFF
+endif
+
+# Flag for GRD files
+TURTLE_USE_GRD := 1
+ifeq ($(TURTLE_USE_GRD), 1)
+	OBJS += grd.o
+else
+	CFLAGS += -DTURTLE_NO_GRD
+endif
+
+# Flag for HGT files
+TURTLE_USE_HGT := 1
+ifeq ($(TURTLE_USE_HGT), 1)
+	OBJS += hgt.o
+else
+	CFLAGS += -DTURTLE_NO_HGT
+endif
+
 # Flag for PNG files
 TURTLE_USE_PNG := 1
-ifeq ($(TURTLE_USE_PNG),1)
+ifeq ($(TURTLE_USE_PNG), 1)
 	PACKAGE := libpng
 	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
 	LIBS += $(shell pkg-config --libs $(PACKAGE))
@@ -17,23 +42,6 @@ ifeq ($(TURTLE_USE_PNG),1)
 	INCLUDES += -I$(DEPS_DIR)/jsmn
 else
 	CFLAGS += -DTURTLE_NO_PNG
-endif
-
-# Flag for GEOTIFF files
-TURTLE_USE_TIFF := 1
-ifeq ($(TURTLE_USE_TIFF),1)
-	LIBS += -ltiff
-	OBJS += geotiff16.o
-else
-	CFLAGS += -DTURTLE_NO_TIFF
-endif
-
-# Flag for HGT files
-TURTLE_USE_HGT := 1
-ifeq ($(TURTLE_USE_HGT),1)
-	OBJS += hgt.o
-else
-	CFLAGS += -DTURTLE_NO_HGT
 endif
 
 # Available builds.

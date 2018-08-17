@@ -36,7 +36,7 @@ int main()
         /* Load the RGF93 map dumped by `example-projection`. */
         const char * path = "pdd-30m.png";
         struct turtle_map * map;
-        enum turtle_return rc = turtle_map_load(path, &map);
+        enum turtle_return rc = turtle_map_load(&map, path);
         if (rc != TURTLE_RETURN_SUCCESS)
                 exit_abruptly(rc, (turtle_function_t *)turtle_map_load,
                     "could not load map");

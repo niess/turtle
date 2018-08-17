@@ -36,28 +36,35 @@ struct io_info {
 };
 
 /* List of available formats */
-#ifndef TURTLE_NO_PNG
-extern enum turtle_return turtle_io_png16_create_(
+#ifndef TURTLE_NO_TIFF
+extern enum turtle_return turtle_io_geotiff16_create_(
+    struct turtle_io ** io, struct turtle_error_context * error_);
+#endif
+#ifndef TURTLE_NO_GRD
+extern enum turtle_return turtle_io_grd_create_(
     struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
 #ifndef TURTLE_NO_HGT
 extern enum turtle_return turtle_io_hgt_create_(
     struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
-#ifndef TURTLE_NO_TIFF
-extern enum turtle_return turtle_io_geotiff16_create_(
+#ifndef TURTLE_NO_PNG
+extern enum turtle_return turtle_io_png16_create_(
     struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
 
 static struct io_info info[] = {
-#ifndef TURTLE_NO_PNG
-        { "png", &turtle_io_png16_create_ },
+#ifndef TURTLE_NO_TIFF
+        { "tif", &turtle_io_geotiff16_create_ },
+#endif
+#ifndef TURTLE_NO_GRD
+        { "grd", &turtle_io_grd_create_ },
 #endif
 #ifndef TURTLE_NO_HGT
         { "hgt", &turtle_io_hgt_create_ },
 #endif
-#ifndef TURTLE_NO_TIFF
-        { "tif", &turtle_io_geotiff16_create_ },
+#ifndef TURTLE_NO_PNG
+        { "png", &turtle_io_png16_create_ },
 #endif
 };
 

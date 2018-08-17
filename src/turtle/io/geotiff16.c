@@ -43,7 +43,7 @@
 #define TIFFTAG_GDAL_METADATA 42112
 #define TIFFTAG_GDAL_NODATA 42113
 
-/* Data for reading a png file */
+/* Data for accessing a GEOTIFF file */
 struct geotiff16_io {
         /* Base io object */
         struct turtle_io base;

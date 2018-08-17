@@ -341,7 +341,8 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
 
         /* Load the map data according to the format */
         struct turtle_map * map;
-        if (turtle_map_load(stack->path[index], &map) != TURTLE_RETURN_SUCCESS)
+        if (turtle_map_load_(&map, stack->path[index], error_) !=
+            TURTLE_RETURN_SUCCESS)
                 return error_->code;
 
         /* Make room for the new map, if needed */

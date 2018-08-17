@@ -60,12 +60,12 @@ int main()
          * Get the RGF93 local projection map, centered on the Auberge des
          * Gros Manaux at Col de Ceyssat, Auvergne, France.
          */
-        turtle_map_load("pdd-30m.png", &map);
+        turtle_map_load(&map, "pdd-30m.png");
 
         /* Load the EGM96 geoid map */
-        turtle_map_load("share/data/egm96.png", &geoid);
+        turtle_map_load(&geoid, "share/data/egm96.png");
 
-        /* Create the ECEF stepper and configure it. */
+        /* Create the ECEF stepper and configure it */
         turtle_stepper_create(&stepper);
         turtle_stepper_geoid_set(stepper, geoid);
         turtle_stepper_range_set(stepper, 100.);

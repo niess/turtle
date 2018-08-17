@@ -56,8 +56,8 @@ struct turtle_error_context {
         turtle_error_format_(error_, rc, __FILE__, __LINE__, message)
 
 #define TURTLE_ERROR_VREGISTER(rc, format, ...)                                \
-        turtle_error_format_(error_, rc, __FILE__, __LINE__, format,           \
-            __VA_ARGS__)
+        turtle_error_format_(                                                  \
+            error_, rc, __FILE__, __LINE__, format, __VA_ARGS__)
 
 #define TURTLE_ERROR_RAISE() turtle_error_raise_(error_)
 

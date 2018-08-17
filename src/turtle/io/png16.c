@@ -36,7 +36,7 @@
 /* TURTLE library */
 #include "turtle/io.h"
 
-/* Data for reading a png file */
+/* Data for accessing a png file */
 struct png16_io {
         /* Base io object */
         struct turtle_io base;

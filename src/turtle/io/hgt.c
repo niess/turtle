@@ -32,7 +32,7 @@
 /* TURTLE library */
 #include "turtle/io.h"
 
-/* Data for reading a png file */
+/* Data for accessing an hgt file */
 struct hgt_io {
         /* Base io object */
         struct turtle_io base;
@@ -57,7 +57,7 @@ static enum turtle_return hgt_open(struct turtle_io * io, const char * path,
         /* Initialise the io object */
         io->meta.nx = io->meta.ny = 0;
         io->meta.x0 = io->meta.y0 = 0.;
-        io->meta.dx = io->meta.dy = io->meta.dz = 0.;
+        io->meta.dx = io->meta.dy = 0.;
         io->meta.z0 = -32767.;
         io->meta.dz = 1.;
         io->meta.projection.type = PROJECTION_NONE;
