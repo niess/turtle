@@ -1,38 +1,58 @@
-/**
+/*
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * For more information, please refer to <http://unlicense.org>
+ */
+
+/*
  * This example illustrates the usage of a `turtle_client` in a multithreaded
  * application using `pthread` and `mutex`. A set of `N_THREADS` clients
- * concurrently access to Global Digitale Elevation Model (GDEM) data over a
+ * concurrently access data of a Global Digital Elevation Model (GDEM) over a
  * 2x2 deg^2 angular grid.
+ * 
+ * Note that for this example to work you'll need the 4 tiles at (45N, 2E),
+ * (45N, 3E), (46N, 2E), and (46N, 3E) from a global model, e.g. N45E002.hgt,
+ * etc ... for SRTMGL1. These tiles are assumed to be located in a folder named
+ * `share/topography`.
  */
 
-/* C89 standard library. */
+/* C89 standard library */
 #include <stdio.h>
 #include <stdlib.h>
-
-/* POSIX threads. */
+/* POSIX threads */
 #include <pthread.h>
 #include <semaphore.h>
-
-/* The TURTLE API. */
+/* The TURTLE library */
 #include "turtle.h"
 
-/* The number of threads/clients to run. */
+/* The number of threads/clients to run */
 #define N_THREADS 4
 
-/**
- * First let's implements the threaded task and some storage for its input
- * parameters. Each thread's task instanciates its own client in order to
- * concurrently access the GDEM data. Then the client is used to
- * estimate the elevation at successive steps along a line going from
- * `(latitude_0, longitude_0)` to `(latitude_1, longitude_1)`.
- *
- * *Note* that the stack handle is declared as a global static variable,
- * to be seen by all threads/clients.
- */
-/* Handle for the stack. */
+/* Handle for the stack of maps, from the GDEM */
 struct turtle_stack * stack = NULL;
 
-/* Storage for the thread input parameters. */
+/* Storage for thread parameters */
 struct thread_parameters {
         pthread_t tid;
         double latitude_0;
@@ -41,19 +61,19 @@ struct thread_parameters {
         double longitude_1;
 };
 
-/* The thread `run` function. */
+/* The thread `run` function */
 static void * run_thread(void * args)
 {
         /* Prototypes for lock & unlock functions, securing concurent accesss */
         int lock(void);
         int unlock(void);
 
-        /* Unpack arguments and create the client. */
+        /* Unpack arguments and create the client */
         struct thread_parameters * params = (struct thread_parameters *)args;
         struct turtle_client * client;
         turtle_client_create(&client, stack);
 
-        /* Step along the track. */
+        /* Step along the track */
         const int n = 1001;
         int i;
         for (i = 0; i < n; i++) {
@@ -62,25 +82,22 @@ static void * run_thread(void * args)
                 const double longitude = params->longitude_0 +
                     (i * (params->longitude_1 - params->longitude_0)) / (n - 1);
                 double elevation;
+                int inside;
                 turtle_client_elevation(
-                    client, latitude, longitude, &elevation, NULL);
+                    client, latitude, longitude, &elevation, &inside);
                 lock();
                 fprintf(stdout, "[%02ld] %.3lf %.3lf %.3lf\n",
                     (long)params->tid, latitude, longitude, elevation);
                 unlock();
+                if (!inside) break;
         }
 
-        /* Clean and exit. */
+        /* Clean and exit */
         turtle_client_destroy(&client);
         pthread_exit(0);
 }
 
-/**
- * Then we need to provide some locking mechanism to TURTLE in order to protect
- * critical sections. That for a semaphore is used. The TURTLE lock and unlock
- * callbacks simply encapsulate the sem_wait and sem_post functions.
- */
-/* Semaphore for locking critical sections. */
+/* Semaphore for locking critical sections */
 static sem_t semaphore;
 
 int lock(void)
@@ -95,48 +112,29 @@ int unlock(void)
         return sem_post(&semaphore);
 }
 
-/**
- * Finally the threads are spawned in the main function after various
- * initialisation. For this example to work, you'll need to get the
- * ASTER-GDEM2 (or SRTM) elevation data for the following 4 tiles:
- *
- * * `ASTGMT2_N45E002_dem.tif`
- * * `ASTGMT2_N45E003_dem.tif`
- * * `ASTGMT2_N46E002_dem.tif`
- * * `ASTGMT2_N46E003_dem.tif`
- *
- * The tiles should be extracted to a folder named share/topography.
- *
- * **Note** that since there are only 4 tiles that can be accessed, setting the
- * stack `size` to 4 or more will result in speed up since then there is
- * no need to switch, i.e. unload and reload, tiles between threads.
- */
-/* A basic error handler with an abrupt exit(). */
+/* Handler for TURTLE library errors */
 void error_handler(
     enum turtle_return rc, turtle_function_t * caller, const char * message)
 {
-        fprintf(stderr, "error: %s.\n", message);
-        pthread_exit(0);
+        fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
+        exit(EXIT_FAILURE);
 }
 
-/* Draw a random number uniformly in [0;1] using the standard C library. */
+/* Draw a random number uniformly in [0;1] using the standard C library */
 static double uniform(void) { return ((double)rand()) / RAND_MAX; }
 
-/* The main function, spawning the threads. */
+/* The main function, spawning the threads */
 int main()
 {
-        /* Initialise the semaphore, the TURTLE library and the stack. */
+        /* Initialise the semaphore, the TURTLE library and the stack */
         sem_init(&semaphore, 0, 1);
         turtle_initialise(error_handler);
-        turtle_stack_create(
-            &stack,
-            "share/topography", /* <= The elevation data folder. */
-            4,                  /* <= The stack size for tiles.  */
-            lock, unlock);      /* <= The lock/unlock callbacks. */
+        turtle_stack_create(&stack, "share/topography", 4, &lock, &unlock);
+        srand(time(NULL));
 
         /*
          * Create the client threads and initialise the thread specific data
-         * randomly.
+         * randomly
          */
         struct thread_parameters params[N_THREADS];
         int i;
@@ -157,15 +155,15 @@ int main()
                         goto clean_and_exit;
         }
 
-        /* Wait for all threads to finish. */
+        /* Wait for all threads to finish */
         for (i = 0; i < N_THREADS; i++) {
                 if (pthread_join(params[i].tid, NULL) != 0) goto clean_and_exit;
         }
 
-/* Finalise TURTLE and the semaphore. */
+        /* Finalise TURTLE and the semaphore */
 clean_and_exit:
         turtle_stack_destroy(&stack);
         turtle_finalise();
         sem_destroy(&semaphore);
-        pthread_exit(0);
+        exit(EXIT_SUCCESS);
 }

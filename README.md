@@ -18,12 +18,16 @@ geodetic coordinates and Cartesian **E**arth-**C**entered, **E**arth-**F**ixed
 optimised for tracking problems. It allows to balance execution speed, I/Os and
 memory usage.
 
+The supported data formats for loading maps are: **GEOTIFF**, **GRD**, **HGT**
+and **PNG**. Binary formats must be 16b and grayscale. Maps can only be dumped
+to PNG though. Note that whe doing so, the meta-data of PNG maps are enriched
+with a custom header.
+
 ## Installation
 
 Currently there is no automatic build procedure. If on a Linux box you might
-try and adapt the provided `setup.sh` and `Makefile`. The source code conforms
-to C99. For loading or dumping **DEM**s, you will need the following
-libraries and packages:
+try and adapt the provided `Makefile`. The source code conforms to C99. For
+loading or dumping **DEM**s, you will need the following libraries and packages:
 
 * **libpng** and [JSMN][JSMN] for local maps.
 * **libtiff** for geotiff data, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp)
@@ -48,4 +52,5 @@ You might directly check the [examples](examples) as well.
 ## License
 
 The TURTLE library is  under the **GNU LGPLv3** license. See the provided
-`LICENSE` and `COPYING.LESSER` files.
+`LICENSE` and `COPYING.LESSER` files. The [examples](examples) however have a
+separate public domain license allowing them to be copied without restrictions.

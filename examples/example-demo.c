@@ -1,52 +1,66 @@
-/**
+/*
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * For more information, please refer to <http://unlicense.org>
+ */
+
+/*
  * This example demonstrates various functionalities of the TURTLE library,
  * e.g. handling projection maps, a Global Digital Elevation Model (GDEM), and
  * frame coordinates conversions. It also provides a simple example of TURTLE's
  * error handling using a user defined `turtle_handler` callback.
+ *
+ * Note that you'll need to run `example-projection` first in order to generate
+ * the map used in this example.
  */
+
+/* C89 standard library */
 #include <stdio.h>
 #include <stdlib.h>
-
+/* The TURTLE library */
 #include "turtle.h"
 
-/* Error handler: dump any error message and exit to the OS. */
-void exit_abruptly(
-    enum turtle_return rc, turtle_function_t * caller, const char * message)
+/* Handler for TURTLE library errors */
+void handle_error(
+    enum turtle_return rc, turtle_function_t * function, const char * message)
 {
-        if (rc != TURTLE_RETURN_SUCCESS)
-                fprintf(stderr, "error: %s.\n", message);
-        exit(0);
+        fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
+        exit(EXIT_FAILURE);
 }
 
 int main()
 {
-        /** First let us initialise the TURTLE library. The `NULL` argument
-         * specifies that no error handler is used. Most of TURTLE's library
-         * functions return a `turtle_return` code that could be catched by a
-         * user defined error handler. But, to start with let us handle
-         * explicitly the return codes.
-         */
-        /* Initialise the TURTLE library. */
-        turtle_initialise(NULL);
+        /* Initialise the TURTLE library */
+        turtle_initialise(&handle_error);
 
-        /** Let us now demonstrate how to load a projection map from the disk
-         * and how to access its meta-data. So you'll need to run
-         * example-projection` first if you don't already have the map.
-         */
-        /* Load the RGF93 map dumped by `example-projection`. */
-        const char * path = "pdd-30m.png";
+        /* Load the RGF93 map dumped by `example-projection` */
+        const char * path = "share/data/pdd-30m.png";
         struct turtle_map * map;
-        enum turtle_return rc = turtle_map_load(&map, path);
-        if (rc != TURTLE_RETURN_SUCCESS)
-                exit_abruptly(rc, (turtle_function_t *)turtle_map_load,
-                    "could not load map");
-
+        turtle_map_load(&map, path);
         printf("o) Loaded projection map `%s`\n", path);
 
-        /* Get a handle to the map's projection. */
-        struct turtle_projection * rgf93 = turtle_map_projection(map);
-
-        /* Show the map statistics. */
+        /* Show the map statistics */
         struct turtle_map_info info;
         const char * strproj;
         turtle_map_meta(map, &info, &strproj);
@@ -62,26 +76,14 @@ int main()
         printf("    + elevation    :  %.1lf -> %.1lf\n", info.z[0], info.z[1]);
         printf("    + encoding     :  %s\n", info.encoding);
 
-        /** For the following, let us attach an error handler to TURTLE such
-         * that we don't need anymore to explicitly handle return codes.
-         *
-         * *Note* that we could have done so right from the start by passing the
-         * error handler as argument to `turtle_initialise`.
-         */
-        /* Set an error handler from here on. */
-        turtle_handler(&exit_abruptly);
+        /* Get the map projection */
+        struct turtle_projection * rgf93 = turtle_map_projection(map);
 
-        /** Let us illustrate how to manipulate `turtle_projection`s in order to
-         * do frame coordinates conversions.
-         */
-        /*
-         * Convert the local coordinates of the map's origin to geodetic ones.
-         */
+        /* Convert the local coordinates of the map's origin to geodetic ones */
         double latitude, longitude;
-        turtle_projection_unproject(
-            rgf93, x0, y0, &latitude, &longitude);
+        turtle_projection_unproject(rgf93, x0, y0, &latitude, &longitude);
 
-        /* Convert the coordinates to UTM. */
+        /* Convert the geodetic coordinates to UTM */
         const char * strutm = "UTM 31N";
         struct turtle_projection * utm;
         turtle_projection_create(&utm, strutm);
@@ -93,29 +95,21 @@ int main()
         printf("    + GPS          :  (%.8lf, %.8lf)\n", latitude, longitude);
         printf("    + %-12s :  (%.2lf, %.2lf)\n", strutm, xUTM, yUTM);
 
-        /* We don't need the UTM projection anymore ... */
+        /* We don't need the UTM projection anymore. So let's destroy it */
         turtle_projection_destroy(&utm);
 
-        /** Let us show how to access the GDEM data. That for we need to
-         * instanciate a `turtle_stack`. Since we are only interested in a
-         * single coordinate the stack size for elevation data is set to `1`,
-         * i.e. a single data file will be loaded and buffered.
-         *
-         * Having a new `turtle_stack` we can request the origin's elevation and
-         * compare the result to the map's one. *Note* that there might be a
-         * 1 cm difference between both due to the encoding of the elevation
-         * data over 16 bits.
+        /* Create a new stack handle to access the global elevation data
+         * used for building the map
          */
-        /* Create a new stack handle to access elevation data. */
         struct turtle_stack * stack;
         turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
 
-        /* Get the orgin's elevation from the stack. */
+        /* Get the orgine's elevation from the stack */
         double elevation_gdem;
         turtle_stack_elevation(
             stack, latitude, longitude, &elevation_gdem, NULL);
 
-        /* Get the same from the map. */
+        /* Get the same from the map */
         double elevation_map;
         turtle_map_elevation(map, x0, y0, &elevation_map, NULL);
 
@@ -123,7 +117,7 @@ int main()
         printf("    + GDEM         : %.2lf m\n", elevation_gdem);
         printf("    + RGF93 map    : %.2lf m\n", elevation_map);
 
-        /** Finally, let us express the origin's coordinates in a Cartesian
+        /* Finally, let us express the origin's coordinates in a Cartesian
          * frame, i.e. Earth-Centered, Earth-Fixed (ECEF). *Note* that this
          * conversion doesn't require access to the GDEM data, provided that
          * the elevation is known from elsewhere. E.g. in this case we use the
@@ -147,9 +141,9 @@ int main()
         printf("    + ECEF         : (%.8lg, %.8lg, %.8lg)\n", direction[0],
             direction[1], direction[2]);
 
-        /* Finalise and exit to the OS. */
+        /* Clean and exit to the OS */
         turtle_map_destroy(&map);
         turtle_stack_destroy(&stack);
         turtle_finalise();
-        exit(0);
+        exit(EXIT_SUCCESS);
 }

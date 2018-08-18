@@ -319,7 +319,6 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
 #define RETURN_OR_RAISE()                                                      \
         {                                                                      \
                 if (inside != NULL) {                                          \
-                        *inside = 0;                                           \
                         return TURTLE_RETURN_SUCCESS;                          \
                 } else {                                                       \
                         return TURTLE_ERROR_MISSING_DATA(stack);               \
@@ -327,6 +326,7 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
         }
 
         /* Lookup the requested file */
+        if (inside != NULL) *inside = 0;
         if ((longitude < stack->longitude_0) || (latitude < stack->latitude_0))
                 RETURN_OR_RAISE()
         const int ix =
@@ -363,5 +363,6 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
         stack->head = map;
         stack->size++;
 
+        if (inside != NULL) *inside = 1;
         return TURTLE_RETURN_SUCCESS;
 }

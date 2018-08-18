@@ -106,8 +106,8 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                 hx = (longitude - current->meta.x0) / current->meta.dx;
                 hy = (latitude - current->meta.y0) / current->meta.dy;
 
-                if ((hx >= 0.) && (hx <= current->meta.nx) && (hy >= 0.) &&
-                    (hy <= current->meta.ny))
+                if ((hx >= 0.) && (hx < current->meta.nx - 1) && (hy >= 0.) &&
+                    (hy < current->meta.ny - 1))
                         goto interpolate;
         } else if (((int)latitude == client->index_la) &&
             ((int)longitude == client->index_lo)) {
@@ -134,17 +134,18 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                 }
                 hx = (longitude - current->meta.x0) / current->meta.dx;
                 hy = (latitude - current->meta.y0) / current->meta.dy;
-                if ((hx >= 0.) && (hx <= current->meta.nx) && (hy >= 0.) &&
-                    (hy <= current->meta.ny)) {
+                if ((hx >= 0.) && (hx < current->meta.nx - 1) && (hy >= 0.) &&
+                    (hy < current->meta.ny - 1)) {
                         turtle_stack_touch_(stack, current);
+                        if (inside != NULL) *inside = 1;
                         goto update;
                 }
                 current = current->prev;
         }
 
         /* No valid map was found. Let's try to load it */
-        if (turtle_stack_load_(stack, latitude, longitude, inside, error_) !=
-            TURTLE_RETURN_SUCCESS) {
+        if ((turtle_stack_load_(stack, latitude, longitude, inside, error_) !=
+            TURTLE_RETURN_SUCCESS) || ((inside != NULL) && (*inside == 0))) {
                 /* The requested map is not available. Let's record this */
                 client_release(client, 0, error_);
                 client->index_la = (int)latitude;
@@ -164,7 +165,7 @@ update:
         client->index_la = INT_MIN;
         client->index_lo = INT_MIN;
 
-/* Unlock the stack. */
+/* Unlock the stack */
 unlock:
         if ((stack->unlock != NULL) && (stack->unlock() != 0))
                 return TURTLE_ERROR_UNLOCK();
