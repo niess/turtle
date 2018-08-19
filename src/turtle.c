@@ -31,12 +31,12 @@
 void turtle_initialise(turtle_handler_cb * handler)
 {
         /* Set any user supplied error handler */
-        /* TODO: migrate the following if no initialisation needed */
         turtle_handler(handler);
 
 #ifndef TURTLE_NO_TIFF
         /* Register the geotiff16 tags */
-        /* TODO: geotiff16_register(); */
+        extern void turtle_geotiff16_register_(void);
+        turtle_geotiff16_register_();
 #endif
 }
 

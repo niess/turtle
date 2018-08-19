@@ -43,6 +43,41 @@
 #define TIFFTAG_GDAL_METADATA 42112
 #define TIFFTAG_GDAL_NODATA 42113
 
+static const TIFFFieldInfo field_info[] = { { TIFFTAG_GEOPIXELSCALE, -1, -1,
+                                                TIFF_DOUBLE, FIELD_CUSTOM, 1, 1,
+                                                "GeoPixelScale" },
+        { TIFFTAG_INTERGRAPH_MATRIX, -1, -1, TIFF_DOUBLE, FIELD_CUSTOM, 1, 1,
+            "Intergraph TransformationMatrix" },
+        { TIFFTAG_GEOTIEPOINTS, -1, -1, TIFF_DOUBLE, FIELD_CUSTOM, 1, 1,
+            "GeoTiePoints" },
+        { TIFFTAG_GEOKEYDIRECTORY, -1, -1, TIFF_SHORT, FIELD_CUSTOM, 1, 1,
+            "GeoKeyDirectory" },
+        { TIFFTAG_GEODOUBLEPARAMS, -1, -1, TIFF_DOUBLE, FIELD_CUSTOM, 1, 1,
+            "GeoDoubleParams" },
+        { TIFFTAG_GEOASCIIPARAMS, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
+            "GeoASCIIParams" },
+        { TIFFTAG_GDAL_METADATA, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
+            "GDAL_METADATA" },
+        { TIFFTAG_GDAL_NODATA, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0,
+            "GDAL_NODATA" } };
+
+/* Extender for GEOTIFF tags */
+static TIFFExtendProc parent_extender = NULL;
+
+static void default_directory(TIFF * tiff)
+{
+        TIFFMergeFieldInfo(
+            tiff, field_info, sizeof(field_info) / sizeof(field_info[0]));
+        if (parent_extender != NULL) (*parent_extender)(tiff);
+}
+
+/* Register the tag extender to libtiff */
+void turtle_geotiff16_register_(void)
+{
+        parent_extender = TIFFSetTagExtender(default_directory);
+        TIFFSetErrorHandler(NULL); /* Mute error messages */
+}
+
 /* Data for accessing a GEOTIFF file */
 struct geotiff16_io {
         /* Base io object */
@@ -67,8 +102,10 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
 
         /* Initialise the io object */
         io->meta.nx = io->meta.ny = 0;
-        io->meta.x0 = io->meta.y0 = io->meta.z0 = 0.;
-        io->meta.dx = io->meta.dy = io->meta.dz = 0.;
+        io->meta.x0 = io->meta.y0 = 0.;
+        io->meta.dx = io->meta.dy = 0.;
+        io->meta.z0 = -32767.;
+        io->meta.dz = 1.;
         io->meta.projection.type = PROJECTION_NONE;
 
         /* Open the TIFF file */
@@ -90,15 +127,12 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
         if (count == 3) {
                 io->meta.dx = data[0];
                 io->meta.dy = data[1];
-                io->meta.dz = data[2];
         }
         TIFFGetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);
         if (count == 6) {
                 io->meta.x0 = data[3];
                 io->meta.y0 = data[4] + (1. - io->meta.ny) * io->meta.dy;
-                io->meta.z0 = data[5];
         }
-        /* TODO: check range in z */
 
         geotiff16->path = path;
         return TURTLE_RETURN_SUCCESS;
@@ -121,7 +155,7 @@ static double get_z(const struct turtle_map * map, int ix, int iy)
 
 static void set_z(struct turtle_map * map, int ix, int iy, double z)
 {
-        map->data[iy * map->meta.nx + ix] = (uint16_t)(int16_t)z;
+        map->data[iy * map->meta.nx + ix] = (int16_t)z;
 }
 
 static enum turtle_return geotiff16_read(struct turtle_io * io,

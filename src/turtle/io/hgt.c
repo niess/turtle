@@ -126,7 +126,6 @@ static void hgt_close(struct turtle_io * io)
 
 static double get_z(const struct turtle_map * map, int ix, int iy)
 {
-        /* TODO: check this ... */
         iy = map->meta.ny - 1 - iy;
         return (int16_t)ntohs(map->data[iy * map->meta.nx + ix]);
 }
@@ -134,7 +133,7 @@ static double get_z(const struct turtle_map * map, int ix, int iy)
 static void set_z(struct turtle_map * map, int ix, int iy, double z)
 {
         iy = map->meta.ny - 1 - iy;
-        map->data[iy * map->meta.nx + ix] = (uint16_t)(int16_t)htons(z);
+        map->data[iy * map->meta.nx + ix] = (int16_t)htons(z);
 }
 
 static enum turtle_return hgt_read(struct turtle_io * io,
