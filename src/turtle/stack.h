@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
  *
- * Topographic Utilities for Rendering The eLEvation (TURTLE)
+ * Topographic Utilities for tRacking The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -33,9 +33,9 @@ struct turtle_stack {
         struct turtle_map * head;
         int size, max_size;
 
-        /* Callbacks for lock handling */
-        turtle_stack_cb * lock;
-        turtle_stack_cb * unlock;
+        /* Callbacks for managing concurent accesses to the stack */
+        turtle_stack_locker_t * lock;
+        turtle_stack_locker_t * unlock;
 
         /* Lookup data for tile's file names */
         double latitude_0, latitude_delta;

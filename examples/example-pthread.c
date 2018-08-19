@@ -112,14 +112,6 @@ int unlock(void)
         return sem_post(&semaphore);
 }
 
-/* Handler for TURTLE library errors */
-void error_handler(
-    enum turtle_return rc, turtle_function_t * caller, const char * message)
-{
-        fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
-        exit(EXIT_FAILURE);
-}
-
 /* Draw a random number uniformly in [0;1] using the standard C library */
 static double uniform(void) { return ((double)rand()) / RAND_MAX; }
 
@@ -128,7 +120,7 @@ int main()
 {
         /* Initialise the semaphore, the TURTLE library and the stack */
         sem_init(&semaphore, 0, 1);
-        turtle_initialise(error_handler);
+        turtle_initialise();
         turtle_stack_create(&stack, "share/topography", 4, &lock, &unlock);
         srand(time(NULL));
 

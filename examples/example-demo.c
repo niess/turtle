@@ -28,8 +28,7 @@
 /*
  * This example demonstrates various functionalities of the TURTLE library,
  * e.g. handling projection maps, a Global Digital Elevation Model (GDEM), and
- * frame coordinates conversions. It also provides a simple example of TURTLE's
- * error handling using a user defined `turtle_handler` callback.
+ * frame coordinates conversions.
  *
  * Note that you'll need to run `example-projection` first in order to generate
  * the map used in this example.
@@ -41,18 +40,10 @@
 /* The TURTLE library */
 #include "turtle.h"
 
-/* Handler for TURTLE library errors */
-void handle_error(
-    enum turtle_return rc, turtle_function_t * function, const char * message)
-{
-        fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
-        exit(EXIT_FAILURE);
-}
-
 int main()
 {
         /* Initialise the TURTLE library */
-        turtle_initialise(&handle_error);
+        turtle_initialise();
 
         /* Load the RGF93 map dumped by `example-projection` */
         const char * path = "share/data/pdd-30m.png";

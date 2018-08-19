@@ -1,27 +1,29 @@
 # TURTLE
-( **T**opographic **U**tilities for **R**endering **T**he e**LE**vation )
+( **T**opographic **U**tilities for t**R**acking **T**he e**LE**vation )
 
 ## Description
 
 TURTLE is a C99 library for rendering a terrain elevation from various
-**D**igital **E**levation **M**odels (**DEM**s). Its main features are:
+**D**igital **E**levation **M**odels (**DEM**s). It is optimised for tracking
+problems, e.g. Monte-Carlo transport of particles, where only a subset of the
+terrain is sampled, on the fly. Its main features are:
 
 * Support for local projection maps (**UTM**, **Lambert**, **RGF93**) as well
-as for world wide models with tiles, e.g. [SRTMGL1](https://lpdaac.usgs.gov/node/527)
+as for tiled world wide models, e.g. [SRTMGL1](https://lpdaac.usgs.gov/node/527)
 or [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp).
 
 * Provide utilities for frame transforms between the supported projections,
 geodetic coordinates and Cartesian **E**arth-**C**entered, **E**arth-**F**ixed
 (**ECEF**) coordinates.
 
-* Provide a thread safe interface for accessing world wide **DEM**s,
+* Provide a thread safe interface for accessing **DEM**s from multiple sources,
 optimised for tracking problems. It allows to balance execution speed, I/Os and
 memory usage.
 
-The supported data formats for loading maps are: **GEOTIFF**, **GRD**, **HGT**
-and **PNG**. Binary formats must be 16b and grayscale. Maps can only be dumped
-to PNG though. Note that whe doing so, the meta-data of PNG maps are enriched
-with a custom header.
+Note that TURTLE is not an ~image library~. It can only load a few commonly
+used data formats for geographic maps, i.e: **GEOTIFF**, **GRD** and **HGT**.
+Binary data formats must be 16b and grayscale. In addition, maps can be loaded
+and dumped in **PNG**, enriched with a custom header (as a `tEXt` chunk).
 
 ## Installation
 

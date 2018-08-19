@@ -43,7 +43,8 @@
 
 /*
  * The turtle objects are declared globally. This allows us to define a simple
- * error handler with a gracefull exit to the OS.
+ * error handler with a gracefull exit to the OS. It also provides a simple
+ * example of error handler with clean memory management.
  */
 static struct turtle_map * geoid = NULL;
 static struct turtle_map * map = NULL;
@@ -62,7 +63,7 @@ void exit_gracefully(enum turtle_return rc)
 }
 
 /* Handler for TURTLE library errors */
-void error_handler(
+void handle_error(
     enum turtle_return rc, turtle_function_t * caller, const char * message)
 {
         fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
@@ -72,7 +73,8 @@ void error_handler(
 int main()
 {
         /* Initialise the TURTLE library */
-        turtle_initialise(error_handler);
+        turtle_error_handler_set(&handle_error);
+        turtle_initialise();
 
         /* Create the stack */
         turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);

@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
  *
- * Topographic Utilities for Rendering The eLEvation (TURTLE)
+ * Topographic Utilities for tRacking The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -23,11 +23,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* The library user supplied error handler. */
-static turtle_handler_cb * _handler = NULL;
+/* Default handler for TURTLE library errors */
+void handle_error(
+    enum turtle_return rc, turtle_function_t * function, const char * message)
+{
+        fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
+        exit(EXIT_FAILURE);
+}
 
-/* Setter for the error handler. */
-void turtle_handler(turtle_handler_cb * handler) { _handler = handler; }
+/* The library user supplied error handler */
+static turtle_error_handler_t * _handler = &handle_error;
+
+/* Getter for the error handler */
+turtle_error_handler_t * turtle_error_handler_get(void)
+{
+        return _handler;
+}
+
+/* Setter for the error handler */
+void turtle_error_handler_set(turtle_error_handler_t * handler)
+{
+        _handler = handler;
+}
 
 /* Utility function for formating an error */
 enum turtle_return turtle_error_format_(struct turtle_error_context * error_,

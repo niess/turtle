@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
  *
- * Topographic Utilities for Rendering The eLEvation (TURTLE)
+ * Topographic Utilities for tRacking The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -189,8 +189,8 @@ static enum turtle_return png16_open(struct turtle_io * io, const char * path,
                                         if (value->end > value->start) {
                                                 text[value->end] = '\0';
                                                 if (turtle_projection_configure_(
-                                                        text + value->start,
                                                         &io->meta.projection,
+                                                        text + value->start,
                                                         error_) !=
                                                     TURTLE_RETURN_SUCCESS)
                                                         goto error;

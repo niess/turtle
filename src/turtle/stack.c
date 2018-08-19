@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
  *
- * Topographic Utilities for Rendering The eLEvation (TURTLE)
+ * Topographic Utilities for tRacking The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -42,8 +42,8 @@
 
 /* Create a new stack of maps */
 enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
-    const char * path, int size, turtle_stack_cb * lock,
-    turtle_stack_cb * unlock)
+    const char * path, int size, turtle_stack_locker_t * lock,
+    turtle_stack_locker_t * unlock)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stack_create);
         *stack = NULL;

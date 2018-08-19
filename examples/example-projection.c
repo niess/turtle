@@ -27,7 +27,8 @@
 
 /*
  * This example shows how to project data from a Global Digital Elevation Model
- * (GDEM) onto a local map dumped to disk.
+ * (GDEM) onto a local map dumped to disk. It also provides a simple example
+ * of error handler with clean memory management.
  *
  * Note that for this example to work you'll need the tile at (45N, 2E) from
  * a global model, e.g. N45E002.hgt for SRTMGL1. This tile is assumed to be
@@ -67,15 +68,16 @@ void handle_error(
 
 int main()
 {
-        /* Initialise the TURTLE API with an error handler */
-        turtle_initialise(&handle_error);
+        /* Initialise the TURTLE API with a custom error handler */
+        turtle_error_handler_set(&handle_error);
+        turtle_initialise();
 
         /* Create the stack of global elevation data */
         turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
 
         /*
          * Create a RGF93 local projection map, centered on the Auberge des
-         * Gros Manaux at Col de Ceyssat, Auvergne, France.
+         * Gros Manaux at Col de Ceyssat, Auvergne, France
          */
         const int nx = 201;
         const int ny = 201;

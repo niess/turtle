@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
  *
- * Topographic Utilities for Rendering The eLEvation (TURTLE)
+ * Topographic Utilities for tRacking The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -59,7 +59,7 @@ enum turtle_return turtle_projection_create(
         /* Parse the config from the name string */
         *projection = NULL;
         struct turtle_projection tmp;
-        if (turtle_projection_configure_(name, &tmp, error_) !=
+        if (turtle_projection_configure_(&tmp, name, error_) !=
             TURTLE_RETURN_SUCCESS)
                 return TURTLE_ERROR_RAISE();
 
@@ -95,8 +95,9 @@ static int locate_word(const char ** str)
 }
 
 /* Configure a projection from a name string */
-enum turtle_return turtle_projection_configure_(const char * name,
-    struct turtle_projection * projection, struct turtle_error_context * error_)
+enum turtle_return turtle_projection_configure_(
+    struct turtle_projection * projection, const char * name,
+    struct turtle_error_context * error_)
 {
         projection->type = PROJECTION_NONE;
         if (name == NULL) {
@@ -171,10 +172,10 @@ exit:
 }
 
 enum turtle_return turtle_projection_configure(
-    const char * name, struct turtle_projection * projection)
+    struct turtle_projection * projection, const char * name)
 {
         TURTLE_ERROR_INITIALISE(&turtle_projection_configure);
-        turtle_projection_configure_(name, projection, error_);
+        turtle_projection_configure_(projection, name, error_);
         return TURTLE_ERROR_RAISE();
 }
 

@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Université Clermont Auvergne, CNRS/IN2P3, LPC
  * Author: Valentin NIESS (niess@in2p3.fr)
  *
- * Topographic Utilities for Rendering The eLEvation (TURTLE)
+ * Topographic Utilities for tRacking The eLEvation (TURTLE)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -28,11 +28,8 @@
 #include "turtle.h"
 
 /* Initialise the TURTLE library */
-void turtle_initialise(turtle_handler_cb * handler)
+void turtle_initialise(void)
 {
-        /* Set any user supplied error handler */
-        turtle_handler(handler);
-
 #ifndef TURTLE_NO_TIFF
         /* Register the geotiff16 tags */
         extern void turtle_geotiff16_register_(void);
