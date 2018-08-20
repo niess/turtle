@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 /* TinyDir library */
-#include "tinydir.h"
+#include "deps/tinydir.h"
 /* TURTLE library */
 #include "turtle.h"
 #include "turtle/error.h"

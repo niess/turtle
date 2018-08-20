@@ -27,24 +27,24 @@ and dumped in **PNG**, enriched with a custom header (as a `tEXt` chunk).
 
 ## Installation
 
-Currently there is no automatic build procedure. If on a Linux box you might
-try and adapt the provided `Makefile`. The source code conforms to C99. For
-loading or dumping **DEM**s, you will need the following libraries and packages:
+Currently the TURTLE library only supports Linux systems. An example of
+[`Makefile`](Makefile) is shipped with the sources. The following should
+build TURTLE (as a shared library: `libturtle.so`) and the examples:
+```bash
+make && make examples
+```
 
-* **libpng** and [JSMN][JSMN] for local maps.
-* **libtiff** for geotiff data, e.g. [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp)
-  or [GEBCO](http://www.gebco.net/).
-* [TinyDir][TinyDir] for OS independent directories management.
+Note that the TURTLE source code conforms to C99 and has little dependencies
+except on the C89 standard library. Note however that for loading or dumping
+**DEM**s, you might also need the following external libraries:
 
-Note that build options allow to disable either or both of PNG or TIFF formats,
-and their dependencies, if not needed.
+* **libpng** for custom TURTLE dumps.
+* **libtiff** for loading GEOTIFF data, e.g.
+  [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp) or
+  [GEBCO](http://www.gebco.net/).
 
-Note also that while **libpng** and **libtiff** are expected to be installed
-on your system, you can directly get [JSMN][JSMN] and [TinyDir][TinyDir] as
-submodules, e.g. using `git clone --recursive`.
-
-[JSMN]: https://github.com/zserge/jsmn
-[TinyDIr]: https://github.com/cxong/tinydir
+Build options in the Makefile allow to disable either or both of PNG or TIFF
+formats, and their dependencies, if not needed.
 
 ## Documentation
 
@@ -54,5 +54,6 @@ You might directly check the [examples](examples) as well.
 ## License
 
 The TURTLE library is  under the **GNU LGPLv3** license. See the provided
-`LICENSE` and `COPYING.LESSER` files. The [examples](examples) however have a
-separate public domain license allowing them to be copied without restrictions.
+[`LICENSE`](LICENSE) and [`COPYING.LESSER`](COPYING.LESSER) files. The
+[examples](examples) however have a separate public domain license allowing
+them to be copied without restrictions.

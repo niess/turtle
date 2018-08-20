@@ -1,13 +1,7 @@
-# Ignore any library object.
-lib
-*.so
-
-# Ignore any binaries.
-*.o
+# Ignore library and binaries
 bin
-
-# Ignore examples output.
-*.png
+build
+lib
 
 # Ignore shared data
 share

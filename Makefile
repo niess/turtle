@@ -1,17 +1,16 @@
 # Default compilation flags
-DEPS_DIR := deps
-
-CFLAGS := -O2 -std=c99 -pedantic -Wall -fPIC -Wfatal-errors
+CFLAGS := -O3 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
-OBJS := client.o ecef.o error.o io.o map.o projection.o stack.o stepper.o      \
-	turtle.o
-INCLUDES := -Iinclude -Isrc -I$(DEPS_DIR)/tinydir
+INCLUDES := -Iinclude -Isrc
+
+OBJS := build/client.o build/ecef.o build/error.o build/io.o build/map.o       \
+	build/projection.o build/stack.o build/stepper.o build/turtle.o
 
 # Flag for GEOTIFF files
 TURTLE_USE_TIFF := 1
 ifeq ($(TURTLE_USE_TIFF), 1)
 	LIBS += -ltiff
-	OBJS += geotiff16.o
+	OBJS += build/geotiff16.o
 else
 	CFLAGS += -DTURTLE_NO_TIFF
 endif
@@ -19,7 +18,7 @@ endif
 # Flag for GRD files
 TURTLE_USE_GRD := 1
 ifeq ($(TURTLE_USE_GRD), 1)
-	OBJS += grd.o
+	OBJS += build/grd.o
 else
 	CFLAGS += -DTURTLE_NO_GRD
 endif
@@ -27,7 +26,7 @@ endif
 # Flag for HGT files
 TURTLE_USE_HGT := 1
 ifeq ($(TURTLE_USE_HGT), 1)
-	OBJS += hgt.o
+	OBJS += build/hgt.o
 else
 	CFLAGS += -DTURTLE_NO_HGT
 endif
@@ -38,36 +37,39 @@ ifeq ($(TURTLE_USE_PNG), 1)
 	PACKAGE := libpng
 	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
 	LIBS += $(shell pkg-config --libs $(PACKAGE))
-	OBJS += jsmn.o png16.o
-	INCLUDES += -I$(DEPS_DIR)/jsmn
+	OBJS += build/jsmn.o build/png16.o
 else
 	CFLAGS += -DTURTLE_NO_PNG
 endif
 
-# Available builds.
+# Available builds
 .PHONY: lib clean examples
 
-# Rules for building the library.
+# Rules for building the library
 lib: lib/libturtle.so
-	@rm -f *.o
 
 lib/libturtle.so: $(OBJS)
 	@mkdir -p lib
 	@gcc -o $@ $(CFLAGS) -shared $(INCLUDES) $(OBJS) $(LIBS)
 
-%.o: src/turtle/%.c src/turtle/%.h
+build/%.o: src/turtle/%.c src/turtle/%.h
+	@mkdir -p build
 	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-%.o: src/turtle/%.c
+build/%.o: src/turtle/%.c
+	@mkdir -p build
 	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-%.o: src/turtle/io/%.c
+build/%.o: src/turtle/io/%.c
+	@mkdir -p build
 	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-%.o: src/%.c include/%.h
+build/%.o: src/%.c include/%.h
+	@mkdir -p build
 	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-%.o: $(DEPS_DIR)/jsmn/%.c $(DEPS_DIR)/jsmn/%.h
+build/%.o: src/deps/%.c src/deps/%.h
+	@mkdir -p build
 	@gcc $(CFLAGS) -o $@ -c $<
 
 # Rules for building the examples
@@ -85,4 +87,4 @@ bin/example-%: examples/example-%.c
 
 # Clean-up rule
 clean:
-	@rm -rf bin lib *.o
+	@rm -rf bin lib build

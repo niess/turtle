@@ -27,12 +27,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-/* Linux library */
+/* Endianess utilities */
 #include <arpa/inet.h>
 /* PNG library */
 #include <png.h>
-/* JSON library */
-#include "jsmn.h"
+/* JSON parser */
+#include "deps/jsmn.h"
 /* TURTLE library */
 #include "turtle/io.h"
 
