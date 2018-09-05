@@ -36,6 +36,7 @@
  */
 
 /* C89 standard library */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 /* The TURTLE library */
@@ -70,8 +71,16 @@ void handle_error(
         exit_gracefully(EXIT_FAILURE);
 }
 
-int main()
+int main(int argc, char * argv[])
 {
+        /* Parse the arguments */
+        double azimuth = 26., elevation = 5.;
+        double stepper_range = 0., step = 0.;
+        if (argc && --argc) azimuth = atof(*++argv);
+        if (argc && --argc) elevation = atof(*++argv);
+        if (argc && --argc) stepper_range = atof(*++argv);
+        if (argc && --argc) step = atof(*++argv);
+        
         /* Initialise the TURTLE library */
         turtle_error_handler_set(&handle_error);
         turtle_initialise();
@@ -84,6 +93,7 @@ int main()
          * Gros Manaux at Col de Ceyssat, Auvergne, France.
          */
         turtle_map_load(&map, "share/data/pdd-30m.png");
+        struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Load the EGM96 geoid map */
         turtle_map_load(&geoid, "share/data/egm96.png");
@@ -91,31 +101,71 @@ int main()
         /* Create the ECEF stepper and configure it */
         turtle_stepper_create(&stepper);
         turtle_stepper_geoid_set(stepper, geoid);
-        turtle_stepper_range_set(stepper, 100.);
+        turtle_stepper_range_set(stepper, stepper_range);
         turtle_stepper_add_flat(stepper, 0.);
         turtle_stepper_add_stack(stepper, stack);
         turtle_stepper_add_map(stepper, map);
 
-        /* Do some stepping */
+        /* Get the initial position and direction in ECEF */
         const double latitude = 45.76415653, longitude = 2.95536402;
-        double position[3], direction[3], undulation;
+        double x0, y0, z0;
+        turtle_projection_project(rgf93, latitude, longitude, &x0, &y0);
+        turtle_map_elevation(map, x0, y0, &z0, NULL);
+        z0 += 0.5;
+        
+        double undulation;
         turtle_map_elevation(geoid, longitude, latitude, &undulation, NULL);
-        turtle_ecef_from_geodetic(
-            latitude, longitude, 1080.86 + undulation, position);
-        turtle_ecef_from_horizontal(latitude, longitude, 26., 5., direction);
+        z0 += undulation;
+        
+        double position[3], direction[3];
+        turtle_ecef_from_geodetic(latitude, longitude, z0, position);
+        turtle_ecef_from_horizontal(
+            latitude, longitude, azimuth, elevation, direction);
 
-        double s;
-        for (s = 0.; s <= 5E+03; s += 10.) {
+        /* Do the stepping */
+        double s = 0., rock_length = 0.;
+        int inside = 0;
+        for (;;) {
                 double r[3] = { position[0] + direction[0] * s,
                         position[1] + direction[1] * s,
                         position[2] + direction[2] * s };
                 double altitude, ground_elevation;
-                int layer;
                 turtle_stepper_step(stepper, r, NULL, NULL, &altitude,
-                    &ground_elevation, &layer);
-                printf("%2d %.5lE %.5lE %.5lE\n", layer, s, altitude,
-                    ground_elevation);
+                    &ground_elevation, NULL);
+                
+                const double d = altitude - ground_elevation;
+                double ds = (step <= 0.) ? fabs(d) : step;
+                if (inside != (d >= 0.)) {
+                        /* A change of medium occured. Let us locate the
+                         * change of medium by dichotomy.
+                         */
+                        double ds0 = 0., ds1 = ds;
+                        while (ds1 - ds0 > 1E-08) {
+                                const double ds2 = 0.5 * (ds0 + ds1);
+                                double r1[3] = { r[0] + direction[0] * ds2,
+                                        r[1] + direction[1] * ds2,
+                                        r[2] + direction[2] * ds2 };
+                                double altitude1, ground_elevation1;
+                                turtle_stepper_step(stepper, r1, NULL, NULL,
+                                    &altitude1, &ground_elevation1, NULL);
+                                const double d1 = altitude1 - ground_elevation1;
+                                if (inside != (d1 >= 0.))
+                                        ds0 = ds2;
+                                else
+                                        ds1 = ds2;
+                        }
+                        ds = ds1;
+                }
+                
+                /* Update the step length and the rock depth */
+                s += ds;
+                if (inside) rock_length += ds;
+                inside = (d < 0.);
+                
+                if (altitude >= 2E+03) break;
         }
-
+        
+        /* Log the result and exit */
+        printf("%.6lf\n", rock_length);
         exit_gracefully(TURTLE_RETURN_SUCCESS);
 }
