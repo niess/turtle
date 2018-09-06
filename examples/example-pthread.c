@@ -121,7 +121,7 @@ int main()
         /* Initialise the semaphore, the TURTLE library and the stack */
         sem_init(&semaphore, 0, 1);
         turtle_initialise();
-        turtle_stack_create(&stack, "share/topography", 4, &lock, &unlock);
+        turtle_stack_create(&stack, "share/topography", 0, &lock, &unlock);
         srand(time(NULL));
 
         /*

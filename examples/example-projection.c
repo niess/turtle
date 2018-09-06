@@ -73,7 +73,7 @@ int main()
         turtle_initialise();
 
         /* Create the stack of global elevation data */
-        turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
+        turtle_stack_create(&stack, "share/topography", 0, NULL, NULL);
 
         /*
          * Create a RGF93 local projection map, centered on the Auberge des

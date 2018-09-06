@@ -93,7 +93,7 @@ int main()
          * used for building the map
          */
         struct turtle_stack * stack;
-        turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
+        turtle_stack_create(&stack, "share/topography", 0, NULL, NULL);
 
         /* Get the orgine's elevation from the stack */
         double elevation_gdem;

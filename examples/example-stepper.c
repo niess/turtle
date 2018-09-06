@@ -32,7 +32,8 @@
  * Note that for this example to work you'll need the 4 tiles at (45N, 2E),
  * (45N, 3E), (46N, 2E), and (46N, 3E) from a global model, e.g. N45E002.hgt,
  * etc ... for SRTMGL1. These tiles are assumed to be located in a folder named
- * `share/topography`.
+ * `share/topography`. In addition you'll need the local map created by 
+ * `example-projection`.
  */
 
 /* C89 standard library */
@@ -86,7 +87,7 @@ int main(int argc, char * argv[])
         turtle_initialise();
 
         /* Create the stack */
-        turtle_stack_create(&stack, "share/topography", 1, NULL, NULL);
+        turtle_stack_create(&stack, "share/topography", 0, NULL, NULL);
 
         /*
          * Get the RGF93 local projection map, centered on the Auberge des

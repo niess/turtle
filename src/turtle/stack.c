@@ -24,6 +24,7 @@
 
 /* C89 standard library */
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,7 +144,7 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
         /* Initialise the handle */
         (*stack)->head = NULL;
         (*stack)->size = 0;
-        (*stack)->max_size = size;
+        (*stack)->max_size = (size > 0) ? size : INT_MAX;
         (*stack)->lock = lock;
         (*stack)->unlock = unlock;
         (*stack)->latitude_0 = lat_min;

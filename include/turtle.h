@@ -607,7 +607,7 @@ TURTLE_API void turtle_ecef_to_horizontal(double latitude, double longitude,
  *
  * @param stack         The stack object
  * @param path          The path where elevation data are stored, or `NULL`.
- * @param size          The number of elevation maps kept in memory.
+ * @param size          The maximum number of elevation maps kept in memory.
  * @param lock          A callback for locking critical sections, or `NULL`.
  * @param unlock        A callback for unlocking critical sections, or `NULL`.
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
@@ -615,7 +615,8 @@ TURTLE_API void turtle_ecef_to_horizontal(double latitude, double longitude,
  *
  * Allocate memory for a new stack and initialise it. Use `turtle_stack_destroy`
  * in order to recover any memory allocated subsequently. The stack is
- * initialised as empty.
+ * initialised as empty. **Note** that providing a null or negative stack *size*
+ * results in all maps being kept in memory.
  *
  * __Warnings__
  *
