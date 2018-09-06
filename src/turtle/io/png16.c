@@ -175,9 +175,8 @@ static enum turtle_return png16_open(struct turtle_io * io, const char * path,
                         memset(done, 0x0, sizeof(done));
                         for (j = 0, key = tokens + 3, value = tokens + 4;
                              j < N_FIELDS; j++, key += 2, value += 2) {
-                                if (!done[0] &&
-                                    (json_strcmp(text, key, "projection") ==
-                                        0)) {
+                                if (!done[0] && (json_strcmp(text, key,
+                                                     "projection") == 0)) {
                                         if (value->type != JSMN_STRING) {
                                                 TURTLE_ERROR_VREGISTER(
                                                     TURTLE_RETURN_BAD_FORMAT,
@@ -206,9 +205,8 @@ static enum turtle_return png16_open(struct turtle_io * io, const char * path,
                                                 goto error;
                                         }
 
-                                        if (!done[1] &&
-                                            (json_strcmp(text, key, "x0") ==
-                                                0)) {
+                                        if (!done[1] && (json_strcmp(text, key,
+                                                             "x0") == 0)) {
                                                 json_sscanf(
                                                     text, value, &io->meta.x0);
                                                 done[1] = 1;

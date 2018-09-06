@@ -673,6 +673,24 @@ TURTLE_API void turtle_stack_destroy(struct turtle_stack ** stack);
 TURTLE_API enum turtle_return turtle_stack_clear(struct turtle_stack * stack);
 
 /**
+ * Load the stack elevation data into memory
+ *
+ * @param stack    The stack object
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below
+ *
+ * Load the stack elevation data into memory, until the max stack size is
+ * reached or all tiles have been loaded.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_LOCK_ERROR      The lock couldn't be acquired
+ *
+ *    TURTLE_RETURN_UNLOCK_ERROR    The lock couldn't be released
+ */
+TURTLE_API enum turtle_return turtle_stack_load(struct turtle_stack * stack);
+
+/**
  * Get the elevation at geodetic coordinates
  *
  * @param stack        The stack object

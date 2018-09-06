@@ -73,7 +73,7 @@ static enum turtle_return grd_open(struct turtle_io * io, const char * path,
         /* Parse the meta data from the header */
         double h[6];
         if (fscanf(grd->fid, "%lf %lf %lf %lf %lf %lf", h, h + 1, h + 2, h + 3,
-            h + 4, h + 5) != 6) {
+                h + 4, h + 5) != 6) {
                 io->close(io);
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "could not read the header of file `%s'", path);
@@ -142,12 +142,12 @@ static enum turtle_return grd_read(struct turtle_io * io,
         int i = 0;
         char buffer[128];
         while (fgets(buffer, sizeof(buffer), grd->fid) != NULL) {
-                char * start = buffer, * end;
+                char *start = buffer, *end;
                 for (;; i++) {
                         const double d = strtod(start, &end);
                         if (start == end) break;
                         start = end;
-                        int ix  = i % io->meta.nx;
+                        int ix = i % io->meta.nx;
                         int iy = i / io->meta.nx;
                         set_z(map, ix, iy, d);
                 }

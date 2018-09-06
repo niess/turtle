@@ -145,7 +145,8 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
 
         /* No valid map was found. Let's try to load it */
         if ((turtle_stack_load_(stack, latitude, longitude, inside, error_) !=
-            TURTLE_RETURN_SUCCESS) || ((inside != NULL) && (*inside == 0))) {
+                TURTLE_RETURN_SUCCESS) ||
+            ((inside != NULL) && (*inside == 0))) {
                 /* The requested map is not available. Let's record this */
                 client_release(client, 0, error_);
                 client->index_la = (int)latitude;
@@ -175,7 +176,7 @@ unlock:
                 return TURTLE_ERROR_RAISE();
         }
 
-        /* Interpolate the elevation */
+/* Interpolate the elevation */
 interpolate:
         return turtle_map_elevation_(
             client->map, longitude, latitude, elevation, inside, error_);

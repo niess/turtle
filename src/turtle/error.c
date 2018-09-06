@@ -35,10 +35,7 @@ void handle_error(
 static turtle_error_handler_t * _handler = &handle_error;
 
 /* Getter for the error handler */
-turtle_error_handler_t * turtle_error_handler_get(void)
-{
-        return _handler;
-}
+turtle_error_handler_t * turtle_error_handler_get(void) { return _handler; }
 
 /* Setter for the error handler */
 void turtle_error_handler_set(turtle_error_handler_t * handler)

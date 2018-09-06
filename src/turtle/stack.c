@@ -222,7 +222,7 @@ void turtle_stack_destroy(struct turtle_stack ** stack)
         *stack = NULL;
 }
 
-/* Clear the stack from unused maps. */
+/* Clear the stack from unused maps */
 enum turtle_return turtle_stack_clear(struct turtle_stack * stack)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stack_clear);
@@ -236,6 +236,57 @@ enum turtle_return turtle_stack_clear(struct turtle_stack * stack)
                 return TURTLE_ERROR_UNLOCK();
         else
                 return TURTLE_RETURN_SUCCESS;
+}
+
+/* Load the stack elevation data into memory */
+enum turtle_return turtle_stack_load(struct turtle_stack * stack)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_stack_load);
+        if ((stack->lock != NULL) && (stack->lock() != 0))
+                return TURTLE_ERROR_LOCK();
+
+        double x = stack->longitude_0 + 0.5 * stack->longitude_delta;
+        double y = stack->latitude_0 + 0.5 * stack->latitude_delta;
+        struct turtle_map * head = stack->head;
+        while (stack->size < stack->max_size) {
+                /* First, let us check the initial stack */
+                int load = 1;
+                struct turtle_map * map = head;
+                while (map != NULL) {
+                        const double hx = (x - map->meta.x0) / map->meta.dx;
+                        const double hy = (y - map->meta.y0) / map->meta.dy;
+
+                        if ((hx >= 0.) && (hx <= map->meta.nx) && (hy >= 0.) &&
+                            (hy <= map->meta.ny)) {
+                                load = 0;
+                                break;
+                        }
+                        map = map->prev;
+                }
+
+                if (load) {
+                        int inside;
+                        if (turtle_stack_load_(stack, y, x, &inside, error_) !=
+                            TURTLE_RETURN_SUCCESS)
+                                break;
+                }
+
+                /* Update the coordinates and check for termination */
+                x += stack->longitude_delta;
+                if (x > stack->longitude_0 +
+                        stack->longitude_n * stack->longitude_delta) {
+                        y += stack->latitude_delta;
+                        if (y > stack->latitude_0 +
+                                stack->latitude_n * stack->latitude_delta)
+                                break;
+                        x = stack->longitude_0 + 0.5 * stack->longitude_delta;
+                }
+        }
+
+        if ((stack->unlock != NULL) && (stack->unlock() != 0))
+                return TURTLE_ERROR_UNLOCK();
+        else
+                return TURTLE_ERROR_RAISE();
 }
 
 /* Get the elevation at the given geodetic coordinates */
@@ -257,7 +308,7 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                 if ((hx < 0.) || (hx > head->meta.nx) || (hy < 0.) ||
                     (hy > head->meta.ny)) {
                         /* The requested coordinates are not in the top
-                         * amps. Let's check the full stack */
+                         * maps. Let's check the full stack */
                         struct turtle_map * map = head->prev;
                         while (map != NULL) {
                                 hx = (longitude - map->meta.x0) / map->meta.dx;

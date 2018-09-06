@@ -38,8 +38,8 @@ struct turtle_error_context {
 
 /* Helper macros for managing errors */
 #define TURTLE_ERROR_INITIALISE(caller)                                        \
-        struct turtle_error_context error_data = { .code =                     \
-                                                       TURTLE_RETURN_SUCCESS,  \
+        struct turtle_error_context error_data = {.code =                      \
+                                                      TURTLE_RETURN_SUCCESS,   \
                 .function = (turtle_function_t *)caller };                     \
         struct turtle_error_context * error_ = &error_data;
 
