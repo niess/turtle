@@ -986,13 +986,36 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
  * data
- *
- *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated
  */
 TURTLE_API enum turtle_return turtle_stepper_step(
     struct turtle_stepper * stepper, const double * position, double * latitude,
     double * longitude, double * altitude, double * ground_elevation,
     int * layer);
+
+/**
+ * Convert a geograhic location to an ECEF one
+ *
+ * @param stepper              The stepper object
+ * @param latitude             The geodetic latitude
+ * @param longitude            The geodetic longitude
+ * @param height               The height above ground
+ * @param position             The corresponding ECEF position
+ * @param layer                The corresponding data layer
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below
+ *
+ * Inspect the stepper's data stack and provide the top most ECEF position.
+ * If no valid layer was found a negative *layer* value is returned, or an
+ * error is raised if *layer* points to `NULL`.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
+ * data
+ */
+enum turtle_return turtle_stepper_position(struct turtle_stepper * stepper,
+    double latitude, double longitude, double height, double * position,
+    int * layer_depth);
 
 #ifdef __cplusplus
 }

@@ -28,11 +28,11 @@
 /*
  * This example illustrates how to step through elevation data with a
  * `turtle_stepper`, using Cartesian ECEF coordinates.
- * 
+ *
  * Note that for this example to work you'll need the 4 tiles at (45N, 2E),
  * (45N, 3E), (46N, 2E), and (46N, 3E) from a global model, e.g. N45E002.hgt,
  * etc ... for SRTMGL1. These tiles are assumed to be located in a folder named
- * `share/topography`. In addition you'll need the local map created by 
+ * `share/topography`. In addition you'll need the local map created by
  * `example-projection`.
  */
 
@@ -81,7 +81,7 @@ int main(int argc, char * argv[])
         if (argc && --argc) elevation = atof(*++argv);
         if (argc && --argc) stepper_range = atof(*++argv);
         if (argc && --argc) step = atof(*++argv);
-        
+
         /* Initialise the TURTLE library */
         turtle_error_handler_set(&handle_error);
         turtle_initialise();
@@ -94,7 +94,6 @@ int main(int argc, char * argv[])
          * Gros Manaux at Col de Ceyssat, Auvergne, France.
          */
         turtle_map_load(&map, "share/data/pdd-30m.png");
-        struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Load the EGM96 geoid map */
         turtle_map_load(&geoid, "share/data/egm96.png");
@@ -109,17 +108,9 @@ int main(int argc, char * argv[])
 
         /* Get the initial position and direction in ECEF */
         const double latitude = 45.76415653, longitude = 2.95536402;
-        double x0, y0, z0;
-        turtle_projection_project(rgf93, latitude, longitude, &x0, &y0);
-        turtle_map_elevation(map, x0, y0, &z0, NULL);
-        z0 += 0.5;
-        
-        double undulation;
-        turtle_map_elevation(geoid, longitude, latitude, &undulation, NULL);
-        z0 += undulation;
-        
         double position[3], direction[3];
-        turtle_ecef_from_geodetic(latitude, longitude, z0, position);
+        turtle_stepper_position(
+            stepper, latitude, longitude, 0.5, position, NULL);
         turtle_ecef_from_horizontal(
             latitude, longitude, azimuth, elevation, direction);
 
@@ -131,9 +122,9 @@ int main(int argc, char * argv[])
                         position[1] + direction[1] * s,
                         position[2] + direction[2] * s };
                 double altitude, ground_elevation;
-                turtle_stepper_step(stepper, r, NULL, NULL, &altitude,
-                    &ground_elevation, NULL);
-                
+                turtle_stepper_step(
+                    stepper, r, NULL, NULL, &altitude, &ground_elevation, NULL);
+
                 const double d = altitude - ground_elevation;
                 double ds = (step <= 0.) ? fabs(d) : step;
                 if (inside != (d >= 0.)) {
@@ -157,15 +148,15 @@ int main(int argc, char * argv[])
                         }
                         ds = ds1;
                 }
-                
+
                 /* Update the step length and the rock depth */
                 s += ds;
                 if (inside) rock_length += ds;
                 inside = (d < 0.);
-                
+
                 if (altitude >= 2E+03) break;
         }
-        
+
         /* Log the result and exit */
         printf("%.6lf\n", rock_length);
         exit_gracefully(TURTLE_RETURN_SUCCESS);

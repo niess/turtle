@@ -32,6 +32,10 @@ typedef enum turtle_return turtle_stepper_stepper_t(
     const double * position, int has_geodetic, double * geographic,
     double * ground_elevation, int * inside);
 
+typedef void turtle_stepper_elevator_t(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, double latitude, double longitude,
+    double * ground_elevation, int * inside);
+
 struct turtle_error_context;
 typedef enum turtle_return turtle_stepper_cleaner_t(
     struct turtle_stepper_layer * layer, struct turtle_error_context * error_);
@@ -47,6 +51,7 @@ struct turtle_stepper_layer {
         struct turtle_stepper_layer * previous;
         struct turtle_stepper_layer * next;
         turtle_stepper_stepper_t * step;
+        turtle_stepper_elevator_t * elevation;
         turtle_stepper_cleaner_t * clean;
         union {
                 struct turtle_client * client;

@@ -204,6 +204,34 @@ static enum turtle_return stepper_step_flat(struct turtle_stepper * stepper,
         return TURTLE_RETURN_SUCCESS;
 }
 
+static void stepper_elevation_stack(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, double latitude, double longitude,
+    double * ground_elevation, int * inside)
+{
+        *inside = 0;
+        turtle_stack_elevation(
+            layer->a.stack, latitude, longitude, ground_elevation, inside);
+}
+
+static void stepper_elevation_map(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, double latitude, double longitude,
+    double * ground_elevation, int * inside)
+{
+        struct turtle_projection * projection =
+            turtle_map_projection(layer->a.map);
+        double x, y;
+        turtle_projection_project(projection, latitude, longitude, &x, &y);
+        turtle_map_elevation(layer->a.map, x, y, ground_elevation, inside);
+}
+
+static void stepper_elevation_flat(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, double latitude, double longitude,
+    double * ground_elevation, int * inside)
+{
+        *inside = 1;
+        *ground_elevation = layer->a.ground_level;
+}
+
 static enum turtle_return stepper_clean_client(
     struct turtle_stepper_layer * layer, struct turtle_error_context * error_)
 {
@@ -245,6 +273,7 @@ enum turtle_return turtle_stepper_add_stack(
                 }
                 return TURTLE_ERROR_MEMORY();
         }
+        layer->elevation = &stepper_elevation_stack;
         if (client != NULL) {
                 layer->step = &stepper_step_client;
                 layer->clean = &stepper_clean_client;
@@ -270,6 +299,7 @@ enum turtle_return turtle_stepper_add_map(
         struct turtle_stepper_layer * layer = malloc(sizeof(*layer));
         if (layer == NULL) return TURTLE_ERROR_MEMORY();
         layer->step = &stepper_step_map;
+        layer->elevation = &stepper_elevation_map;
         layer->clean = NULL;
         layer->a.map = map;
 
@@ -288,6 +318,7 @@ enum turtle_return turtle_stepper_add_flat(
         struct turtle_stepper_layer * layer = malloc(sizeof(*layer));
         if (layer == NULL) return TURTLE_ERROR_MEMORY();
         layer->step = &stepper_step_flat;
+        layer->elevation = &stepper_elevation_flat;
         layer->clean = NULL;
         layer->a.ground_level = ground_level;
 
@@ -446,6 +477,49 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         if (altitude != NULL) *altitude = geographic[2];
         update_(stepper, position, geographic, ground, depth);
         if (layer_depth != NULL) {
+                *layer_depth = -1;
+                return TURTLE_RETURN_SUCCESS;
+        } else {
+                return TURTLE_ERROR_MESSAGE(
+                    TURTLE_RETURN_DOMAIN_ERROR, "no valid layer");
+        }
+}
+
+enum turtle_return turtle_stepper_position(struct turtle_stepper * stepper,
+    double latitude, double longitude, double height, double * position,
+    int * layer_depth)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_position);
+
+        /* Loop over layers and locate the proper data */
+        int depth;
+        struct turtle_stepper_layer * layer;
+        double ground = 0.;
+        for (layer = stepper->layers, depth = 0; layer != NULL;
+             layer = layer->previous, depth++) {
+                int inside;
+                layer->elevation(
+                    stepper, layer, latitude, longitude, &ground, &inside);
+                if (inside) {
+                        if (stepper->geoid != NULL) {
+                                /* Correct from the geoid */
+                                int inside_;
+                                double undulation;
+                                turtle_map_elevation(stepper->geoid, longitude,
+                                    latitude, &undulation, &inside_);
+                                if (inside_) ground += undulation;
+                        }
+
+                        /* Compute the ECEF position */
+                        turtle_ecef_from_geodetic(
+                            latitude, longitude, ground + height, position);
+                        if (layer_depth != NULL) *layer_depth = depth;
+                        return TURTLE_RETURN_SUCCESS;
+                }
+        }
+
+        if (layer_depth != NULL) {
+                *layer_depth = -1;
                 return TURTLE_RETURN_SUCCESS;
         } else {
                 return TURTLE_ERROR_MESSAGE(
