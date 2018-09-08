@@ -42,6 +42,7 @@
 #include <stdlib.h>
 /* POSIX threads */
 #include <pthread.h>
+#include <fcntl.h>
 #include <semaphore.h>
 /* The TURTLE library */
 #include "turtle.h"
@@ -98,18 +99,18 @@ static void * run_thread(void * args)
 }
 
 /* Semaphore for locking critical sections */
-static sem_t semaphore;
+static sem_t * semaphore;
 
 int lock(void)
 {
         /* Get the lock */
-        return sem_wait(&semaphore);
+        return sem_wait(semaphore);
 }
 
 int unlock(void)
 {
         /* Release the lock. */
-        return sem_post(&semaphore);
+        return sem_post(semaphore);
 }
 
 /* Draw a random number uniformly in [0;1] using the standard C library */
@@ -119,7 +120,8 @@ static double uniform(void) { return ((double)rand()) / RAND_MAX; }
 int main()
 {
         /* Initialise the semaphore, the TURTLE library and the stack */
-        sem_init(&semaphore, 0, 1);
+        semaphore = sem_open("/semaphore", O_CREAT | O_EXCL, 0644, 1);
+        sem_unlink("/semaphore");
         turtle_initialise();
         turtle_stack_create(&stack, "share/topography", 0, &lock, &unlock);
         srand(time(NULL));
@@ -156,6 +158,6 @@ int main()
 clean_and_exit:
         turtle_stack_destroy(&stack);
         turtle_finalise();
-        sem_destroy(&semaphore);
+        sem_close(semaphore);
         exit(EXIT_SUCCESS);
 }

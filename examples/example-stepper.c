@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
 
         /* Get the initial position and direction in ECEF */
         const double latitude = 45.76415653, longitude = 2.95536402;
-        const double height = 0.5, height_max = 2.0E+03;
+        const double height = 0.5, altitude_max = 2.0E+03;
         double position[3], direction[3];
         turtle_stepper_position(stepper, latitude, longitude, height,
             position, NULL);
@@ -123,7 +123,7 @@ int main(int argc, char * argv[])
 
         /* Do the stepping */
         double rock_length = 0.;
-        while (altitude < height_max) {
+        while (altitude < altitude_max) {
                 /* Compute the step length */
                 double ds;
                 ds = slope_factor * fabs(altitude - ground_elevation);

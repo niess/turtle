@@ -247,8 +247,8 @@ static enum turtle_return png16_open(struct turtle_io * io, const char * path,
                                         }
                                 }
                         }
-                        io->meta.dx = (x1 - io->meta.x0) / io->meta.nx;
-                        io->meta.dy = (y1 - io->meta.y0) / io->meta.ny;
+                        io->meta.dx = (x1 - io->meta.x0) / (io->meta.nx - 1);
+                        io->meta.dy = (y1 - io->meta.y0) / (io->meta.ny - 1);
                         io->meta.dz = (z1 - io->meta.z0) / 65535;
 #undef N_FIELDS
 #undef N_TOKENS
@@ -372,8 +372,10 @@ static enum turtle_return png16_write(struct turtle_io * io,
                 char * new = realloc(header, header_size);
                 if (new == NULL) goto exit;
                 header = new;
-                const double x1 = map->meta.x0 + map->meta.dx * map->meta.nx;
-                const double y1 = map->meta.y0 + map->meta.dy * map->meta.ny;
+                const double x1 =
+                    map->meta.x0 + map->meta.dx * (map->meta.nx - 1);
+                const double y1 =
+                    map->meta.y0 + map->meta.dy * (map->meta.ny - 1);
                 const double z1 = map->meta.z0 + map->meta.dz * 65535;
                 if (snprintf(header, header_size,
                         "{\"topography\" : {\"x0\" : %.5lf, \"y0\" : %.5lf, "

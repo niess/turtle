@@ -4,7 +4,8 @@ LIBS := -lm
 INCLUDES := -Iinclude -Isrc
 
 OBJS := build/client.o build/ecef.o build/error.o build/io.o build/map.o       \
-	build/projection.o build/stack.o build/stepper.o build/turtle.o
+	build/projection.o build/stack.o build/stepper.o build/turtle.o        \
+	build/tinydir.o
 
 # Flag for GEOTIFF files
 TURTLE_USE_TIFF := 1
@@ -43,7 +44,7 @@ else
 endif
 
 # Available builds
-.PHONY: lib clean examples
+.PHONY: lib clean examples test
 
 # Rules for building the library
 lib: lib/libturtle.so
@@ -76,15 +77,39 @@ build/%.o: src/deps/%.c src/deps/%.h
 examples: bin/example-demo bin/example-projection bin/example-pthread          \
           bin/example-stepper
 
-bin/example-pthread: examples/example-pthread.c
+bin/example-pthread: examples/example-pthread.c lib/libturtle.so
 	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib -Wl,-rpath $(PWD)/lib -lturtle \
              -lpthread
 
-bin/example-%: examples/example-%.c
+bin/example-%: examples/example-%.c lib/libturtle.so
 	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib -Wl,-rpath $(PWD)/lib -lturtle
 
+# Rules for building the tests binaries
+SOURCES := src/turtle.c src/turtle/client.c src/turtle/ecef.c                  \
+	src/turtle/error.c src/turtle/io.c src/turtle/map.c                    \
+	src/turtle/projection.c src/turtle/stack.c src/turtle/stepper.c        \
+	src/turtle/io/geotiff16.c src/turtle/io/grd.c src/turtle/io/hgt.c      \
+	src/turtle/io/png16.c
+
+test: bin/test-turtle
+	@mkdir -p tests/topography
+	@./bin/test-turtle
+	@rm -rf tests/*.png tests/*.grd tests/*.hgt tests/*.tif                \
+		tests/topography/*.png
+	@mv *.gcda tests/.
+	@gcov -o tests $(SOURCES)
+	@rm -rf tinydir.h.gcov tests/test-turtle.gcno tests/test-turtle.gcda
+	@mv *.gcov tests/.
+
+bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
+	@mkdir -p bin
+	@gcc -o $@ $(CFLAGS) -O0 -g -ftest-coverage -fprofile-arcs $(INCLUDES) \
+		$^ $(LIBS)
+	@mv *.gcno tests/.
+	
 # Clean-up rule
 clean:
-	@rm -rf bin lib build
+	@rm -rf bin lib build tests/*.gcno tests/*.gcda tests/*.gcov *.gcov    \
+		*.gcno *.gcda tests/*.png tests/*.grd tests/topography

@@ -24,10 +24,11 @@
 #include <stdlib.h>
 
 /* Default handler for TURTLE library errors */
-void handle_error(
+static void handle_error(
     enum turtle_return rc, turtle_function_t * function, const char * message)
 {
         fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
+        turtle_finalise();
         exit(EXIT_FAILURE);
 }
 

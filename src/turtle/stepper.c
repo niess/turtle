@@ -42,8 +42,10 @@ static void ecef_to_geodetic(struct turtle_stepper * stepper,
         if (stepper->geoid != NULL) {
                 int inside;
                 double undulation;
-                turtle_map_elevation(stepper->geoid, geographic[1],
-                    geographic[0], &undulation, &inside);
+                const double lo = (geographic[1] >= 0) ? geographic[1]:
+                    geographic[1] + 360.;
+                turtle_map_elevation(stepper->geoid, lo, geographic[0],
+                    &undulation, &inside);
                 if (inside) geographic[2] -= undulation;
         }
 }
@@ -213,6 +215,15 @@ static void stepper_elevation_stack(struct turtle_stepper * stepper,
             layer->a.stack, latitude, longitude, ground_elevation, inside);
 }
 
+static void stepper_elevation_client(struct turtle_stepper * stepper,
+    struct turtle_stepper_layer * layer, double latitude, double longitude,
+    double * ground_elevation, int * inside)
+{
+        *inside = 0;
+        turtle_client_elevation(
+            layer->a.client, latitude, longitude, ground_elevation, inside);
+}
+
 static void stepper_elevation_map(struct turtle_stepper * stepper,
     struct turtle_stepper_layer * layer, double latitude, double longitude,
     double * ground_elevation, int * inside)
@@ -273,13 +284,15 @@ enum turtle_return turtle_stepper_add_stack(
                 }
                 return TURTLE_ERROR_MEMORY();
         }
-        layer->elevation = &stepper_elevation_stack;
+        
         if (client != NULL) {
                 layer->step = &stepper_step_client;
+                layer->elevation = &stepper_elevation_client;
                 layer->clean = &stepper_clean_client;
                 layer->a.client = client;
         } else {
                 layer->step = &stepper_step_stack;
+                layer->elevation = &stepper_elevation_stack;
                 layer->clean = NULL;
                 layer->a.stack = stack;
         }
@@ -505,7 +518,9 @@ enum turtle_return turtle_stepper_position(struct turtle_stepper * stepper,
                                 /* Correct from the geoid */
                                 int inside_;
                                 double undulation;
-                                turtle_map_elevation(stepper->geoid, longitude,
+                                const double lo = (longitude >= 0) ? 
+                                    longitude : longitude + 360.;
+                                turtle_map_elevation(stepper->geoid, lo,
                                     latitude, &undulation, &inside_);
                                 if (inside_) ground += undulation;
                         }

@@ -24,6 +24,7 @@
  */
 
 /* C89 standard library */
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,9 +96,14 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
         if (geotiff16->tiff == NULL) io->close(io);
 
         if (mode[0] != 'r') {
-                /* Write mode is not yet implemented */
-                return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
-                    "invalid write format for file`%s'", path);
+                geotiff16->tiff = TIFFOpen(path, mode);
+                if (geotiff16->tiff == NULL) {
+                        return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_PATH_ERROR,
+                            "could not create file `%s'", path);
+                }
+
+                geotiff16->path = path;
+                return EXIT_SUCCESS;
         }
 
         /* Initialise the io object */
@@ -131,7 +137,7 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
         TIFFGetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);
         if (count == 6) {
                 io->meta.x0 = data[3];
-                io->meta.y0 = data[4] + (1. - io->meta.ny) * io->meta.dy;
+                io->meta.y0 = data[4] + (1 - io->meta.ny) * io->meta.dy;
         }
 
         geotiff16->path = path;
@@ -178,6 +184,74 @@ static enum turtle_return geotiff16_read(struct turtle_io * io,
         return TURTLE_RETURN_SUCCESS;
 }
 
+/* Dump a map in GEOTIFF format */
+static enum turtle_return geotiff16_write(struct turtle_io * io,
+    const struct turtle_map * map, struct turtle_error_context * error_)
+{
+        struct geotiff16_io * geotiff16 = (struct geotiff16_io *)io;
+        
+        /* Check the map scale */
+        if ((map->meta.z0 != -32767.) || (map->meta.dz != 1.)) {
+                return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
+                    "unsupported z scale when dumping map to `%s'",
+                    geotiff16->path);
+        }
+        
+        /* Check that there is no projection */
+        if (turtle_map_projection((struct turtle_map *)map) != NULL) {
+                return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
+                    "unsupported projection when dumping map to `%s'",
+                    geotiff16->path);
+        }
+
+        /* Dump the meta data */
+        TIFFSetField(geotiff16->tiff, TIFFTAG_IMAGEWIDTH, map->meta.nx);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_IMAGELENGTH, map->meta.ny);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_SAMPLESPERPIXEL, 1);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_BITSPERSAMPLE, 16);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+        TIFFSetField(
+            geotiff16->tiff, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_ROWSPERSTRIP, 1);
+        TIFFSetField(
+            geotiff16->tiff, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_RESOLUTIONUNIT, RESUNIT_NONE);
+        TIFFSetField(geotiff16->tiff, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+
+        double scale[3] = { map->meta.dx, map->meta.dy, 0. };
+        TIFFSetField(geotiff16->tiff, TIFFTAG_GEOPIXELSCALE, 3, scale);
+        
+        double tiepoints[6] = { 0, 0, 0, map->meta.x0,
+            map->meta.y0 + (map->meta.ny - 1) * map->meta.dy, 0. };
+        TIFFSetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, 6, tiepoints);
+
+        /* Dump the raw data */
+        int16_t * data = malloc(map->meta.nx * sizeof(*data));
+        if (data == NULL) {
+                return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_MEMORY_ERROR,
+                    "could not allocate memory when writing file `%s'",
+                    geotiff16->path);
+        }
+
+        int i;
+        for (i = 0; i < map->meta.ny; i++) {
+                int j;
+                for (j = 0; j < map->meta.nx; j++) {
+                        const double d = round(map->meta.get_z(map, j, i));
+                        data[j] = (int16_t)d;
+                }
+                if (TIFFWriteScanline(geotiff16->tiff, data, i, 0) != 1) {
+                        free(data);
+                        return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
+                            "a libtiff error occured when writing to file `%s'",
+                            geotiff16->path);
+                }
+        }
+        free(data);
+
+        return TURTLE_RETURN_SUCCESS;
+}
+
 enum turtle_return turtle_io_geotiff16_create_(
     struct turtle_io ** io_p, struct turtle_error_context * error_)
 {
@@ -198,7 +272,7 @@ enum turtle_return turtle_io_geotiff16_create_(
         geotiff16->base.open = &geotiff16_open;
         geotiff16->base.close = &geotiff16_close;
         geotiff16->base.read = &geotiff16_read;
-        geotiff16->base.write = NULL;
+        geotiff16->base.write = &geotiff16_write;
 
         geotiff16->base.meta.get_z = &get_z;
         geotiff16->base.meta.set_z = &set_z;

@@ -8,3 +8,10 @@ share
 
 # Ignore the docs
 docs
+
+# Ignore coverage temporaries
+*.gcov
+*.gcno
+*.gcda
+tests/*.png
+tests/topography

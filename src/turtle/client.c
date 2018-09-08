@@ -43,10 +43,15 @@ enum turtle_return turtle_client_create(
 
         /* Check that one has a valid stack */
         *client = NULL;
-        if ((stack == NULL) || (stack->lock == NULL))
-                TURTLE_ERROR_MESSAGE(
-                    TURTLE_RETURN_BAD_ADDRESS, "invalid stack or missing lock");
-
+        if (stack == NULL) {
+                return TURTLE_ERROR_MESSAGE(
+                    TURTLE_RETURN_BAD_ADDRESS, "invalid null stack");
+        }
+        else if (stack->lock == NULL) {
+                return TURTLE_ERROR_MESSAGE(
+                    TURTLE_RETURN_BAD_ADDRESS, "stack has no lock");
+        }
+                
         /* Allocate the new client and initialise it. */
         *client = malloc(sizeof(**client));
         if (*client == NULL) return TURTLE_ERROR_MEMORY();

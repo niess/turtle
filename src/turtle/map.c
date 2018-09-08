@@ -202,7 +202,7 @@ enum turtle_return turtle_map_fill(
                 return TURTLE_ERROR_MESSAGE(
                     TURTLE_RETURN_DOMAIN_ERROR, "inconsistent elevation value");
         if ((elevation < map->meta.z0) ||
-            (elevation >= map->meta.z0 + 65535 * map->meta.dz))
+            (elevation > map->meta.z0 + 65535 * map->meta.dz))
                 return TURTLE_ERROR_MESSAGE(TURTLE_RETURN_DOMAIN_ERROR,
                     "elevation is outside of map span");
         map->meta.set_z(map, ix, iy, elevation);
@@ -225,10 +225,8 @@ enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
 
         if (x != NULL) *x = map->meta.x0 + ix * map->meta.dx;
         if (y != NULL) *y = map->meta.y0 + iy * map->meta.dy;
-        if (elevation != NULL) {
-                *elevation =
-                    map->meta.z0 + map->meta.dz * map->meta.get_z(map, ix, iy);
-        }
+        if (elevation != NULL)
+                *elevation = map->meta.get_z(map, ix, iy);
 
         return TURTLE_RETURN_SUCCESS;
 }
@@ -243,8 +241,8 @@ enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
         int ix = (int)hx;
         int iy = (int)hy;
 
-        if (ix >= map->meta.nx - 1 || hx < 0 || iy >= map->meta.ny - 1 ||
-            hy < 0) {
+        if ((hx > map->meta.nx - 1) || (hx < 0) ||
+            (hy > map->meta.ny - 1) || (hy < 0)) {
                 if (inside != NULL) {
                         *inside = 0;
                         return TURTLE_RETURN_SUCCESS;
@@ -252,8 +250,16 @@ enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
                         return TURTLE_ERROR_OUTSIDE_MAP();
                 }
         }
-        hx -= ix;
-        hy -= iy;
+        if (ix == map->meta.nx - 1) {
+                ix--;
+                hx = 1.;
+        } else
+                hx -= ix;
+        if (iy == map->meta.ny - 1) {
+                iy--;
+                hy = 1.;
+        } else
+                hy -= iy;
 
         turtle_map_getter_t * get_z = map->meta.get_z;
         const double z00 = get_z(map, ix, iy);
@@ -276,7 +282,8 @@ enum turtle_return turtle_map_elevation(
 
 struct turtle_projection * turtle_map_projection(struct turtle_map * map)
 {
-        if (map == NULL) return NULL;
+        if ((map == NULL) || (map->meta.projection.type < 0))
+                return NULL;
         return &map->meta.projection;
 }
 
