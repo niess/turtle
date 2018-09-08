@@ -33,7 +33,8 @@
  * (45N, 3E), (46N, 2E), and (46N, 3E) from a global model, e.g. N45E002.hgt,
  * etc ... for SRTMGL1. These tiles are assumed to be located in a folder named
  * `share/topography`. In addition you'll need the local map created by
- * `example-projection`.
+ * `example-projection` as well as a grid of the EGM96 geoid undulations
+ * (`ww15mgh.grd`).
  */
 
 /* C89 standard library */
@@ -76,11 +77,12 @@ int main(int argc, char * argv[])
 {
         /* Parse the arguments */
         double azimuth = 26., elevation = 5.;
-        double stepper_range = 0., step = 0.;
+        double approximation_range = 10., step_min = 1E-02, slope_factor = 1.;
         if (argc && --argc) azimuth = atof(*++argv);
         if (argc && --argc) elevation = atof(*++argv);
-        if (argc && --argc) stepper_range = atof(*++argv);
-        if (argc && --argc) step = atof(*++argv);
+        if (argc && --argc) approximation_range = atof(*++argv);
+        if (argc && --argc) step_min = atof(*++argv);
+        if (argc && --argc) slope_factor = atof(*++argv);
 
         /* Initialise the TURTLE library */
         turtle_error_handler_set(&handle_error);
@@ -96,65 +98,76 @@ int main(int argc, char * argv[])
         turtle_map_load(&map, "share/data/pdd-30m.png");
 
         /* Load the EGM96 geoid map */
-        turtle_map_load(&geoid, "share/data/egm96.png");
+        turtle_map_load(&geoid, "share/data/ww15mgh.grd");
 
         /* Create the ECEF stepper and configure it */
         turtle_stepper_create(&stepper);
         turtle_stepper_geoid_set(stepper, geoid);
-        turtle_stepper_range_set(stepper, stepper_range);
+        turtle_stepper_range_set(stepper, approximation_range);
         turtle_stepper_add_flat(stepper, 0.);
         turtle_stepper_add_stack(stepper, stack);
         turtle_stepper_add_map(stepper, map);
 
         /* Get the initial position and direction in ECEF */
         const double latitude = 45.76415653, longitude = 2.95536402;
+        const double height = 0.5, height_max = 2.0E+03;
         double position[3], direction[3];
-        turtle_stepper_position(
-            stepper, latitude, longitude, 0.5, position, NULL);
-        turtle_ecef_from_horizontal(
-            latitude, longitude, azimuth, elevation, direction);
+        turtle_stepper_position(stepper, latitude, longitude, height,
+            position, NULL);
+        turtle_ecef_from_horizontal(latitude, longitude, azimuth, elevation,
+            direction);
+        
+        double altitude, ground_elevation;
+        turtle_stepper_step(stepper, position, NULL, NULL, &altitude,
+            &ground_elevation, NULL);
 
         /* Do the stepping */
-        double s = 0., rock_length = 0.;
-        int inside = 0;
-        for (;;) {
-                double r[3] = { position[0] + direction[0] * s,
-                        position[1] + direction[1] * s,
-                        position[2] + direction[2] * s };
-                double altitude, ground_elevation;
-                turtle_stepper_step(
-                    stepper, r, NULL, NULL, &altitude, &ground_elevation, NULL);
-
-                const double d = altitude - ground_elevation;
-                double ds = (step <= 0.) ? fabs(d) : step;
-                if (inside != (d >= 0.)) {
+        double rock_length = 0.;
+        while (altitude < height_max) {
+                /* Compute the step length */
+                double ds;
+                ds = slope_factor * fabs(altitude - ground_elevation);
+                if (ds < step_min) ds = step_min;
+                
+                /* Do the tentative step */
+                int i;
+                for (i = 0; i < 3; i++) position[i] += direction[i] * ds;
+                
+                const int inside = altitude < ground_elevation;
+                turtle_stepper_step(stepper, position, NULL, NULL, &altitude,
+                    &ground_elevation, NULL);
+                const int inside1 = altitude < ground_elevation;
+                
+                if (inside != inside1) {
                         /* A change of medium occured. Let us locate the
                          * change of medium by dichotomy.
                          */
-                        double ds0 = 0., ds1 = ds;
+                        double ds0 = -ds, ds1 = 0.;
                         while (ds1 - ds0 > 1E-08) {
                                 const double ds2 = 0.5 * (ds0 + ds1);
-                                double r1[3] = { r[0] + direction[0] * ds2,
-                                        r[1] + direction[1] * ds2,
-                                        r[2] + direction[2] * ds2 };
-                                double altitude1, ground_elevation1;
-                                turtle_stepper_step(stepper, r1, NULL, NULL,
-                                    &altitude1, &ground_elevation1, NULL);
-                                const double d1 = altitude1 - ground_elevation1;
-                                if (inside != (d1 >= 0.))
-                                        ds0 = ds2;
-                                else
+                                double position2[3] = {
+                                        position[0] + direction[0] * ds2,
+                                        position[1] + direction[1] * ds2,
+                                        position[2] + direction[2] * ds2 };
+                                double altitude2, ground_elevation2;
+                                turtle_stepper_step(stepper, position2, NULL,
+                                    NULL, &altitude2, &ground_elevation2, NULL);
+                                const int inside2 =
+                                    altitude2 < ground_elevation2;
+                                if (inside2 == inside1) {
                                         ds1 = ds2;
+                                        altitude = altitude2;
+                                        ground_elevation = ground_elevation2;
+                                } else
+                                        ds0 = ds2;
                         }
-                        ds = ds1;
+                        ds += ds1;
+                        for (i = 0; i < 3; i++)
+                                position[i] += direction[i] * ds1;
                 }
 
                 /* Update the step length and the rock depth */
-                s += ds;
                 if (inside) rock_length += ds;
-                inside = (d < 0.);
-
-                if (altitude >= 2E+03) break;
         }
 
         /* Log the result and exit */
