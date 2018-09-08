@@ -305,8 +305,8 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                 hx = (longitude - head->meta.x0) / head->meta.dx;
                 hy = (latitude - head->meta.y0) / head->meta.dy;
 
-                if ((hx < 0.) || (hx > head->meta.nx) || (hy < 0.) ||
-                    (hy > head->meta.ny)) {
+                if ((hx < 0.) || (hx >= head->meta.nx - 1) || (hy < 0.) ||
+                    (hy >= head->meta.ny - 1)) {
                         /* The requested coordinates are not in the top
                          * maps. Let's check the full stack */
                         struct turtle_map * map = head->prev;
@@ -314,8 +314,8 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                                 hx = (longitude - map->meta.x0) / map->meta.dx;
                                 hy = (latitude - map->meta.y0) / map->meta.dy;
 
-                                if ((hx >= 0.) && (hx <= map->meta.nx) &&
-                                    (hy >= 0.) && (hy <= map->meta.ny)) {
+                                if ((hx >= 0.) && (hx < map->meta.nx - 1) &&
+                                    (hy >= 0.) && (hy < map->meta.ny - 1)) {
                                         /*
                                          * Move the valid map to the top
                                          * of the stack
