@@ -905,7 +905,8 @@ TURTLE_API double turtle_stepper_resolution_get(
  * @param stepper        The stepper object
  * @param resolution     The resolution factor
  *
- * The default value is 1E-02.
+ * The resolution factor corresponds to the minimum length for the initial
+ * step. Its default value is 1E-02.
  */
 TURTLE_API void turtle_stepper_resolution_set(
     struct turtle_stepper * stepper, double resolution);

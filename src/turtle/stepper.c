@@ -439,7 +439,7 @@ void turtle_stepper_slope_set(struct turtle_stepper * stepper, double slope)
 
 double turtle_stepper_resolution_get(const struct turtle_stepper * stepper)
 {
-        return stepper->slope_factor;
+        return stepper->resolution_factor;
 }
 
 void turtle_stepper_resolution_set(

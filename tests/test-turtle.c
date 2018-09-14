@@ -458,6 +458,14 @@ static void test_stepper(void)
         
         assert(turtle_stepper_geoid_get(stepper) == geoid);
         assert(turtle_stepper_range_get(stepper) == 0);
+        turtle_stepper_range_set(stepper, 10.);
+        assert(turtle_stepper_range_get(stepper) == 10.);
+        assert(turtle_stepper_slope_get(stepper) == 1.);
+        turtle_stepper_slope_set(stepper, 0.5);
+        assert(turtle_stepper_slope_get(stepper) == 0.5);
+        assert(turtle_stepper_resolution_get(stepper) == 1E-02);
+        turtle_stepper_resolution_set(stepper, 1E-03);
+        assert(turtle_stepper_resolution_get(stepper) == 1E-03);
         
         const double latitude = 45.5, longitude = 2.5, height = 0.5;
         double position[3];
@@ -734,8 +742,10 @@ static void test_strfunc(void)
         CHECK_API(turtle_stepper_range_set);
         CHECK_API(turtle_stepper_position);
         CHECK_API(turtle_stepper_sample);
-        CHECK_API(turtle_stepper_sample);
+        CHECK_API(turtle_stepper_step);
         
+        assert(
+            turtle_error_function((turtle_function_t *)&test_strfunc) == NULL);
 #undef CHECK_API
 }
 
