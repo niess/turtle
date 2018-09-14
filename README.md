@@ -2,13 +2,13 @@
 [![codecov](https://codecov.io/gh/niess/turtle/branch/dev/graph/badge.svg)](https://codecov.io/gh/niess/turtle)
 
 # TURTLE
-( **T**opographic **U**tilities for t**R**ansporting par**T**ic**U**les over **L**ong rang**E**s )
+( **T**opographic **U**tilities for t**R**ansporting par**T**icules over **L**ong rang**E**s )
 
 ## Description
 
-TURTLE is a C99 library providing utilities for the transport of particles
-through a topography, described by **D**igital **E**levation **M**odels
-(**DEM**s). Its main features are:
+TURTLE is a C99 library providing utilities for the long range transport of
+particles through a topography, described by **D**igital **E**levation
+**M**odels (**DEM**s). Its main features are:
 
 * Support for local projection maps (**UTM**, **Lambert**, **RGF93**) as well
 as for tiled world wide models, e.g. [SRTMGL1](https://lpdaac.usgs.gov/node/527)
