@@ -461,8 +461,8 @@ TURTLE_API enum turtle_return turtle_map_fill(
  * Get the properties of a map node, i.e. its geographic coordinates and
  * elevation value.
  */
-TURTLE_API enum turtle_return turtle_map_node(struct turtle_map * map, int ix,
-    int iy, double * x, double * y, double * elevation);
+TURTLE_API enum turtle_return turtle_map_node(const struct turtle_map * map,
+    int ix, int iy, double * x, double * y, double * elevation);
 
 /**
  * Get the map elevation at a geographic coordinate
@@ -499,8 +499,8 @@ TURTLE_API enum turtle_return turtle_map_elevation(
  * **Note** The provided projection object allows to set and modify the map's
  * projection, e.g. using `turtle_projection_configure`.
  */
-TURTLE_API struct turtle_projection * turtle_map_projection(
-    struct turtle_map * map);
+TURTLE_API const struct turtle_projection * turtle_map_projection(
+    const struct turtle_map * map);
 
 /**
  * Get basic information on a projection map

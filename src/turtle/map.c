@@ -211,8 +211,8 @@ enum turtle_return turtle_map_fill(
 }
 
 /* Get the properties of a map node */
-enum turtle_return turtle_map_node(struct turtle_map * map, int ix, int iy,
-    double * x, double * y, double * elevation)
+enum turtle_return turtle_map_node(const struct turtle_map * map, int ix,
+    int iy, double * x, double * y, double * elevation)
 {
         TURTLE_ERROR_INITIALISE(&turtle_map_node);
 
@@ -280,7 +280,8 @@ enum turtle_return turtle_map_elevation(
         return turtle_map_elevation_(map, x, y, z, inside, error_);
 }
 
-struct turtle_projection * turtle_map_projection(struct turtle_map * map)
+const struct turtle_projection * turtle_map_projection(
+    const struct turtle_map * map)
 {
         if ((map == NULL) || (map->meta.projection.type < 0))
                 return NULL;

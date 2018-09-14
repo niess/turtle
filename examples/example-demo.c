@@ -65,7 +65,7 @@ int main()
         printf("    + encoding     :  %s\n", info.encoding);
 
         /* Get the map projection */
-        struct turtle_projection * rgf93 = turtle_map_projection(map);
+        const struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Convert the local coordinates of the map's origin to geodetic ones */
         double latitude, longitude;

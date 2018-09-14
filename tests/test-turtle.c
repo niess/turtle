@@ -150,7 +150,7 @@ static void test_projection(void)
         turtle_map_destroy(&map);
         const char * path = "tests/map.png";
         turtle_map_load(&map, path);
-        struct turtle_projection * utm = turtle_map_projection(map);
+        const struct turtle_projection * utm = turtle_map_projection(map);
         assert(strcmp(turtle_projection_name(utm), "UTM 31N") == 0);
         
         

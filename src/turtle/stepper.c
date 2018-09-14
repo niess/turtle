@@ -70,7 +70,8 @@ static enum turtle_return compute_geomap(struct turtle_stepper * stepper,
                 ecef_to_geodetic(stepper, position, geographic);
         }
         struct turtle_map * map = layer->a.map;
-        struct turtle_projection * projection = turtle_map_projection(map);
+        const struct turtle_projection * projection =
+            turtle_map_projection(map);
         return turtle_projection_project(projection, geographic[0],
             geographic[1], geographic + 3, geographic + 4);
 }
@@ -228,7 +229,7 @@ static void stepper_elevation_map(struct turtle_stepper * stepper,
     struct turtle_stepper_layer * layer, double latitude, double longitude,
     double * ground_elevation, int * inside)
 {
-        struct turtle_projection * projection =
+        const struct turtle_projection * projection =
             turtle_map_projection(layer->a.map);
         double x, y;
         turtle_projection_project(projection, latitude, longitude, &x, &y);

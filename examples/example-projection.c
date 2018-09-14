@@ -85,7 +85,7 @@ int main()
                 .y = { 6515284.5, 6521284.5 },
                 .z = { 500., 1500. } };
         turtle_map_create(&map, &info, "Lambert 93");
-        struct turtle_projection * rgf93 = turtle_map_projection(map);
+        const struct turtle_projection * rgf93 = turtle_map_projection(map);
 
         /* Fill the local map from the global data */
         int ix, iy;
