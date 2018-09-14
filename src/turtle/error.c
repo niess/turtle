@@ -28,7 +28,6 @@ static void handle_error(
     enum turtle_return rc, turtle_function_t * function, const char * message)
 {
         fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
-        turtle_finalise();
         exit(EXIT_FAILURE);
 }
 
@@ -54,8 +53,8 @@ enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
 
         /* Format the error message */
         const int n = snprintf(error_->message, TURTLE_ERROR_MSG_LENGTH,
-            "{ %s [#%d], %s:%d } ", turtle_strfunc(error_->function), rc, file,
-            line);
+            "{ %s [#%d], %s:%d } ", turtle_error_function(error_->function),
+            rc, file, line);
         if (n < TURTLE_ERROR_MSG_LENGTH - 1) {
                 va_list ap;
                 va_start(ap, format);
@@ -75,4 +74,63 @@ enum turtle_return turtle_error_raise_(struct turtle_error_context * error_)
 
         _handler(error_->code, error_->function, error_->message);
         return error_->code;
+}
+
+/* Get a library function name as a string */
+const char * turtle_error_function(turtle_function_t * caller)
+{
+#define TOSTRING(function)                                                     \
+        if (caller == (turtle_function_t *)function) return #function
+
+        TOSTRING(turtle_client_clear);
+        TOSTRING(turtle_client_create);
+        TOSTRING(turtle_client_destroy);
+        TOSTRING(turtle_client_elevation);
+        
+        TOSTRING(turtle_ecef_from_geodetic);
+        TOSTRING(turtle_ecef_from_horizontal);
+        TOSTRING(turtle_ecef_to_geodetic);
+        TOSTRING(turtle_ecef_to_horizontal);
+        
+        TOSTRING(turtle_error_function);
+        TOSTRING(turtle_error_handler_get);
+        TOSTRING(turtle_error_handler_set);
+        
+        TOSTRING(turtle_map_create);
+        TOSTRING(turtle_map_destroy);
+        TOSTRING(turtle_map_dump);
+        TOSTRING(turtle_map_elevation);
+        TOSTRING(turtle_map_fill);
+        TOSTRING(turtle_map_load);
+        TOSTRING(turtle_map_meta);
+        TOSTRING(turtle_map_node);
+        TOSTRING(turtle_map_projection);
+        
+        TOSTRING(turtle_projection_configure);
+        TOSTRING(turtle_projection_create);
+        TOSTRING(turtle_projection_destroy);
+        TOSTRING(turtle_projection_name);
+        TOSTRING(turtle_projection_project);
+        TOSTRING(turtle_projection_unproject);
+        
+        TOSTRING(turtle_stack_clear);
+        TOSTRING(turtle_stack_create);
+        TOSTRING(turtle_stack_destroy);
+        TOSTRING(turtle_stack_elevation);
+        TOSTRING(turtle_stack_load);
+        
+        TOSTRING(turtle_stepper_add_flat);
+        TOSTRING(turtle_stepper_add_map);
+        TOSTRING(turtle_stepper_add_stack);
+        TOSTRING(turtle_stepper_create);
+        TOSTRING(turtle_stepper_destroy);
+        TOSTRING(turtle_stepper_geoid_get);
+        TOSTRING(turtle_stepper_geoid_set);
+        TOSTRING(turtle_stepper_range_get);
+        TOSTRING(turtle_stepper_range_set);
+        TOSTRING(turtle_stepper_position);
+        TOSTRING(turtle_stepper_step);
+
+        return NULL;
+#undef TOSTRING
 }

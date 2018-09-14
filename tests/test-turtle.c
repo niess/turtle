@@ -685,11 +685,7 @@ static void test_io_tiff(void)
 static void test_strfunc(void)
 {
 #define CHECK_API(FUNCTION)                                                    \
-        assert(turtle_strfunc((turtle_function_t *)&FUNCTION) != NULL)
-        
-        CHECK_API(turtle_finalise);
-        CHECK_API(turtle_initialise);
-        CHECK_API(turtle_strfunc);
+        assert(turtle_error_function((turtle_function_t *)&FUNCTION) != NULL)
                 
         CHECK_API(turtle_client_clear);
         CHECK_API(turtle_client_create);
@@ -701,6 +697,7 @@ static void test_strfunc(void)
         CHECK_API(turtle_ecef_to_geodetic);
         CHECK_API(turtle_ecef_to_horizontal);
         
+        CHECK_API(turtle_error_function);
         CHECK_API(turtle_error_handler_get);
         CHECK_API(turtle_error_handler_set);
         
@@ -744,9 +741,6 @@ static void test_strfunc(void)
 
 int main()
 {
-        /* Initialise the library */
-        turtle_initialise();
-        
         /* Run the tests */
         test_map();
         test_projection();
@@ -765,7 +759,6 @@ int main()
 #endif
         test_strfunc();
         
-        /* Clean the library and exit */
-        turtle_finalise();
+        /* Exit to the OS */
         exit(EXIT_SUCCESS);
 }

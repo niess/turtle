@@ -149,39 +149,12 @@ typedef void turtle_error_handler_t(
 typedef int turtle_stack_locker_t(void);
 
 /**
- * Initialise the TURTLE library
- *
- * Initialise the library. Call `turtle_finalise` in order to unload the
- * library.
- * 
- * Note that by default library errors are printed to `stderr` and trigger a
- * hard exit. Use the `turtle_error_handler_set` function in order to provide
- * your own error handler and override this behaviour.
- *
- * __Warnings__
- *
- * This function is not thread safe.
- */
-TURTLE_API void turtle_initialise(void);
-
-/**
- * Finalise the TURTLE library
- *
- * Unload the library. `turtle_initialise` must have been called first.
- *
- * __Warnings__
- *
- * This function is not thread safe.
- */
-TURTLE_API void turtle_finalise(void);
-
-/**
  * Return a string describing a TURTLE library function
  *
  * This function is meant for verbosing when handling errors. It is thread
  * safe.
  */
-TURTLE_API const char * turtle_strfunc(turtle_function_t * function);
+TURTLE_API const char * turtle_error_function(turtle_function_t * function);
 
 /**
  * Get the library error handler

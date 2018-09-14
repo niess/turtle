@@ -119,17 +119,16 @@ static double uniform(void) { return ((double)rand()) / RAND_MAX; }
 /* The main function, spawning the threads */
 int main()
 {
-        /* Initialise the semaphore, the TURTLE library and the stack */
+        /* Initialise the semaphore and the stack */
         semaphore = sem_open("/semaphore", O_CREAT | O_EXCL, 0644, 1);
         sem_unlink("/semaphore");
-        turtle_initialise();
         turtle_stack_create(&stack, "share/topography", 0, &lock, &unlock);
-        srand(time(NULL));
 
         /*
          * Create the client threads and initialise the thread specific data
          * randomly
          */
+        srand(time(NULL));
         struct thread_parameters params[N_THREADS];
         int i;
         for (i = 0; i < N_THREADS; i++) {
@@ -154,10 +153,9 @@ int main()
                 if (pthread_join(params[i].tid, NULL) != 0) goto clean_and_exit;
         }
 
-        /* Finalise TURTLE and the semaphore */
+        /* Finalise the semaphore, clean the stack and exit to the OS */
 clean_and_exit:
         turtle_stack_destroy(&stack);
-        turtle_finalise();
         sem_close(semaphore);
         exit(EXIT_SUCCESS);
 }

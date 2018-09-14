@@ -42,9 +42,6 @@
 
 int main()
 {
-        /* Initialise the TURTLE library */
-        turtle_initialise();
-
         /* Load the RGF93 map dumped by `example-projection` */
         const char * path = "share/data/pdd-30m.png";
         struct turtle_map * map;
@@ -135,6 +132,5 @@ int main()
         /* Clean and exit to the OS */
         turtle_map_destroy(&map);
         turtle_stack_destroy(&stack);
-        turtle_finalise();
         exit(EXIT_SUCCESS);
 }

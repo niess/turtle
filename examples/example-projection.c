@@ -54,7 +54,6 @@ void exit_gracefully(enum turtle_return rc)
 {
         turtle_map_destroy(&map);
         turtle_stack_destroy(&stack);
-        turtle_finalise();
         exit(rc);
 }
 
@@ -68,9 +67,8 @@ void handle_error(
 
 int main()
 {
-        /* Initialise the TURTLE API with a custom error handler */
+        /* Set a custom error handler */
         turtle_error_handler_set(&handle_error);
-        turtle_initialise();
 
         /* Create the stack of global elevation data */
         turtle_stack_create(&stack, "share/topography", 0, NULL, NULL);

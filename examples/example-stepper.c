@@ -61,7 +61,6 @@ void exit_gracefully(enum turtle_return rc)
         turtle_map_destroy(&geoid);
         turtle_map_destroy(&map);
         turtle_stack_destroy(&stack);
-        turtle_finalise();
         exit(rc);
 }
 
@@ -84,9 +83,8 @@ int main(int argc, char * argv[])
         if (argc && --argc) step_min = atof(*++argv);
         if (argc && --argc) slope_factor = atof(*++argv);
 
-        /* Initialise the TURTLE library */
+        /* Set a custom error handler */
         turtle_error_handler_set(&handle_error);
-        turtle_initialise();
 
         /* Create the stack */
         turtle_stack_create(&stack, "share/topography", 0, NULL, NULL);

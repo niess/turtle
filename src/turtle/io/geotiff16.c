@@ -73,10 +73,14 @@ static void default_directory(TIFF * tiff)
 }
 
 /* Register the tag extender to libtiff */
-void turtle_geotiff16_register_(void)
+static void turtle_geotiff16_register(void)
 {
+        static int initialised = 0;
+        if (initialised) return;
+        
         parent_extender = TIFFSetTagExtender(default_directory);
         TIFFSetErrorHandler(NULL); /* Mute error messages */
+        initialised = 1;
 }
 
 /* Data for accessing a GEOTIFF file */
@@ -276,6 +280,9 @@ enum turtle_return turtle_io_geotiff16_create_(
 
         geotiff16->base.meta.get_z = &get_z;
         geotiff16->base.meta.set_z = &set_z;
-
+        
+        /* Register the GeoTIFF tags, if not already done */
+        turtle_geotiff16_register();
+        
         return TURTLE_RETURN_SUCCESS;
 }
