@@ -19,7 +19,7 @@
  */
 
 /*
- * Turtle utilities for converting from/to ECEF coordinates.
+ * Turtle utilities for converting from/to ECEF coordinates
  */
 #include <float.h>
 #include <math.h>
@@ -36,14 +36,14 @@
 #define WGS84_A 6378137
 #define WGS84_E 0.081819190842622
 
-/* Compute ECEF coordinates from latitude and longitude. */
+/* Compute ECEF coordinates from latitude and longitude */
 void turtle_ecef_from_geodetic(
     double latitude, double longitude, double elevation, double ecef[3])
 {
-        /* Get the parameters of the reference ellipsoid. */
+        /* Get the parameters of the reference ellipsoid */
         const double a = WGS84_A, e = WGS84_E;
 
-        /* Compute the Cartesian coordinates. */
+        /* Compute the Cartesian coordinates */
         const double s = sin(latitude * M_PI / 180.);
         const double c = cos(latitude * M_PI / 180.);
         const double R = a / sqrt(1. - e * e * s * s);
@@ -53,59 +53,82 @@ void turtle_ecef_from_geodetic(
         ecef[2] = (R * (1. - e * e) + elevation) * s;
 }
 
-/* Compute the geodetic coordinates from the ECEF ones.
+/* Compute the geodetic coordinates from the ECEF ones
  *
- * Reference: B. R. Bowring's 1985 algorithm (single iteration).
+ * Reference: Olson, D. K. (1996). "Converting earth-Centered,
+ * Earth-Fixed Coordinates to Geodetic Coordinates," IEEE Transactions on
+ * Aerospace and Electronic Systems, Vol. 32, No. 1, January 1996, pp. 473-476
  */
 void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
     double * longitude, double * altitude)
 {
-        /* Get the parameters of the reference ellipsoid. */
-        const double a = WGS84_A, e = WGS84_E;
-        const double b2 = a * a * (1. - e * e);
-        const double b = sqrt(b2);
-        const double eb2 = e * e * a * a / b2;
-
-        /* Compute the geodetic coordinates. */
+        /* Get the parameters of the reference ellipsoid */
+        const double a = WGS84_A;
+        const double e2 = WGS84_E * WGS84_E;
+        const double a1 = a * e2;
+        const double a2 = a1 * a1;
+        const double a3 = 0.5 * a1 * e2;
+        const double a4 = 2.5 * a2;
+        const double a5 = a1 + a3;
+        const double a6 = 1. - e2;
+        
+        /* Check special cases */
         if ((ecef[0] == 0.) && (ecef[1] == 0.)) {
                 if (latitude != NULL) *latitude = (ecef[2] >= 0.) ? 90. : -90.;
                 if (longitude != NULL) *longitude = 0.0;
-                if (altitude != NULL) *altitude = fabs(ecef[2]) - b;
+                if (altitude != NULL) *altitude = fabs(ecef[2]) - sqrt(a2 * a6);
                 return;
         }
 
         if (longitude != NULL)
                 *longitude = atan2(ecef[1], ecef[0]) * 180. / M_PI;
         if ((latitude == NULL) && (altitude == NULL)) return;
-
-        const double p2 = ecef[0] * ecef[0] + ecef[1] * ecef[1];
-        const double p = sqrt(p2);
-        if (ecef[2] == 0.) {
-                if (latitude != NULL) *latitude = 0.;
-                if (altitude != NULL) *altitude = p - a;
-                return;
+        
+        /* Compute the geodetic coordinates */
+        const double zp = fabs(ecef[2]);
+        const double w2 = ecef[0] * ecef[0] + ecef[1] * ecef[1];
+        const double w = sqrt(w2);
+        const double z2 = ecef[2] * ecef[2];
+        const double r2 = w2 + z2;
+        const double r = sqrt(r2);
+        const double s2 = z2 / r2;
+        const double c2 = w2 / r2;
+        
+        double c, s, ss, la;
+        if (c2 > 0.3) {
+                const double u = a2 / r;
+                const double v = a3 - a4 / r;
+                s = (zp / r) * (1. + c2 * (a1 + u + s2 * v) / r);
+                la = asin(s);
+                ss = s * s;
+                c = sqrt(1. - ss);
+        } else {
+                const double u = a2 / r;
+                const double v = a3 - a4 / r;
+                c = (w / r) * (1. - s2 * (a5 - u - c2 * v) / r);
+                la = acos(c);
+                ss = 1. - c * c;
+                s = sqrt(ss);
         }
-
-        const double r = sqrt(p2 + ecef[2] * ecef[2]);
-        const double tu = b * ecef[2] * (1. + eb2 * b / r) / (a * p);
-        const double tu2 = tu * tu;
-        const double cu = 1. / sqrt(1. + tu2);
-        const double su = cu * tu;
-        const double tp =
-            (ecef[2] + eb2 * b * su * su * su) / (p - e * e * a * cu * cu * cu);
-        if (latitude != NULL) *latitude = atan(tp) * 180. / M_PI;
-
-        if (altitude != NULL) {
-                const double cp = 1. / sqrt(1.0 + tp * tp);
-                const double sp = cp * tp;
-                *altitude =
-                    p * cp + ecef[2] * sp - a * sqrt(1. - e * e * sp * sp);
-        }
+        
+        const double g = 1. - e2 * ss;
+        const double rg = a / sqrt(g);
+        const double rf = a6 * rg;
+        const double u = w - rg * c;
+        const double v = zp - rf * s;
+        const double f = c * u + s * v;
+        const double m = c * v - s * u;
+        const double p = m / (rf / g + f);
+        
+        la += p;
+        if (ecef[2] < 0.) la = -la;
+        if (latitude != NULL) *latitude = la * 180. / M_PI;
+        if (altitude != NULL) *altitude = f + 0.5 * m * p;
 }
 
-/* Compute the local East, North, Up (ENU) basis vectors. .
+/* Compute the local East, North, Up (ENU) basis vectors
  *
- * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system.
+ * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system
  */
 static inline void compute_enu(
     double latitude, double longitude, double e[3], double n[3], double u[3])
@@ -127,18 +150,18 @@ static inline void compute_enu(
         u[2] = sp;
 }
 
-/* Compute the direction vector in ECEF from the horizontal coordinates.
+/* Compute the direction vector in ECEF from the horizontal coordinates
  *
- * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system.
+ * Reference: https://en.wikipedia.org/wiki/Horizontal_coordinate_system
  */
 void turtle_ecef_from_horizontal(double latitude, double longitude,
     double azimuth, double elevation, double direction[3])
 {
-        /* Compute the local E, N, U basis vectors. */
+        /* Compute the local E, N, U basis vectors */
         double e[3], n[3], u[3];
         compute_enu(latitude, longitude, e, n, u);
 
-        /* Project on the E,N,U basis. */
+        /* Project on the E,N,U basis */
         const double az = azimuth * M_PI / 180.;
         const double el = elevation * M_PI / 180.;
         const double ce = cos(el);
@@ -152,11 +175,11 @@ void turtle_ecef_from_horizontal(double latitude, double longitude,
 void turtle_ecef_to_horizontal(double latitude, double longitude,
     const double direction[3], double * azimuth, double * elevation)
 {
-        /* Compute the local E, N, U basis vectors. */
+        /* Compute the local E, N, U basis vectors */
         double e[3], n[3], u[3];
         compute_enu(latitude, longitude, e, n, u);
 
-        /* Project on the E,N,U basis. */
+        /* Project on the E,N,U basis */
         const double x =
             e[0] * direction[0] + e[1] * direction[1] + e[2] * direction[2];
         const double y =

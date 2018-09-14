@@ -91,13 +91,13 @@ int main()
         int ix, iy;
         for (ix = 0; ix < nx; ix++)
                 for (iy = 0; iy < ny; iy++) {
-                        /* Get the node geodetic coordinates. */
+                        /* Get the node geodetic coordinates */
                         double x, y, latitude, longitude;
                         turtle_map_node(map, ix, iy, &x, &y, NULL);
                         turtle_projection_unproject(
                             rgf93, x, y, &latitude, &longitude);
 
-                        /* Fill the elevation. */
+                        /* Fill the elevation */
                         double elevation;
                         turtle_stack_elevation(
                             stack, latitude, longitude, &elevation, NULL);

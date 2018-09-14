@@ -218,7 +218,6 @@ static void test_ecef(void)
         
         /* Check the boundary cases */
         turtle_ecef_from_geodetic(90, 0, altitude, position);
-        position[0] = position[1] = 0.;
         turtle_ecef_to_geodetic(position, lla, lla + 1, lla + 2);
         assert(lla[0] == 90);
         assert(lla[1] == 0);
