@@ -870,6 +870,47 @@ TURTLE_API double turtle_stepper_range_get(
     const struct turtle_stepper * stepper);
 
 /**
+ * Get the slope factor for the stepping algorithm
+ *
+ * @param stepper    The stepper object
+ * @return The slope factor.
+ */
+TURTLE_API double turtle_stepper_slope_get(
+    const struct turtle_stepper * stepper);
+
+/**
+ * Set the slope factor for the stepping algorithm
+ *
+ * @param stepper    The stepper object
+ * @param slope      The slope factor
+ *
+ * Setting a slope factor smaller than one allows to resolve stepper slopes
+ * but at the cost of slowing down the stepping. The default value is 1.
+ */
+TURTLE_API void turtle_stepper_slope_set(
+    struct turtle_stepper * stepper, double slope);
+
+/**
+ * Get the resolution factor for the stepping algorithm
+ *
+ * @param stepper    The stepper object
+ * @return The resolution factor.
+ */
+TURTLE_API double turtle_stepper_resolution_get(
+    const struct turtle_stepper * stepper);
+
+/**
+ * Set the resolution factor for the stepping algorithm
+ *
+ * @param stepper        The stepper object
+ * @param resolution     The resolution factor
+ *
+ * The default value is 1E-02.
+ */
+TURTLE_API void turtle_stepper_resolution_set(
+    struct turtle_stepper * stepper, double resolution);
+
+/**
  * Add a `turtle_stack` data layer to a stepper
  *
  * @param stepper   The stepper object
@@ -936,7 +977,7 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
     struct turtle_stepper * stepper, double ground_level);
 
 /**
- * Access geography data from ECEF, step by step
+ * Sample geography data at a given ECEF position
  *
  * @param stepper              The stepper object
  * @param position             The ECEF position of interest
@@ -955,15 +996,52 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * set local *range*, an approximation might be used for computing geographic
  * coordinates.
  *
+ * If *layer* is non `NULL`, if the ECEF position is outside of the topography
+ * area then a negative layer value is returned. Otherwise an error is raised.
+ *
  * __Error codes__
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
  * data
  */
-TURTLE_API enum turtle_return turtle_stepper_step(
+TURTLE_API enum turtle_return turtle_stepper_sample(
     struct turtle_stepper * stepper, const double * position, double * latitude,
     double * longitude, double * altitude, double * ground_elevation,
     int * layer);
+
+/**
+ * Do a step through the topography using ECEF coordinates
+ *
+ * @param stepper              The stepper object
+ * @param position             The initial (final) ECEF position
+ * @param position             The initial direction in ECEF
+ * @param latitude             The final geodetic latitude
+ * @param longitude            The final geodetic longitude
+ * @param altitude             The final geodetic altitude
+ * @param ground_elevation     The final ground elevation
+ * @param step                 The step length
+ * @param layer                The final data layer
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below
+ *
+ * Do a single step through the topography along the given direction. At exit
+ * the ECEF position is updated. Note that any of the other output data can
+ * point to `NULL` if it is of no interest. Note also that depending of the
+ * set local *range*, an approximation might be used for computing geographic
+ * coordinates.
+ *
+ * If *layer* is non `NULL`, when the step exit the topography area then a
+ * negative layer value is returned. Otherwise an error is raised.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
+ * data
+ */
+enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
+    double * position, const double * direction, double * latitude,
+    double * longitude, double * altitude, double * ground_elevation,
+    double * step, int * layer);
 
 /**
  * Convert a geograhic location to an ECEF one

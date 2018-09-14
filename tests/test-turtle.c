@@ -416,7 +416,7 @@ static void test_stepper(void)
                 /* Get the initial position and direction in ECEF */
                 const double latitude = 45.5, longitude = 2.5;
                 const double azimuth = 0, elevation = 0;
-                const double height = 0.5, altitude_max = 1.5E+03;
+                const double height = -0.5, altitude_max = 1.5E+03;
                 double position[3], direction[3];
                 int layer;
                 turtle_stepper_position(stepper, latitude, longitude, height,
@@ -428,13 +428,13 @@ static void test_stepper(void)
                 for (;;) {
                         /* Update the step data */
                         double altitude, ground_elevation, la, lo;
-                        turtle_stepper_step(stepper, position, &la, &lo,
+                        turtle_stepper_sample(stepper, position, &la, &lo,
                             &altitude, &ground_elevation, &layer);
                         if (altitude >= altitude_max) break;
                         
                         double altitude1, ground_elevation1, la1, lo1;
                         int layer1;
-                        turtle_stepper_step(stepper, position, &la1, &lo1,
+                        turtle_stepper_sample(stepper, position, &la1, &lo1,
                             &altitude1, &ground_elevation1, &layer1);
                         assert(altitude1 == altitude);
                         assert(ground_elevation1 == ground_elevation);
@@ -443,10 +443,10 @@ static void test_stepper(void)
                         assert(layer1 == layer);
                 
                         /* Update the position */
-                        const double ds = 10;
-                        int i;
-                        for (i = 0; i < 3; i++)
-                                position[i] += direction[i] * ds;
+                        turtle_stepper_step(stepper, position, direction, &la,
+                            &lo, &altitude, &ground_elevation, NULL, &layer);
+                        if (altitude >= altitude_max) break;
+        
                 }
         }
         
@@ -466,7 +466,7 @@ static void test_stepper(void)
             position, &layer);
         
         double altitude, ground_elevation, la, lo;
-        turtle_stepper_step(stepper, position, &la, &lo, &altitude,
+        turtle_stepper_sample(stepper, position, &la, &lo, &altitude,
             &ground_elevation, &layer);
         assert(fabs(ground_elevation + height - altitude) < 1E-08);
         
@@ -474,14 +474,14 @@ static void test_stepper(void)
         turtle_stepper_create(&stepper);
         turtle_stepper_add_stack(stepper, stack);
         turtle_stepper_geoid_set(stepper, geoid);
-        turtle_stepper_step(stepper, position, &la, &lo, &altitude,
+        turtle_stepper_sample(stepper, position, &la, &lo, &altitude,
             &ground_elevation, &layer);
         assert(fabs(ground_elevation + height - altitude) < 1E-08);
         
         double direction[3];
         turtle_ecef_from_horizontal(latitude, longitude, 0, 0, direction);
         for (i = 0; i < 3; i++) position[i] += direction[i] * 1E+06;
-        turtle_stepper_step(stepper, position, &la, &lo, &altitude,
+        turtle_stepper_sample(stepper, position, &la, &lo, &altitude,
             &ground_elevation, &layer);
         assert(layer == -1);
         
@@ -498,13 +498,13 @@ static void test_stepper(void)
         
         turtle_stepper_position(stepper, latitude, longitude, height,
             position, &layer);
-        turtle_stepper_step(stepper, position, &la, &lo, &altitude,
+        turtle_stepper_sample(stepper, position, &la, &lo, &altitude,
             &ground_elevation, &layer);
         assert(fabs(ground_elevation + height - altitude) < 1E-08);
         
         double altitude1, ground_elevation1, la1, lo1;
         int layer1;
-        turtle_stepper_step(stepper, position, &la1, &lo1, &altitude1,
+        turtle_stepper_sample(stepper, position, &la1, &lo1, &altitude1,
             &ground_elevation1, &layer1);
         assert(altitude1 == altitude);
         assert(ground_elevation1 == ground_elevation);
@@ -513,12 +513,12 @@ static void test_stepper(void)
         assert(layer1 == layer);
         
         for (i = 0; i < 3; i++) position[i] += direction[i] * 10;
-        turtle_stepper_step(stepper, position, &la, &lo, &altitude,
+        turtle_stepper_sample(stepper, position, &la, &lo, &altitude,
             &ground_elevation, &layer);
         assert(ground_elevation == 0);
         
         for (i = 0; i < 3; i++) position[i] += direction[i] * 100;
-        turtle_stepper_step(stepper, position, &la, &lo, &altitude,
+        turtle_stepper_sample(stepper, position, &la, &lo, &altitude,
             &ground_elevation, &layer);
         assert(ground_elevation == 0);
         
@@ -733,7 +733,8 @@ static void test_strfunc(void)
         CHECK_API(turtle_stepper_range_get);
         CHECK_API(turtle_stepper_range_set);
         CHECK_API(turtle_stepper_position);
-        CHECK_API(turtle_stepper_step);
+        CHECK_API(turtle_stepper_sample);
+        CHECK_API(turtle_stepper_sample);
         
 #undef CHECK_API
 }

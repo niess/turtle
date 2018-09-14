@@ -76,11 +76,12 @@ int main(int argc, char * argv[])
 {
         /* Parse the arguments */
         double azimuth = 26., elevation = 5.;
-        double approximation_range = 10., step_min = 1E-02, slope_factor = 1.;
+        double approximation_range = 10., resolution_factor = 1E-02,
+            slope_factor = 1.;
         if (argc && --argc) azimuth = atof(*++argv);
         if (argc && --argc) elevation = atof(*++argv);
         if (argc && --argc) approximation_range = atof(*++argv);
-        if (argc && --argc) step_min = atof(*++argv);
+        if (argc && --argc) resolution_factor = atof(*++argv);
         if (argc && --argc) slope_factor = atof(*++argv);
 
         /* Set a custom error handler */
@@ -101,6 +102,8 @@ int main(int argc, char * argv[])
         /* Create the ECEF stepper and configure it */
         turtle_stepper_create(&stepper);
         turtle_stepper_geoid_set(stepper, geoid);
+        turtle_stepper_slope_set(stepper, slope_factor);
+        turtle_stepper_resolution_set(stepper, resolution_factor);
         turtle_stepper_range_set(stepper, approximation_range);
         turtle_stepper_add_flat(stepper, 0.);
         turtle_stepper_add_stack(stepper, stack);
@@ -116,56 +119,24 @@ int main(int argc, char * argv[])
             direction);
         
         double altitude, ground_elevation;
-        turtle_stepper_step(stepper, position, NULL, NULL, &altitude,
+        turtle_stepper_sample(stepper, position, NULL, NULL, &altitude,
             &ground_elevation, NULL);
 
         /* Do the stepping */
         double rock_length = 0.;
         while (altitude < altitude_max) {
-                /* Compute the step length */
-                double ds;
-                ds = slope_factor * fabs(altitude - ground_elevation);
-                if (ds < step_min) ds = step_min;
-                
-                /* Do the tentative step */
-                int i;
-                for (i = 0; i < 3; i++) position[i] += direction[i] * ds;
-                
+                /* Check the step position */
                 const int inside = altitude < ground_elevation;
-                turtle_stepper_step(stepper, position, NULL, NULL, &altitude,
-                    &ground_elevation, NULL);
-                const int inside1 = altitude < ground_elevation;
                 
-                if (inside != inside1) {
-                        /* A change of medium occured. Let us locate the
-                         * change of medium by dichotomy.
-                         */
-                        double ds0 = -ds, ds1 = 0.;
-                        while (ds1 - ds0 > 1E-08) {
-                                const double ds2 = 0.5 * (ds0 + ds1);
-                                double position2[3] = {
-                                        position[0] + direction[0] * ds2,
-                                        position[1] + direction[1] * ds2,
-                                        position[2] + direction[2] * ds2 };
-                                double altitude2, ground_elevation2;
-                                turtle_stepper_step(stepper, position2, NULL,
-                                    NULL, &altitude2, &ground_elevation2, NULL);
-                                const int inside2 =
-                                    altitude2 < ground_elevation2;
-                                if (inside2 == inside1) {
-                                        ds1 = ds2;
-                                        altitude = altitude2;
-                                        ground_elevation = ground_elevation2;
-                                } else
-                                        ds0 = ds2;
-                        }
-                        ds += ds1;
-                        for (i = 0; i < 3; i++)
-                                position[i] += direction[i] * ds1;
-                }
+                /* Do the next step */
+                double step;
+                turtle_stepper_step(stepper, position, direction, NULL,
+                        NULL, &altitude, &ground_elevation, &step, NULL);
 
-                /* Update the step length and the rock depth */
-                if (inside) rock_length += ds;
+                /* Update the rock depth if the step started below the
+                 * topography
+                 */
+                if (inside) rock_length += step;
         }
 
         /* Log the result and exit */

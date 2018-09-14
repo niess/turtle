@@ -129,6 +129,7 @@ const char * turtle_error_function(turtle_function_t * caller)
         TOSTRING(turtle_stepper_range_get);
         TOSTRING(turtle_stepper_range_set);
         TOSTRING(turtle_stepper_position);
+        TOSTRING(turtle_stepper_sample);
         TOSTRING(turtle_stepper_step);
 
         return NULL;
