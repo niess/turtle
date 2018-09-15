@@ -62,6 +62,13 @@ struct turtle_stepper_layer {
         struct turtle_stepper_transform transform;
 };
 
+struct turtle_stepper_sample {
+        double position[3];
+        double geographic[5];
+        double ground_elevation;
+        int layer;
+};
+
 /* Container for an ECEF stepper */
 struct turtle_stepper {
         struct turtle_stepper_layer * layers;
@@ -69,10 +76,7 @@ struct turtle_stepper {
         double local_range;
         double slope_factor;
         double resolution_factor;
-        double last_position[3];
-        double last_geographic[5];
-        double last_ground;
-        int last_layer;
+        struct turtle_stepper_sample last;
 };
 
 #endif

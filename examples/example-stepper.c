@@ -119,8 +119,8 @@ int main(int argc, char * argv[])
             direction);
         
         double altitude, ground_elevation;
-        turtle_stepper_sample(stepper, position, NULL, NULL, &altitude,
-            &ground_elevation, NULL);
+        turtle_stepper_step(stepper, position, NULL, NULL, NULL, &altitude,
+            &ground_elevation, NULL, NULL);
 
         /* Do the stepping */
         double rock_length = 0.;

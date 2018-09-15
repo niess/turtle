@@ -978,61 +978,35 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
     struct turtle_stepper * stepper, double ground_level);
 
 /**
- * Sample geography data at a given ECEF position
- *
- * @param stepper              The stepper object
- * @param position             The ECEF position of interest
- * @param latitude             The corresponding geodetic latitude
- * @param longitude            The corresponding geodetic longitude
- * @param altitude             The corresponding geodetic altitude
- * @param ground_elevation     The corresponding ground elevation
- * @param layer                The selected data layer
- * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
- * code is returned as detailed below
- *
- * Inspect the stepper's data stack and provide the top most valid one. If no
- * valid layer was found a negative *layer* value is returned, or an error is
- * raised if *layer* points to `NULL`. Note that any of the output data can
- * point to `NULL` if it is of no interest. Note also that depending of the
- * set local *range*, an approximation might be used for computing geographic
- * coordinates.
- *
- * If *layer* is non `NULL`, if the ECEF position is outside of the topography
- * area then a negative layer value is returned. Otherwise an error is raised.
- *
- * __Error codes__
- *
- *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
- * data
- */
-TURTLE_API enum turtle_return turtle_stepper_sample(
-    struct turtle_stepper * stepper, const double * position, double * latitude,
-    double * longitude, double * altitude, double * ground_elevation,
-    int * layer);
-
-/**
- * Do a step through the topography using ECEF coordinates
+ * Compute (or do) a step through the topography using ECEF coordinates
  *
  * @param stepper              The stepper object
  * @param position             The initial (final) ECEF position
- * @param position             The initial direction in ECEF
- * @param latitude             The final geodetic latitude
- * @param longitude            The final geodetic longitude
- * @param altitude             The final geodetic altitude
- * @param ground_elevation     The final ground elevation
- * @param step                 The step length
- * @param layer                The final data layer
+ * @param direction            The initial direction in ECEF, or `NULL`
+ * @param latitude             The (final) geodetic latitude
+ * @param longitude            The (final) geodetic longitude
+ * @param altitude             The (final) geodetic altitude
+ * @param ground_elevation     The (final) ground elevation
+ * @param step_length          The step length
+ * @param layer                The (final) data layer
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Do a single step through the topography along the given direction. At exit
- * the ECEF position is updated. Note that any of the other output data can
- * point to `NULL` if it is of no interest. Note also that depending of the
- * set local *range*, an approximation might be used for computing geographic
- * coordinates.
- *
- * If *layer* is non `NULL`, when the step exit the topography area then a
- * negative layer value is returned. Otherwise an error is raised.
+ * If *direction* is `NULL`, sample the geography data at the given ECEF
+ * position and compute a tentative *step length*. The top most valid data in
+ * the stepper's stack are returned. If no valid layer was found a negative
+ * *layer* value is returned, or an error is raised if *layer* points to `NULL`.
+ * 
+ * If a *direction* is provided, do a single step through the topography along
+ * the given direction, using the tentative *step length*. If a change of medium
+ * occurs, the boundary is located using a binary search. At exit the ECEF
+ * position is updated. If the step exit the topography area and if *layer* is
+ * non `NULL`, then a negative layer value is returned. Otherwise an error is
+ * raised.
+ * 
+ * Note that any of the output data can point to `NULL` if it is of no interest.
+ * Note also that depending of the set local *range*, an approximation might be
+ * used for computing geographic coordinates.
  *
  * __Error codes__
  *
