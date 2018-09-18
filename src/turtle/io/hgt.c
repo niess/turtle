@@ -96,7 +96,7 @@ static enum turtle_return hgt_open(struct turtle_io * io, const char * path,
         }
 
         const int n = ext - filename - 8;
-        if ((n == 0) || (strncmp(filename + 8, "SRTMGL1", n) == 0))
+        if ((n == 0) || (strncmp(filename + 8, "SRTMGL1", n - 1) == 0))
                 io->meta.nx = io->meta.ny = 3601;
         else
                 io->meta.nx = io->meta.ny = 1201;
