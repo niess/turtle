@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/niess/turtle.svg?branch=ci)](https://travis-ci.com/niess/turtle)
+[![Build Status](https://travis-ci.com/niess/turtle.svg?branch=dev)](https://travis-ci.com/niess/turtle)
 [![codecov](https://codecov.io/gh/niess/turtle/branch/dev/graph/badge.svg)](https://codecov.io/gh/niess/turtle)
 
 # TURTLE
