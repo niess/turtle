@@ -22,10 +22,11 @@
 /* C89 standard library */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Default handler for TURTLE library errors */
 static void handle_error(
-    enum turtle_return rc, turtle_function_t * function, const char * message)
+    enum turtle_return code, turtle_function_t * function, const char * message)
 {
         fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
         exit(EXIT_FAILURE);
@@ -43,6 +44,25 @@ void turtle_error_handler_set(turtle_error_handler_t * handler)
         _handler = handler;
 }
 
+/* Utility function for setting a static error */
+enum turtle_return turtle_error_message_(struct turtle_error_context * error_,
+    enum turtle_return rc, const char * file, int line, const char * message)
+{
+        error_->code = rc;
+        if ((_handler == NULL) || (rc == TURTLE_RETURN_SUCCESS)) return rc;
+        error_->file = file;
+        error_->line = line;
+        
+        if (error_->dynamic && (error_->message != NULL)) {
+                free(error_->message);
+                error_->message = NULL;
+        }
+        error_->message = (char *)message;
+        error_->dynamic = 0;
+
+        return error_->code;
+}
+
 /* Utility function for formating an error */
 enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
     enum turtle_return rc, const char * file, int line, const char * format,
@@ -50,20 +70,38 @@ enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
 {
         error_->code = rc;
         if ((_handler == NULL) || (rc == TURTLE_RETURN_SUCCESS)) return rc;
+        error_->file = file;
+        error_->line = line;
+        
+        /* Compute the length of the error message, in order to store it
+         * on the heap
+         */
+        va_list ap;
+        va_start(ap, format);
+        const int n = vsnprintf(NULL, 0, format, ap);
+        va_end(ap);
 
-        /* Format the error message */
-        const int n = snprintf(error_->message, TURTLE_ERROR_MSG_LENGTH,
-            "{ %s [#%d], %s:%d } ", turtle_error_function(error_->function),
-            rc, file, line);
-        if (n < TURTLE_ERROR_MSG_LENGTH - 1) {
-                va_list ap;
-                va_start(ap, format);
-                vsnprintf(error_->message + n, TURTLE_ERROR_MSG_LENGTH - n,
-                    format, ap);
-                va_end(ap);
+        /* Allocate memory on the heap for the error message */
+        if (error_->dynamic && (error_->message != NULL)) {
+                free(error_->message);
+                error_->message = NULL;
         }
+        error_->message = malloc(n + 1);
+        if (error_->message == NULL) {
+                /* Fallback message */
+                error_->message =
+                    (char *)"unknown error (could not allocate memory)";
+                error_->dynamic = 0;
+                return rc;
+        }
+        error_->dynamic = 1;
 
-        return rc;
+        /* Fill the error message and return */
+        va_start(ap, format);
+        vsprintf(error_->message, format, ap);
+        va_end(ap);
+
+        return error_->code;
 }
 
 /* Utility function for handling an error */
@@ -72,7 +110,30 @@ enum turtle_return turtle_error_raise_(struct turtle_error_context * error_)
         if ((_handler == NULL) || (error_->code == TURTLE_RETURN_SUCCESS))
                 return error_->code;
 
-        _handler(error_->code, error_->function, error_->message);
+        /* Compute the total of the error message, in order to store it
+         * back on the stack
+         */
+        const int m = snprintf(NULL, 0, "{ %s [#%d], %s:%d } ",
+            turtle_error_function(error_->function), error_->code, error_->file,
+            error_->line);
+        const int n = strlen(error_->message);
+        
+        /* Format the erreor message on the stack */
+        char message[m + n + 1];
+        sprintf(message, "{ %s [#%d], %s:%d } ",
+            turtle_error_function(error_->function), error_->code, error_->file,
+            error_->line);
+        memcpy(message + m, error_->message, n + 1);
+        
+        /* Free any dynamic memory */
+        if (error_->dynamic) {
+                free(error_->message);
+                error_->dynamic = 0;
+        }
+        
+        /* Call the library error handler */
+        _handler(error_->code, error_->function, message);
+
         return error_->code;
 }
 
@@ -86,16 +147,16 @@ const char * turtle_error_function(turtle_function_t * caller)
         TOSTRING(turtle_client_create);
         TOSTRING(turtle_client_destroy);
         TOSTRING(turtle_client_elevation);
-        
+
         TOSTRING(turtle_ecef_from_geodetic);
         TOSTRING(turtle_ecef_from_horizontal);
         TOSTRING(turtle_ecef_to_geodetic);
         TOSTRING(turtle_ecef_to_horizontal);
-        
+
         TOSTRING(turtle_error_function);
         TOSTRING(turtle_error_handler_get);
         TOSTRING(turtle_error_handler_set);
-        
+
         TOSTRING(turtle_map_create);
         TOSTRING(turtle_map_destroy);
         TOSTRING(turtle_map_dump);
@@ -105,20 +166,20 @@ const char * turtle_error_function(turtle_function_t * caller)
         TOSTRING(turtle_map_meta);
         TOSTRING(turtle_map_node);
         TOSTRING(turtle_map_projection);
-        
+
         TOSTRING(turtle_projection_configure);
         TOSTRING(turtle_projection_create);
         TOSTRING(turtle_projection_destroy);
         TOSTRING(turtle_projection_name);
         TOSTRING(turtle_projection_project);
         TOSTRING(turtle_projection_unproject);
-        
+
         TOSTRING(turtle_stack_clear);
         TOSTRING(turtle_stack_create);
         TOSTRING(turtle_stack_destroy);
         TOSTRING(turtle_stack_elevation);
         TOSTRING(turtle_stack_load);
-        
+
         TOSTRING(turtle_stepper_add_flat);
         TOSTRING(turtle_stepper_add_map);
         TOSTRING(turtle_stepper_add_stack);

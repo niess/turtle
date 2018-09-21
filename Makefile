@@ -95,7 +95,7 @@ test: bin/test-turtle
 	@mkdir -p tests/topography
 	@./bin/test-turtle
 	@rm -rf tests/*.png tests/*.grd tests/*.hgt tests/*.tif                \
-		tests/topography/*.png
+		tests/topography/*
 	@mv *.gcda tests/.
 	@gcov -o tests $(SOURCES)
 	@rm -rf tinydir.h.gcov tests/test-turtle.gcno tests/test-turtle.gcda
@@ -106,8 +106,9 @@ bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
 	@gcc -o $@ $(CFLAGS) -O0 -g -ftest-coverage -fprofile-arcs $(INCLUDES) \
 		$^ $(LIBS)
 	@mv *.gcno tests/.
-	
+
 # Clean-up rule
 clean:
 	@rm -rf bin lib build tests/*.gcno tests/*.gcda tests/*.gcov *.gcov    \
-		*.gcno *.gcda tests/*.png tests/*.grd tests/topography
+		*.gcno *.gcda tests/*.png tests/*.grd tests/*.hgt tests/*.tif  \
+		tests/topography

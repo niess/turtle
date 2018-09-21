@@ -51,7 +51,7 @@ enum turtle_return turtle_client_create(
                 return TURTLE_ERROR_MESSAGE(
                     TURTLE_RETURN_BAD_ADDRESS, "stack has no lock");
         }
-                
+
         /* Allocate the new client and initialise it. */
         *client = malloc(sizeof(**client));
         if (*client == NULL) return TURTLE_ERROR_MEMORY();

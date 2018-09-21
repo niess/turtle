@@ -58,8 +58,8 @@ void exit_gracefully(enum turtle_return rc)
 }
 
 /* Handler for TURTLE library errors */
-void handle_error(
-    enum turtle_return rc, turtle_function_t * function, const char * message)
+void handle_error(enum turtle_return code, turtle_function_t * function,
+    const char * message)
 {
         fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
         exit_gracefully(EXIT_FAILURE);

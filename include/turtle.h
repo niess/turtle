@@ -91,9 +91,9 @@ struct turtle_stepper;
  * Meta data for elevation maps
  */
 struct turtle_map_info {
-        /* Number of grid nodes along X */
+        /** Number of grid nodes along X */
         int nx;
-        /* Number of grid nodes along Y */
+        /** Number of grid nodes along Y */
         int ny;
         /** X coordinate range (min, max) */
         double x[2];
@@ -116,7 +116,7 @@ typedef void turtle_function_t(void);
 /**
  * Callback for handling TURTLE library errors
  *
- * @param rc        The TURTLE return code
+ * @param code      The TURTLE return code
  * @param caller    The caller function where the error occured
  * @param message   A formated message describing the error
  *
@@ -130,8 +130,8 @@ typedef void turtle_function_t(void);
  *
  * This callback *must* be thread safe if a `turtle_client` is used.
  */
-typedef void turtle_error_handler_t(
-    enum turtle_return rc, turtle_function_t * caller, const char * message);
+typedef void turtle_error_handler_t(enum turtle_return code,
+    turtle_function_t * function, const char * message);
 
 /**
  * Callbacks for managing concurent accesses to the stack

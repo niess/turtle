@@ -30,7 +30,7 @@
  * application using `pthread` and `mutex`. A set of `N_THREADS` clients
  * concurrently access data of a Global Digital Elevation Model (GDEM) over a
  * 2x2 deg^2 angular grid.
- * 
+ *
  * Note that for this example to work you'll need the 4 tiles at (45N, 2E),
  * (45N, 3E), (46N, 2E), and (46N, 3E) from a global model, e.g. N45E002.hgt,
  * etc ... for SRTMGL1. These tiles are assumed to be located in a folder named

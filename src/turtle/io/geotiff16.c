@@ -77,7 +77,7 @@ static void turtle_geotiff16_register(void)
 {
         static int initialised = 0;
         if (initialised) return;
-        
+
         parent_extender = TIFFSetTagExtender(default_directory);
         TIFFSetErrorHandler(NULL); /* Mute error messages */
         initialised = 1;
@@ -193,14 +193,14 @@ static enum turtle_return geotiff16_write(struct turtle_io * io,
     const struct turtle_map * map, struct turtle_error_context * error_)
 {
         struct geotiff16_io * geotiff16 = (struct geotiff16_io *)io;
-        
+
         /* Check the map scale */
         if ((map->meta.z0 != -32767.) || (map->meta.dz != 1.)) {
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "unsupported z scale when dumping map to `%s'",
                     geotiff16->path);
         }
-        
+
         /* Check that there is no projection */
         if (turtle_map_projection((struct turtle_map *)map) != NULL) {
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
@@ -224,7 +224,7 @@ static enum turtle_return geotiff16_write(struct turtle_io * io,
 
         double scale[3] = { map->meta.dx, map->meta.dy, 0. };
         TIFFSetField(geotiff16->tiff, TIFFTAG_GEOPIXELSCALE, 3, scale);
-        
+
         double tiepoints[6] = { 0, 0, 0, map->meta.x0,
             map->meta.y0 + (map->meta.ny - 1) * map->meta.dy, 0. };
         TIFFSetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, 6, tiepoints);
@@ -280,9 +280,9 @@ enum turtle_return turtle_io_geotiff16_create_(
 
         geotiff16->base.meta.get_z = &get_z;
         geotiff16->base.meta.set_z = &set_z;
-        
+
         /* Register the GeoTIFF tags, if not already done */
         turtle_geotiff16_register();
-        
+
         return TURTLE_RETURN_SUCCESS;
 }

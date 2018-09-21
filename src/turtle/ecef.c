@@ -71,7 +71,7 @@ void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
         const double a4 = 2.5 * a2;
         const double a5 = a1 + a3;
         const double a6 = 1. - e2;
-        
+
         /* Check special cases */
         if ((ecef[0] == 0.) && (ecef[1] == 0.)) {
                 if (latitude != NULL) *latitude = (ecef[2] >= 0.) ? 90. : -90.;
@@ -83,7 +83,7 @@ void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
         if (longitude != NULL)
                 *longitude = atan2(ecef[1], ecef[0]) * 180. / M_PI;
         if ((latitude == NULL) && (altitude == NULL)) return;
-        
+
         /* Compute the geodetic coordinates */
         const double zp = fabs(ecef[2]);
         const double w2 = ecef[0] * ecef[0] + ecef[1] * ecef[1];
@@ -93,7 +93,7 @@ void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
         const double r = sqrt(r2);
         const double s2 = z2 / r2;
         const double c2 = w2 / r2;
-        
+
         double c, s, ss, la;
         if (c2 > 0.3) {
                 const double u = a2 / r;
@@ -110,7 +110,7 @@ void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
                 ss = 1. - c * c;
                 s = sqrt(ss);
         }
-        
+
         const double g = 1. - e2 * ss;
         const double rg = a / sqrt(g);
         const double rf = a6 * rg;
@@ -119,7 +119,7 @@ void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
         const double f = c * u + s * v;
         const double m = c * v - s * u;
         const double p = m / (rf / g + f);
-        
+
         la += p;
         if (ecef[2] < 0.) la = -la;
         if (latitude != NULL) *latitude = la * 180. / M_PI;

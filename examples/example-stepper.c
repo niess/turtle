@@ -65,8 +65,8 @@ void exit_gracefully(enum turtle_return rc)
 }
 
 /* Handler for TURTLE library errors */
-void handle_error(
-    enum turtle_return rc, turtle_function_t * caller, const char * message)
+void handle_error(enum turtle_return code, turtle_function_t * function,
+    const char * message)
 {
         fprintf(stderr, "A TURTLE library error occurred:\n%s\n", message);
         exit_gracefully(EXIT_FAILURE);
@@ -117,7 +117,7 @@ int main(int argc, char * argv[])
             position, NULL);
         turtle_ecef_from_horizontal(latitude, longitude, azimuth, elevation,
             direction);
-        
+
         double altitude, ground_elevation;
         turtle_stepper_step(stepper, position, NULL, NULL, NULL, &altitude,
             &ground_elevation, NULL, NULL);
@@ -127,7 +127,7 @@ int main(int argc, char * argv[])
         while (altitude < altitude_max) {
                 /* Check the step position */
                 const int inside = altitude < ground_elevation;
-                
+
                 /* Do the next step */
                 double step;
                 turtle_stepper_step(stepper, position, direction, NULL,

@@ -31,20 +31,23 @@
 /* Storage for error data */
 struct turtle_error_context {
         enum turtle_return code;
+        const char * file;
+        int line;
         turtle_function_t * function;
-#define TURTLE_ERROR_MSG_LENGTH 1024
-        char message[TURTLE_ERROR_MSG_LENGTH];
+        char * message;
+        int dynamic;
 };
 
 /* Helper macros for managing errors */
 #define TURTLE_ERROR_INITIALISE(caller)                                        \
         struct turtle_error_context error_data = {.code =                      \
                                                       TURTLE_RETURN_SUCCESS,   \
-                .function = (turtle_function_t *)caller };                     \
+                .function = (turtle_function_t *)caller, .message = NULL,      \
+                .dynamic = 0 };                                                \
         struct turtle_error_context * error_ = &error_data;
 
 #define TURTLE_ERROR_MESSAGE(rc, message)                                      \
-        turtle_error_format_(error_, rc, __FILE__, __LINE__, message),         \
+        turtle_error_message_(error_, rc, __FILE__, __LINE__, message),        \
             turtle_error_raise_(error_)
 
 #define TURTLE_ERROR_FORMAT(rc, format, ...)                                   \
@@ -53,7 +56,7 @@ struct turtle_error_context {
             turtle_error_raise_(error_)
 
 #define TURTLE_ERROR_REGISTER(rc, message)                                     \
-        turtle_error_format_(error_, rc, __FILE__, __LINE__, message)
+        turtle_error_message_(error_, rc, __FILE__, __LINE__, message)
 
 #define TURTLE_ERROR_VREGISTER(rc, format, ...)                                \
         turtle_error_format_(                                                  \
@@ -100,6 +103,10 @@ struct turtle_error_context {
 #define TURTLE_ERROR_UNEXPECTED(rc)                                            \
         TURTLE_ERROR_MESSAGE(rc, "an unexpected error occured");
 
+/* Generic function for setting a static error message */
+enum turtle_return turtle_error_message_(struct turtle_error_context * error_,
+    enum turtle_return rc, const char * file, int line, const char * message);
+        
 /* Generic function for formating an error */
 enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
     enum turtle_return rc, const char * file, int line, const char * format,
