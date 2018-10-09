@@ -124,7 +124,7 @@ typedef void turtle_function_t(void);
  * to `stderr` and a hard exit occurs.
  *
  * **Note** : providing a `NULL` error handler disables error handling.
- * Nevertheless, the TURTLE library functions will still return and error code. 
+ * Nevertheless, the TURTLE library functions will still return and error code.
  *
  * __Warnings__
  *
@@ -167,7 +167,7 @@ TURTLE_API const char * turtle_error_function(turtle_function_t * function);
  * occurs.
  *
  * **Note** : providing a `NULL` error handler disables error handling.
- * Nevertheless, the TURTLE library functions will still return and error code. 
+ * Nevertheless, the TURTLE library functions will still return and error code.
  */
 TURTLE_API turtle_error_handler_t * turtle_error_handler_get(void);
 
@@ -183,10 +183,10 @@ TURTLE_API turtle_error_handler_t * turtle_error_handler_get(void);
  *
  * Note that providing a `NULL` error handler disables error handling.
  * Nevertheless, the TURTLE library functions will still return and error code.
- * 
+ *
  * Note also that this function can be called before the library
  * initialisation.
- * 
+ *
  * __Warnings__
  *
  * This function is not thread safe.
@@ -852,10 +852,10 @@ TURTLE_API struct turtle_map * turtle_stepper_geoid_get(
  * @param stepper    The stepper object
  * @param range      The approximation range, in m
  *
- * Setting a strictly positive range enables the use of local approximations to
- * geographic transforms, for small consecutive steps. Note that by default
- * this feature is disabled. A typical range value is 100 m, resulting in Less
- * than 1 cm distortions.
+ * Setting a strictly positive range enables the use of local linear
+ * approximations (LLA) to geographic transforms, for small consecutive
+ * steps. The default range value is 1 m. Set this to zero in order to
+ * disable LLA.
  */
 TURTLE_API void turtle_stepper_range_set(
     struct turtle_stepper * stepper, double range);
@@ -873,7 +873,7 @@ TURTLE_API double turtle_stepper_range_get(
  * Get the slope factor for the stepping algorithm
  *
  * @param stepper    The stepper object
- * @return The slope factor.
+ * @return The slope factor*
  */
 TURTLE_API double turtle_stepper_slope_get(
     const struct turtle_stepper * stepper);
@@ -885,7 +885,7 @@ TURTLE_API double turtle_stepper_slope_get(
  * @param slope      The slope factor
  *
  * Setting a slope factor smaller than one allows to resolve stepper slopes
- * but at the cost of slowing down the stepping. The default value is 1.
+ * but at the cost of slowing down the stepping. The default value is 0.4.
  */
 TURTLE_API void turtle_stepper_slope_set(
     struct turtle_stepper * stepper, double slope);
@@ -894,7 +894,7 @@ TURTLE_API void turtle_stepper_slope_set(
  * Get the resolution factor for the stepping algorithm
  *
  * @param stepper    The stepper object
- * @return The resolution factor.
+ * @return The resolution factor
  */
 TURTLE_API double turtle_stepper_resolution_get(
     const struct turtle_stepper * stepper);
@@ -906,7 +906,7 @@ TURTLE_API double turtle_stepper_resolution_get(
  * @param resolution     The resolution factor
  *
  * The resolution factor corresponds to the minimum length for the initial
- * step. Its default value is 1E-02.
+ * step. Its default value is 1E-02 (1 cm).
  */
 TURTLE_API void turtle_stepper_resolution_set(
     struct turtle_stepper * stepper, double resolution);
@@ -996,14 +996,14 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * position and compute a tentative *step length*. The top most valid data in
  * the stepper's stack are returned. If no valid layer was found a negative
  * *layer* value is returned, or an error is raised if *layer* points to `NULL`.
- * 
+ *
  * If a *direction* is provided, do a single step through the topography along
  * the given direction, using the tentative *step length*. If a change of medium
  * occurs, the boundary is located using a binary search. At exit the ECEF
  * position is updated. If the step exit the topography area and if *layer* is
  * non `NULL`, then a negative layer value is returned. Otherwise an error is
  * raised.
- * 
+ *
  * Note that any of the output data can point to `NULL` if it is of no interest.
  * Note also that depending of the set local *range*, an approximation might be
  * used for computing geographic coordinates.

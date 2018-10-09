@@ -351,8 +351,8 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper_)
         *stepper_ = stepper;
         stepper->layers = NULL;
         stepper->geoid = NULL;
-        stepper->local_range = 0.;
-        stepper->slope_factor = 1.;
+        stepper->local_range = 1.;
+        stepper->slope_factor = 0.4;
         stepper->resolution_factor = 1E-02;
         stepper->last.position[0] = DBL_MAX;
         stepper->last.position[1] = DBL_MAX;

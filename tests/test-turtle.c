@@ -453,12 +453,12 @@ static void test_stepper(void)
         turtle_stepper_add_flat(stepper, 0);
 
         assert(turtle_stepper_geoid_get(stepper) == geoid);
-        assert(turtle_stepper_range_get(stepper) == 0);
+        assert(turtle_stepper_range_get(stepper) == 1.);
         turtle_stepper_range_set(stepper, 10.);
         assert(turtle_stepper_range_get(stepper) == 10.);
+        assert(turtle_stepper_slope_get(stepper) == 0.4);
+        turtle_stepper_slope_set(stepper, 1.);
         assert(turtle_stepper_slope_get(stepper) == 1.);
-        turtle_stepper_slope_set(stepper, 0.5);
-        assert(turtle_stepper_slope_get(stepper) == 0.5);
         assert(turtle_stepper_resolution_get(stepper) == 1E-02);
         turtle_stepper_resolution_set(stepper, 1E-03);
         assert(turtle_stepper_resolution_get(stepper) == 1E-03);
