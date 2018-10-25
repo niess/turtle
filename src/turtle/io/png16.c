@@ -418,7 +418,6 @@ exit:
         /* Clean and return */
         free(header);
         if (row_pointers != NULL) {
-                int i;
                 for (i = 0; i < ny; i++) free(row_pointers[i]);
                 free(row_pointers);
         }
