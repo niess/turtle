@@ -2,13 +2,23 @@
 [![codecov](https://codecov.io/gh/niess/turtle/branch/master/graph/badge.svg)](https://codecov.io/gh/niess/turtle)
 
 # TURTLE
-( **T**opographic **U**tilities for t**R**ansporting par**T**icules over **L**ong rang**E**s )
+( **T**opographic **U**tilities for t**R**ansporting par**T**icules over
+  **L**ong rang**E**s )
 
 ## Description
 
-TURTLE is a C99 library providing utilities for the long range transport of
-particles through a topography, described by **D**igital **E**levation
-**M**odels (**DEM**s). Its main features are:
+TURTLE is a C library providing utilities for the long range transport of
+Monte-Carlo particles through a topography, described by **D**igital
+**E**levation **M**odels (**DEM**s). The library was built upon a versatile
+*optimistic* ray tracing algorithm. This algorithm uses only local topography
+data at each Monte-Carlo step, which makes it very efficient for scattering
+particles. The added cpu per Monte-Carlo step is only of a few hundreds of ns.
+In addition, this algorithm allows to traverse a topography in constant time,
+i.e. indepently of the number of DEM nodes, and with zero extra memory cost. As
+a result, TURTLE is also very efficient for ray tracing problems in large scale
+topographies, comprising bilions of nodes.
+
+The main technical features of the TURTLE library are:
 
 * Support for local projection maps (**UTM**, **Lambert**, **RGF93**) as well
 as for tiled world wide models, e.g. [SRTMGL1](https://lpdaac.usgs.gov/node/527)
