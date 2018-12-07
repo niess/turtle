@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.com/niess/turtle.svg?branch=master)](https://travis-ci.com/niess/turtle)
 [![codecov](https://codecov.io/gh/niess/turtle/branch/master/graph/badge.svg)](https://codecov.io/gh/niess/turtle)
+[![Build Status](https://travis-ci.com/niess/turtle.svg?branch=master)](https://travis-ci.com/niess/turtle)
 
 # TURTLE
 ( **T**opographic **U**tilities for t**R**ansporting par**T**icules over

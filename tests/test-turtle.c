@@ -37,6 +37,8 @@
 #endif
 /* The TURTLE library */
 #include "turtle.h"
+/* Opaque TURTLE lists */
+#include "../src/turtle/list.h"
 
 static void catch_error(enum turtle_return code, turtle_function_t * function,
     const char * message)
@@ -745,6 +747,71 @@ static void test_strfunc(void)
 #undef CHECK_API
 }
 
+static void test_list(void)
+{
+        struct turtle_list list = { 0 };
+        struct turtle_list_element * e0 = malloc(sizeof(*e0));
+        struct turtle_list_element * e1 = malloc(sizeof(*e1));
+        struct turtle_list_element * e2 = malloc(sizeof(*e2));
+        struct turtle_list_element * e3 = malloc(sizeof(*e3));
+        struct turtle_list_element * e4 = malloc(sizeof(*e4));
+
+        turtle_list_append_(&list, e0);
+        assert(list.head == e0);
+        assert(list.tail == e0);
+        assert(e0->previous == NULL);
+        assert(e0->next == NULL);
+
+        turtle_list_insert_(&list, e1, 0);
+        assert(list.head == e1);
+        assert(e1->next == e0);
+        assert(e1->previous == NULL);
+        assert(e0->previous == e1);
+
+        turtle_list_append_(&list, e2);
+        assert(list.tail == e2);
+        assert(e2->previous == e0);
+        assert(e0->next == e2);
+        assert(e2->next == NULL);
+
+        turtle_list_insert_(&list, e3, 1);
+        assert(list.head == e1);
+        assert(e0->previous == e3);
+        assert(e3->previous == e1);
+        assert(e3->next == e0);
+        assert(e1->next == e3);
+
+        turtle_list_insert_(&list, e4, 5);
+        assert(list.tail == e4);
+        assert(e4->previous == e2);
+        assert(e4->next == NULL);
+        assert(e2->next == e4);
+        assert(list.size == 5);
+
+        turtle_list_remove_(&list, e1);
+        free(e1);
+        assert(e3->previous == NULL);
+        assert(e3->next == e0);
+
+        turtle_list_remove_(&list, e4);
+        free(e4);
+        assert(e3->previous == NULL);
+        assert(e3->next == e0);
+
+        turtle_list_remove_(&list, e0);
+        free(e0);
+        assert(list.size == 2);
+        assert(e3->previous == NULL);
+        assert(e3->next == e2);
+        assert(e2->previous == e3);
+        assert(e2->next == NULL);
+
+        turtle_list_clear_(&list);
+        assert(list.head == NULL);
+        assert(list.tail == NULL);
+        assert(list.size == 0);
+}
+
 int main()
 {
         /* Run the tests */
@@ -753,6 +820,7 @@ int main()
         test_ecef();
         test_stack();
         test_client();
+        test_list();
         test_stepper();
 #ifndef TURTLE_NO_GRD
         test_io_grd();

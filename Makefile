@@ -87,9 +87,10 @@ bin/example-%: examples/example-%.c lib/libturtle.so
 
 # Rules for building the tests binaries
 SOURCES := src/turtle/client.c src/turtle/ecef.c src/turtle/error.c            \
-	src/turtle/io.c src/turtle/map.c src/turtle/projection.c               \
-	src/turtle/stack.c src/turtle/stepper.c src/turtle/io/geotiff16.c      \
-	src/turtle/io/grd.c src/turtle/io/hgt.c src/turtle/io/png16.c
+	src/turtle/io.c src/turtle/list.c src/turtle/map.c                     \
+	src/turtle/projection.c src/turtle/stack.c src/turtle/stepper.c        \
+	src/turtle/io/geotiff16.c src/turtle/io/grd.c src/turtle/io/hgt.c      \
+	src/turtle/io/png16.c
 
 test: bin/test-turtle
 	@mkdir -p tests/topography
