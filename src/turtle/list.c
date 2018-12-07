@@ -97,3 +97,25 @@ void turtle_list_clear_(struct turtle_list * list)
         list->head = list->tail = NULL;
         list->size = 0;
 }
+
+void * turtle_list_pop_(struct turtle_list * list)
+{
+        if (list->tail == NULL)
+                return NULL;
+
+        struct turtle_list_element * element = list->tail;
+        struct turtle_list_element * previous = element->previous;
+
+        if (previous == NULL) {
+                list->head = NULL;
+        }
+        else {
+                previous->next = NULL;
+                if (previous->previous == NULL)
+                        list->head = previous;
+        }
+        list->tail = previous;
+        list->size--;
+
+        return element;
+}

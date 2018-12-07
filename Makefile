@@ -3,8 +3,9 @@ CFLAGS := -O3 -std=c99 -pedantic -Wall -fPIC
 LIBS := -lm
 INCLUDES := -Iinclude -Isrc
 
-OBJS := build/client.o build/ecef.o build/error.o build/io.o build/map.o       \
-	build/projection.o build/stack.o build/stepper.o build/tinydir.o
+OBJS := build/client.o build/ecef.o build/error.o build/io.o build/list.o      \
+	build/map.o build/projection.o build/stack.o build/stepper.o           \
+	build/tinydir.o
 
 # Flag for GEOTIFF files
 TURTLE_USE_TIFF := 1

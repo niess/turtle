@@ -24,14 +24,14 @@
 
 /* Base list element */
 struct turtle_list_element {
-        struct turtle_list_element * previous;
-        struct turtle_list_element * next;
+        void * previous;
+        void * next;
 };
 
 /* List container */
 struct turtle_list {
-        struct turtle_list_element * head;
-        struct turtle_list_element * tail;
+        void * head;
+        void * tail;
         int size;
 };
 
@@ -41,5 +41,6 @@ void turtle_list_insert_(
     struct turtle_list * list, void * element, int position);
 void turtle_list_remove_(struct turtle_list * list, void * element);
 void turtle_list_clear_(struct turtle_list * list);
+void * turtle_list_pop_(struct turtle_list * list);
 
 #endif

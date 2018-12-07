@@ -37,8 +37,9 @@
 #endif
 /* The TURTLE library */
 #include "turtle.h"
-/* Opaque TURTLE lists */
+/* Opaque TURTLE data */
 #include "../src/turtle/list.h"
+#include "../src/turtle/stepper.h"
 
 static void catch_error(enum turtle_return code, turtle_function_t * function,
     const char * message)
@@ -405,6 +406,11 @@ static void test_stepper(void)
         turtle_stepper_add_flat(stepper, 10);
         turtle_stepper_add_stack(stepper, stack);
         turtle_stepper_add_map(stepper, map);
+        turtle_stepper_add_stack(stepper, stack);
+        turtle_stepper_add_map(stepper, map);
+
+        assert(stepper->data.size == 5);
+        assert(stepper->transforms.size == 2);
 
         for (i = 0; i < 2; i++) {
                 /* Set the approximation range */
@@ -806,6 +812,21 @@ static void test_list(void)
         assert(e2->previous == e3);
         assert(e2->next == NULL);
 
+        struct turtle_list_element * e = turtle_list_pop_(&list);
+        assert(e == e2);
+        assert(e3->next == NULL);
+        assert(list.size == 1);
+        assert(list.head == e3);
+        assert(list.tail == e3);
+
+        e = turtle_list_pop_(&list);
+        assert(e == e3);
+        assert(list.head == NULL);
+        assert(list.tail == NULL);
+        assert(list.size == 0);
+
+        turtle_list_append_(&list, e2);
+        turtle_list_append_(&list, e3);
         turtle_list_clear_(&list);
         assert(list.head == NULL);
         assert(list.tail == NULL);
