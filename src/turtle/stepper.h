@@ -49,8 +49,10 @@ struct turtle_stepper_transform {
         double reference_geographic[5];
         double data[5][3];
 
-        int updated;
-        double geographic[5];
+        struct {
+                int updated;
+                double geographic[5];
+        } history;
 
         char name[];
 };
@@ -65,22 +67,41 @@ struct turtle_stepper_data {
                 struct turtle_client * client;
                 struct turtle_stack * stack;
                 struct turtle_map * map;
-                double ground_level;
         } a;
         struct turtle_stepper_transform * transform;
+
+        struct {
+                int updated;
+                double geographic[5];
+                double elevation;
+                int inside;
+        } history;
+};
+
+struct turtle_stepper_meta {
+        struct turtle_list_element element;
+
+        struct turtle_stepper_data * data;
+        double offset;
+};
+
+struct turtle_stepper_layer {
+        struct turtle_list_element element;
+        struct turtle_list meta;
 };
 
 struct turtle_stepper_sample {
         double position[3];
         double geographic[5];
-        double ground_elevation;
-        int data;
+        double elevation[2];
+        int index[2];
 };
 
 /* Container for an ECEF stepper */
 struct turtle_stepper {
         struct turtle_list data;
         struct turtle_list transforms;
+        struct turtle_list layers;
         struct turtle_map * geoid;
         double local_range;
         double slope_factor;

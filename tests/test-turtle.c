@@ -404,12 +404,14 @@ static void test_stepper(void)
         /* Configure the stepper */
         turtle_stepper_geoid_set(stepper, geoid);
         turtle_stepper_add_flat(stepper, 10);
-        turtle_stepper_add_stack(stepper, stack);
-        turtle_stepper_add_map(stepper, map);
-        turtle_stepper_add_stack(stepper, stack);
-        turtle_stepper_add_map(stepper, map);
+        turtle_stepper_add_stack(stepper, stack, 0.);
+        turtle_stepper_add_map(stepper, map, 0.);
+        turtle_stepper_add_stack(stepper, stack, 0.);
+        turtle_stepper_add_map(stepper, map, 0.);
 
-        assert(stepper->data.size == 5);
+        assert(stepper->data.size == 3);
+        struct turtle_stepper_layer * current_layer = stepper->layers.tail;
+        assert(current_layer->meta.size == 5);
         assert(stepper->transforms.size == 2);
 
         for (i = 0; i < 2; i++) {
@@ -423,7 +425,7 @@ static void test_stepper(void)
                 double position[3], direction[3];
                 int layer;
                 turtle_stepper_position(
-                    stepper, latitude, longitude, height, position, &layer);
+                    stepper, latitude, longitude, height, 0, position, &layer);
                 turtle_ecef_from_horizontal(
                     latitude, longitude, azimuth, elevation, direction);
 
@@ -458,6 +460,7 @@ static void test_stepper(void)
         turtle_stepper_destroy(&stepper);
         turtle_stepper_create(&stepper);
         turtle_stepper_geoid_set(stepper, geoid);
+        turtle_stepper_add_layer(stepper);
         turtle_stepper_add_flat(stepper, 0);
 
         assert(turtle_stepper_geoid_get(stepper) == geoid);
@@ -475,7 +478,7 @@ static void test_stepper(void)
         double position[3];
         int layer;
         turtle_stepper_position(
-            stepper, latitude, longitude, height, position, &layer);
+            stepper, latitude, longitude, height, 0, position, &layer);
 
         double altitude, ground_elevation, la, lo;
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
@@ -484,7 +487,7 @@ static void test_stepper(void)
 
         turtle_stepper_destroy(&stepper);
         turtle_stepper_create(&stepper);
-        turtle_stepper_add_stack(stepper, stack);
+        turtle_stepper_add_stack(stepper, stack, 0.);
         turtle_stepper_geoid_set(stepper, geoid);
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
             &ground_elevation, NULL, &layer);
@@ -497,7 +500,7 @@ static void test_stepper(void)
             &ground_elevation, NULL, &layer);
         assert(layer == -1);
 
-        turtle_stepper_position(stepper, 80, 0, height, position, &layer);
+        turtle_stepper_position(stepper, 80, 0, height, 0, position, &layer);
         assert(layer == -1);
 
         /* Check the client layer */
@@ -505,11 +508,11 @@ static void test_stepper(void)
         turtle_stack_destroy(&stack);
         turtle_stack_create(&stack, "tests/topography", 1, &nothing, &nothing);
         turtle_stepper_create(&stepper);
-        turtle_stepper_add_stack(stepper, stack);
+        turtle_stepper_add_stack(stepper, stack, 0.);
         turtle_stepper_range_set(stepper, 100);
 
         turtle_stepper_position(
-            stepper, latitude, longitude, height, position, &layer);
+            stepper, latitude, longitude, height, 0, position, &layer);
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
             &ground_elevation, NULL, &layer);
         assert(fabs(ground_elevation + height - altitude) < 1E-08);
@@ -737,6 +740,7 @@ static void test_strfunc(void)
         CHECK_API(turtle_stack_load);
 
         CHECK_API(turtle_stepper_add_flat);
+        CHECK_API(turtle_stepper_add_layer);
         CHECK_API(turtle_stepper_add_map);
         CHECK_API(turtle_stepper_add_stack);
         CHECK_API(turtle_stepper_create);

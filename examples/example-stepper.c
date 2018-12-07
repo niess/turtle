@@ -106,15 +106,15 @@ int main(int argc, char * argv[])
         turtle_stepper_resolution_set(stepper, resolution_factor);
         turtle_stepper_range_set(stepper, approximation_range);
         turtle_stepper_add_flat(stepper, 0.);
-        turtle_stepper_add_stack(stepper, stack);
-        turtle_stepper_add_map(stepper, map);
+        turtle_stepper_add_stack(stepper, stack, 0.);
+        turtle_stepper_add_map(stepper, map, 0.);
 
         /* Get the initial position and direction in ECEF */
         const double latitude = 45.76415653, longitude = 2.95536402;
         const double height = 0.5, altitude_max = 2.0E+03;
         double position[3], direction[3];
         turtle_stepper_position(stepper, latitude, longitude, height,
-            position, NULL);
+            0, position, NULL);
         turtle_ecef_from_horizontal(latitude, longitude, azimuth, elevation,
             direction);
 

@@ -47,11 +47,11 @@ enum turtle_return {
         TURTLE_RETURN_BAD_JSON,
         /** Some input parameters are out of their validity range */
         TURTLE_RETURN_DOMAIN_ERROR,
-        /** An TURTLE low level library error occured */
+        /** An TURTLE low level library error occurred */
         TURTLE_RETURN_LIBRARY_ERROR,
         /** A lock couldn't be acquired */
         TURTLE_RETURN_LOCK_ERROR,
-        /** Some meory couldn't be allocated */
+        /** Some memory couldn't be allocated */
         TURTLE_RETURN_MEMORY_ERROR,
         /** A provided path wasn't found */
         TURTLE_RETURN_PATH_ERROR,
@@ -117,8 +117,8 @@ typedef void turtle_function_t(void);
  * Callback for handling TURTLE library errors
  *
  * @param code      The TURTLE return code
- * @param caller    The caller function where the error occured
- * @param message   A formated message describing the error
+ * @param caller    The caller function where the error occurred
+ * @param message   A formatted message describing the error
  *
  * The user might provide its own error handler. By default errors are printed
  * to `stderr` and a hard exit occurs.
@@ -134,17 +134,17 @@ typedef void turtle_error_handler_t(enum turtle_return code,
     turtle_function_t * function, const char * message);
 
 /**
- * Callbacks for managing concurent accesses to the stack
+ * Callbacks for managing concurrent accesses to the stack
  *
  * @return `0` on success, any other value otherwise.
  *
- * For multhithreaded applications with a `turtle_stack` and `turtle_client`s
+ * For multi-threaded applications with a `turtle_stack` and `turtle_client`s
  * the user must supply a `lock` and `unlock` callback providing exclusive
  * access to critical sections, e.g. using a semaphore.
  *
  * __Warnings__
  *
- * The callback *must* return `0` if the (un)lock was successfull.
+ * The callback *must* return `0` if the (un)lock was successful.
  */
 typedef int turtle_stack_locker_t(void);
 
@@ -230,7 +230,7 @@ TURTLE_API void turtle_error_handler_set(turtle_error_handler_t * handler);
  *
  *    TURTLE_RETURN_BAD_PROJECTION    The name tag isn't valid
  *
- *    TURTLE_RETURN_MEMORY_ERROR      The projection couldnt be allocated
+ *    TURTLE_RETURN_MEMORY_ERROR      The projection could not be allocated
  */
 TURTLE_API enum turtle_return turtle_projection_create(
     struct turtle_projection ** projection, const char * name);
@@ -407,7 +407,7 @@ TURTLE_API enum turtle_return turtle_map_load(
  * code is returned as detailed below
  *
  * Dump a projection map to a file. The file format is guessed from the output
- * filename's extension. Currently only a custom `.png` format is supported.
+ * filename extension. Currently only a custom `.png` format is supported.
  *
  * __Error codes__
  *
@@ -517,7 +517,7 @@ TURTLE_API void turtle_map_meta(const struct turtle_map * map,
     struct turtle_map_info * info, const char ** projection);
 
 /**
- * Transform geodetic coordinates to cartesian ECEF ones
+ * Transform geodetic coordinates to Cartesian ECEF ones
  *
  * @param latitude     The geodetic latitude
  * @param longitude    The geodetic longitude
@@ -531,7 +531,7 @@ TURTLE_API void turtle_ecef_from_geodetic(
     double latitude, double longitude, double elevation, double ecef[3]);
 
 /**
- * Transform cartesian ECEF coordinates to geodetic ones
+ * Transform Cartesian ECEF coordinates to geodetic ones
  *
  * @param ecef         The ECEF coordinates
  * @param latitude     The corresponding geodetic latitude
@@ -546,7 +546,7 @@ TURTLE_API void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
     double * longitude, double * altitude);
 
 /**
- * Transform horizontal angles to a cartesian direction in ECEF
+ * Transform horizontal angles to a Cartesian direction in ECEF
  *
  * @param latitude     The geodetic latitude
  * @param longitude    The geodetic longitude
@@ -561,7 +561,7 @@ TURTLE_API void turtle_ecef_from_horizontal(double latitude, double longitude,
     double azimuth, double elevation, double direction[3]);
 
 /**
- * Transform a cartesian direction in ECEF to horizontal angles
+ * Transform a Cartesian direction in ECEF to horizontal angles
  *
  * @param latitude     The geodetic latitude
  * @param longitude    The geodetic longitude
@@ -593,7 +593,7 @@ TURTLE_API void turtle_ecef_to_horizontal(double latitude, double longitude,
  *
  * __Warnings__
  *
- * For multithreaded access to elevation data, using a `turtle_client` one must
+ * For multi-threaded access to elevation data, using a `turtle_client` one must
  * provide both a `lock` and `unlock` callback, e.g. based on `sem_wait` and
  * `sem_post`. Otherwise they can be both set to `NULL`. Note that setting only
  * one to not `NULL` raises a `TURTLE_RETURN_BAD_FORMAT` error.
@@ -701,11 +701,11 @@ TURTLE_API enum turtle_return turtle_stack_elevation(
  * code is returned as detailed below
  *
  * Allocate memory for a new client for a thread safe access to the elevation
- * data of a stack. The client is initialised as iddle. Whenever a new
- * elevation value is requested it will book the needed data to its master
- * `turtle_stack` and release any left over ones. Use `turtle_client_clear`in
- * order to force the release of any reserved data or `turtle_client_destroy`
- * in order to fully recover the client's memory.
+ * data of a stack. The client is initialised as idle. Whenever a new elevation
+ * value is requested it will book the needed data to its master `turtle_stack`
+ * and release any left over ones. Use `turtle_client_clear`in order to force
+ * the release of any reserved data or `turtle_client_destroy` in order to fully
+ * recover the client's memory.
  *
  * __Error codes__
  *
@@ -724,7 +724,7 @@ TURTLE_API enum turtle_return turtle_client_create(
  * code is returned as detailed below
  *
  * Attempts to destroy a stack client. Any reserved elevation data are first
- * freed. On a successfull return `client` is set to `NULL`.
+ * freed. On a successful return `client` is set to `NULL`.
  *
  * __Error codes__
  *
@@ -829,10 +829,10 @@ TURTLE_API enum turtle_return turtle_stepper_destroy(
  * @param geoid      A map object with the geoid undulations
  *
  * Note that by default no geoid undulations corrections are applied. Altitudes
- * are w.r.t. the WGS84 ellipsoid, not w.r.t. the mean sea level.
- * For long range stepping this might introduce distortions of the ground
- * since topography data are ususaly given w.r.t. the mean sea level. Providing
- * a geoid map allows to correct for this.
+ * are w.r.t. WGS84 ellipsoid, not w.r.t. mean sea level.  For long range
+ * stepping this might introduce distortions of the ground since topography data
+ * are usually given w.r.t. mean sea level. Providing a geoid map allows to
+ * correct for this.
  */
 TURTLE_API void turtle_stepper_geoid_set(
     struct turtle_stepper * stepper, struct turtle_map * geoid);
@@ -912,20 +912,44 @@ TURTLE_API void turtle_stepper_resolution_set(
     struct turtle_stepper * stepper, double resolution);
 
 /**
- * Add a `turtle_stack` data layer to a stepper
+ * Add a new geometry layer for the stepper
  *
  * @param stepper   The stepper object
- * @param stack     The stack to access
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Register a new data layer for the stepper accessing an existing
- * `turtle_stack`. Nore that if the stack supports multithreading, i.e. has
- * a registered lock, then a `turtle_client` is automatically created in order
- * to access the stack data.
+ * Add a new geometry layer. Data can be further added to the layer using the
+ * `turtle_stepper_add_*` functions. If the current layer is empty, no new layer
+ * is added. At creation, the stepper geometry is initialised with a single
+ * empty layer.
  *
- * **Note** that the last created layer is the top layer, i.e. it has priority
- * over layers beneath.
+ * **Note** that the added registered layer is the top one. But, the lower a
+ * layer the higher its priority.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
+ */
+TURTLE_API enum turtle_return turtle_stepper_add_layer(
+    struct turtle_stepper * stepper);
+
+/**
+ * Add a `turtle_stack` data resource to the current geometry layer
+ *
+ * @param stepper   The stepper object
+ * @param stack     The stack to access
+ * @param offset    Any offset to the elevation data
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below
+ *
+ * Register a `turtle_stack` data resource for the current geometry layer of
+ * the stepper. An offset to the native elevation data can be specified as well.
+ * Note that if the stack supports multi-threading, i.e. if it has a registered
+ * lock, then a `turtle_client` is automatically created in order to access the
+ * stack data.
+ *
+ * **Note** that the last registered data within the current layer is the top
+ * data, i.e. it has priority over data beneath.
  *
  * __Error codes__
  *
@@ -934,41 +958,44 @@ TURTLE_API void turtle_stepper_resolution_set(
  *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated.
  */
 TURTLE_API enum turtle_return turtle_stepper_add_stack(
-    struct turtle_stepper * stepper, struct turtle_stack * stack);
+    struct turtle_stepper * stepper, struct turtle_stack * stack,
+    double offset);
 
 /**
- * Add a `turtle_map` data layer to a stepper
+ * Add a `turtle_map` data resource to the current geometry layer
  *
  * @param stepper   The stepper object
  * @param map       The map to access
+ * @param offset    Any offset to the elevation data
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Register a new data layer for the stepper accessing an existing
- * `turtle_map`.
+ * Register a `turtle_map` data resource for the current geometry layer of
+ * the stepper. An offset to the native elevation data can be specified as well.
  *
- * **Note** that the last created layer is the top layer, i.e. it has priority
- * over layers beneath.
+ * **Note** that the last registered data within the current layer is the top
+ * data, i.e. it has priority over data beneath.
  *
  * __Error codes__
  *
  *    TURTLE_RETURN_MEMORY_ERROR    The layer couldn't be allocated
  */
 TURTLE_API enum turtle_return turtle_stepper_add_map(
-    struct turtle_stepper * stepper, struct turtle_map * map);
+    struct turtle_stepper * stepper, struct turtle_map * map, double offset);
 
 /**
- * Add a flat data layer to a stepper
+ * Add a flat data resource to the current geometry layer
  *
- * @param stepper         The stepper object
- * @param ground_level    The uniform ground level
+ * @param stepper   The stepper object
+ * @param offset    Any offset to the elevation data
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Register a new data layer for the stepper providing a flat ground.
+ * Register a `flat` (zero elevation) data resource for the current geometry
+ * layer of the stepper. An offset can be specified as well.
  *
- * **Note** that the last created layer is the top layer, i.e. it has priority
- * over layers beneath.
+ * **Note** that the last registered data within the current layer is the top
+ * data, i.e. it has priority over data beneath.
  *
  * __Error codes__
  *
@@ -986,9 +1013,9 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * @param latitude             The (final) geodetic latitude
  * @param longitude            The (final) geodetic longitude
  * @param altitude             The (final) geodetic altitude
- * @param ground_elevation     The (final) ground elevation
+ * @param elevation            The (final) topography elevation(s)
  * @param step_length          The step length
- * @param layer                The (final) data layer
+ * @param index                The (final) geometry and/or meta-data indices
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
@@ -1008,6 +1035,13 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * Note also that depending of the set local *range*, an approximation might be
  * used for computing geographic coordinates.
  *
+ * If the stepper has a single geometry layer, the matching meta data elevation
+ * value and index are returned. Else, if non `NULL`,`*elevation* and *index*
+ * must be size 2 arrays. Then, the elevation values of the lower (elevation[0])
+ * and upper (elevation[1]) bounding layers are returned. The index array is
+ * filled with the containing geometry layer (index[0]) and the matching
+ * meta-data inside the layer (index[1]).
+ *
  * __Error codes__
  *
  *    TURTLE_RETURN_DOMAIN_ERROR    The provided position is outside of all
@@ -1015,8 +1049,8 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  */
 enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
     double * position, const double * direction, double * latitude,
-    double * longitude, double * altitude, double * ground_elevation,
-    double * step, int * layer);
+    double * longitude, double * altitude, double * elevation,
+    double * step, int * index);
 
 /**
  * Convert a geograhic location to an ECEF one
@@ -1024,15 +1058,16 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
  * @param stepper              The stepper object
  * @param latitude             The geodetic latitude
  * @param longitude            The geodetic longitude
- * @param height               The height above ground
+ * @param height               The height w.r.t. the layer elevation
+ * @param layer_index          The index of the reference layer
  * @param position             The corresponding ECEF position
- * @param layer                The corresponding data layer
+ * @param data_index           The index of the matching meta-data
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Inspect the stepper's data stack and provide the top most ECEF position.
- * If no valid layer was found a negative *layer* value is returned, or an
- * error is raised if *layer* points to `NULL`.
+ * Inspect the stepper's geometry layer and provide the top most ECEF position.
+ * If no valid meta-data was found a negative *data_index* value is returned,
+ * or an error is raised if *data_index* points to `NULL`.
  *
  * __Error codes__
  *
@@ -1040,8 +1075,8 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
  * data
  */
 enum turtle_return turtle_stepper_position(struct turtle_stepper * stepper,
-    double latitude, double longitude, double height, double * position,
-    int * layer_depth);
+    double latitude, double longitude, double height, int layer_index,
+    double * position, int * data_index);
 
 #ifdef __cplusplus
 }

@@ -88,8 +88,8 @@ static enum turtle_return get_geographic(struct turtle_stepper * stepper,
 {
         /* Let us check if this transform has already been processed */
         struct turtle_stepper_transform * transform = data->transform;
-        if (transform->updated) {
-                memcpy(geographic + n0, transform->geographic + n0,
+        if (transform->history.updated) {
+                memcpy(geographic + n0, transform->history.geographic + n0,
                     (n1 - n0) * sizeof(double));
                 return TURTLE_RETURN_SUCCESS;
         }
@@ -163,17 +163,42 @@ static enum turtle_return get_geographic(struct turtle_stepper * stepper,
 
         /* Backup the transform result in case that it is called again */
 backup_and_exit:
-        memcpy(transform->geographic + n0, geographic + n0,
+        memcpy(transform->history.geographic + n0, geographic + n0,
             (n1 - n0) * sizeof(double));
-        transform->updated = 1;
+        transform->history.updated = 1;
+
+        return TURTLE_RETURN_SUCCESS;
+}
+
+static enum turtle_return stepper_step(struct turtle_stepper * stepper,
+    struct turtle_stepper_data * data, const double * position,
+    int has_geodetic, double * geographic, double * elevation, int * inside)
+{
+        if (data->history.updated) {
+                memcpy(geographic, data->history.geographic,
+                    sizeof(data->history.geographic));
+                *elevation = data->history.elevation;
+                *inside = data->history.inside;
+        } else {
+                enum turtle_return rc;
+                rc = data->step(stepper, data, position, has_geodetic,
+                    geographic, elevation, inside);
+                if (rc != TURTLE_RETURN_SUCCESS)
+                        return rc;
+
+                data->history.updated = 1;
+                memcpy(data->history.geographic, geographic,
+                    sizeof(data->history.geographic));
+                data->history.elevation = *elevation;
+                data->history.inside = *inside;
+        }
 
         return TURTLE_RETURN_SUCCESS;
 }
 
 static enum turtle_return stepper_step_client(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, const double * position,
-    int has_geodetic, double * geographic, double * ground_elevation,
-    int * inside)
+    int has_geodetic, double * geographic, double * elevation, int * inside)
 {
         *inside = 0;
         if (!has_geodetic) {
@@ -182,13 +207,12 @@ static enum turtle_return stepper_step_client(struct turtle_stepper * stepper,
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
         }
         return turtle_client_elevation(data->a.client, geographic[0],
-            geographic[1], ground_elevation, inside);
+            geographic[1], elevation, inside);
 }
 
 static enum turtle_return stepper_step_stack(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, const double * position,
-    int has_geodetic, double * geographic, double * ground_elevation,
-    int * inside)
+    int has_geodetic, double * geographic, double * elevation, int * inside)
 {
         *inside = 0;
         if (!has_geodetic) {
@@ -197,13 +221,12 @@ static enum turtle_return stepper_step_stack(struct turtle_stepper * stepper,
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
         }
         return turtle_stack_elevation(data->a.stack, geographic[0],
-            geographic[1], ground_elevation, inside);
+            geographic[1], elevation, inside);
 }
 
 static enum turtle_return stepper_step_map(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, const double * position,
-    int has_geodetic, double * geographic, double * ground_elevation,
-    int * inside)
+    int has_geodetic, double * geographic, double * elevation, int * inside)
 {
         *inside = 0;
         const int n0 = has_geodetic ? 3 : 0;
@@ -211,13 +234,12 @@ static enum turtle_return stepper_step_map(struct turtle_stepper * stepper,
             stepper, data, position, n0, 5, &compute_geomap, geographic);
         if (rc != TURTLE_RETURN_SUCCESS) return rc;
         return turtle_map_elevation(data->a.map, geographic[3], geographic[4],
-            ground_elevation, inside);
+            elevation, inside);
 }
 
 static enum turtle_return stepper_step_flat(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, const double * position,
-    int has_geodetic, double * geographic, double * ground_elevation,
-    int * inside)
+    int has_geodetic, double * geographic, double * elevation, int * inside)
 {
         *inside = 1;
         if (!has_geodetic) {
@@ -225,31 +247,47 @@ static enum turtle_return stepper_step_flat(struct turtle_stepper * stepper,
                     0, 3, &compute_geodetic, geographic);
                 if (rc != TURTLE_RETURN_SUCCESS) return rc;
         }
-        *ground_elevation = data->a.ground_level;
+        *elevation = 0.;
         return TURTLE_RETURN_SUCCESS;
+}
+
+static void stepper_elevation(struct turtle_stepper * stepper,
+    struct turtle_stepper_data * data, double latitude, double longitude,
+    double * elevation, int * inside)
+{
+        if (data->history.updated) {
+                *elevation = data->history.elevation;
+                *inside = data->history.inside; 
+        } else {
+                data->elevation(
+                    stepper, data, latitude, longitude, elevation, inside);
+                data->history.updated = 1;
+                data->history.elevation = *elevation;
+                data->history.inside = *inside;
+        }
 }
 
 static void stepper_elevation_stack(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, double latitude, double longitude,
-    double * ground_elevation, int * inside)
+    double * elevation, int * inside)
 {
         *inside = 0;
         turtle_stack_elevation(
-            data->a.stack, latitude, longitude, ground_elevation, inside);
+            data->a.stack, latitude, longitude, elevation, inside);
 }
 
 static void stepper_elevation_client(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, double latitude, double longitude,
-    double * ground_elevation, int * inside)
+    double * elevation, int * inside)
 {
         *inside = 0;
         turtle_client_elevation(
-            data->a.client, latitude, longitude, ground_elevation, inside);
+            data->a.client, latitude, longitude, elevation, inside);
 }
 
 static void stepper_elevation_map(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, double latitude, double longitude,
-    double * ground_elevation, int * inside)
+    double * elevation, int * inside)
 {
         const struct turtle_projection * projection =
             turtle_map_projection(data->a.map);
@@ -258,19 +296,19 @@ static void stepper_elevation_map(struct turtle_stepper * stepper,
                 turtle_projection_project(
                     projection, latitude, longitude, &x, &y);
                 turtle_map_elevation(
-                    data->a.map, x, y, ground_elevation, inside);
+                    data->a.map, x, y, elevation, inside);
         } else {
                turtle_map_elevation(data->a.map, longitude, latitude,
-                   ground_elevation, inside);
+                   elevation, inside);
         }
 }
 
 static void stepper_elevation_flat(struct turtle_stepper * stepper,
     struct turtle_stepper_data * data, double latitude, double longitude,
-    double * ground_elevation, int * inside)
+    double * elevation, int * inside)
 {
         *inside = 1;
-        *ground_elevation = data->a.ground_level;
+        *elevation = 0.;
 }
 
 static enum turtle_return stepper_clean_client(
@@ -311,40 +349,107 @@ static enum turtle_return add_data(struct turtle_stepper * stepper,
         return TURTLE_RETURN_SUCCESS;
 }
 
+static enum turtle_return stepper_add_layer(struct turtle_stepper * stepper)
+{
+        struct turtle_stepper_layer * layer = stepper->layers.tail;
+        if ((layer != NULL) && (layer->meta.size == 0))
+                return TURTLE_RETURN_SUCCESS;
+
+        layer = malloc(sizeof(*layer));
+        if (layer == NULL)
+                return TURTLE_RETURN_MEMORY_ERROR;
+        memset(&layer->meta, 0x0, sizeof(layer->meta));
+        turtle_list_append_(&stepper->layers, layer);
+
+        return TURTLE_RETURN_SUCCESS;
+}
+
+enum turtle_return turtle_stepper_add_layer(struct turtle_stepper * stepper)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_stepper_add_layer);
+
+        if (stepper_add_layer(stepper) != TURTLE_RETURN_SUCCESS) {
+                return TURTLE_ERROR_MEMORY();
+        } else {
+                return TURTLE_RETURN_SUCCESS;
+        }
+}
+
+static enum turtle_return add_meta(struct turtle_stepper * stepper,
+    struct turtle_stepper_data * data, double offset)
+{
+        /* Add a new geometry layer if none so far */
+        if ((stepper->layers.size == 0) && (stepper_add_layer(stepper) !=
+            TURTLE_RETURN_SUCCESS))
+                return TURTLE_RETURN_MEMORY_ERROR;
+
+        /* Add meta data to the current layer */
+        struct turtle_stepper_meta * meta = malloc(sizeof(*meta));
+        if (meta == NULL)
+                return TURTLE_RETURN_MEMORY_ERROR;
+        meta->data = data;
+        meta->offset = offset;
+
+        struct turtle_stepper_layer * layer = stepper->layers.tail;
+        turtle_list_append_(&layer->meta, meta);
+
+        return TURTLE_RETURN_SUCCESS;
+}
+
 enum turtle_return turtle_stepper_add_stack(
-    struct turtle_stepper * stepper, struct turtle_stack * stack)
+    struct turtle_stepper * stepper, struct turtle_stack * stack, double offset)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stepper_add_stack);
 
-        enum turtle_return rc;
+        /* Look if the data already exist */
+        struct turtle_stepper_data * data;
+        for (data = stepper->data.head; data != NULL;
+            data = data->element.next) {
+                if ((stack->lock != NULL) &&
+                    (data->clean == &stepper_clean_client) &&
+                    (data->a.client->stack == stack))
+                        break;
+                else if (data->a.stack == stack)
+                        break;
+        }
+
         struct turtle_client * client = NULL;
-        if (stack->lock != NULL) {
-                /* Get a new client for the stack */
-                rc = turtle_client_create(&client, stack);
-                if (rc != TURTLE_RETURN_SUCCESS) return rc;
+        if (data == NULL) {
+                /* Allocate an encapsulation of the new data */
+                enum turtle_return rc;
+                if (stack->lock != NULL) {
+                        /* Get a new client for the stack */
+                        rc = turtle_client_create(&client, stack);
+                        if (rc != TURTLE_RETURN_SUCCESS) return rc;
+                }
+
+                /* Allocate the data container */
+                data = malloc(sizeof(*data));
+                if (data == NULL) goto memory_error;
+
+                if (client != NULL) {
+                        data->step = &stepper_step_client;
+                        data->elevation = &stepper_elevation_client;
+                        data->clean = &stepper_clean_client;
+                        data->a.client = client;
+                } else {
+                        data->step = &stepper_step_stack;
+                        data->elevation = &stepper_elevation_stack;
+                        data->clean = NULL;
+                        data->a.stack = stack;
+                }
+
+                /* Add the data to the stepper's stack */
+                if (add_data(stepper, data, "geodetic") !=
+                    TURTLE_RETURN_SUCCESS)
+                        goto memory_error;
         }
 
-        /* Allocate the data container */
-        struct turtle_stepper_data * data = malloc(sizeof(*data));
-        if (data == NULL) goto memory_error;
-
-        if (client != NULL) {
-                data->step = &stepper_step_client;
-                data->elevation = &stepper_elevation_client;
-                data->clean = &stepper_clean_client;
-                data->a.client = client;
-        } else {
-                data->step = &stepper_step_stack;
-                data->elevation = &stepper_elevation_stack;
-                data->clean = NULL;
-                data->a.stack = stack;
-        }
-
-        /* Add the data to the stepper's stack */
-        if (add_data(stepper, data, "geodetic") != TURTLE_RETURN_SUCCESS)
+        /* Add the meta data to the current layer */
+        if (add_meta(stepper, data, offset) != TURTLE_RETURN_SUCCESS)
                 goto memory_error;
-
-        return TURTLE_RETURN_SUCCESS;
+        else
+                return TURTLE_RETURN_SUCCESS;
 
 memory_error:
         if (client != NULL)
@@ -352,24 +457,38 @@ memory_error:
         return TURTLE_ERROR_MEMORY();
 }
 
-enum turtle_return turtle_stepper_add_map(
-    struct turtle_stepper * stepper, struct turtle_map * map)
+enum turtle_return turtle_stepper_add_map(struct turtle_stepper * stepper,
+    struct turtle_map * map, double offset)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stepper_add_map);
 
-        /* Allocate the data */
-        struct turtle_stepper_data * data = malloc(sizeof(*data));
-        if (data == NULL) return TURTLE_ERROR_MEMORY();
-        data->step = &stepper_step_map;
-        data->elevation = &stepper_elevation_map;
-        data->clean = NULL;
-        data->a.map = map;
+        /* Look if the data already exist */
+        struct turtle_stepper_data * data;
+        for (data = stepper->data.head; data != NULL;
+            data = data->element.next) {
+                if (data->a.map == map) break;
+        }
 
-        /* Add the data to the stepper's stack */
-        const struct turtle_projection * projection =
-            turtle_map_projection(map);
-        const char * name = turtle_projection_name(projection);
-        if (add_data(stepper, data, name) != TURTLE_RETURN_SUCCESS) {
+        if (data == NULL) {
+                /* Allocate an encapsulation of the new data */
+                data = malloc(sizeof(*data));
+                if (data == NULL) return TURTLE_ERROR_MEMORY();
+                data->step = &stepper_step_map;
+                data->elevation = &stepper_elevation_map;
+                data->clean = NULL;
+                data->a.map = map;
+
+                /* Add the data to the stepper's stack */
+                const struct turtle_projection * projection =
+                    turtle_map_projection(map);
+                const char * name = turtle_projection_name(projection);
+                if (add_data(stepper, data, name) != TURTLE_RETURN_SUCCESS) {
+                        return TURTLE_ERROR_MEMORY();
+                }
+        }
+
+        /* Add the meta data to the current layer */
+        if (add_meta(stepper, data, offset) != TURTLE_RETURN_SUCCESS) {
                 return TURTLE_ERROR_MEMORY();
         } else {
                 return TURTLE_RETURN_SUCCESS;
@@ -377,20 +496,35 @@ enum turtle_return turtle_stepper_add_map(
 }
 
 enum turtle_return turtle_stepper_add_flat(
-    struct turtle_stepper * stepper, double ground_level)
+    struct turtle_stepper * stepper, double offset)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stepper_add_flat);
 
-        /* Allocate the data */
-        struct turtle_stepper_data * data = malloc(sizeof(*data));
-        if (data == NULL) return TURTLE_ERROR_MEMORY();
-        data->step = &stepper_step_flat;
-        data->elevation = &stepper_elevation_flat;
-        data->clean = NULL;
-        data->a.ground_level = ground_level;
+        /* Look if the data already exist */
+        struct turtle_stepper_data * data;
+        for (data = stepper->data.head; data != NULL;
+            data = data->element.next) {
+                if (data->a.map == NULL) break;
+        }
 
-        /* Add the data to the stepper's stack */
-        if (add_data(stepper, data, "geodetic") != TURTLE_RETURN_SUCCESS) {
+        if (data == NULL) {
+                /* Allocate an encapsulation of the new data */
+                data = malloc(sizeof(*data));
+                if (data == NULL) return TURTLE_ERROR_MEMORY();
+                data->step = &stepper_step_flat;
+                data->elevation = &stepper_elevation_flat;
+                data->clean = NULL;
+                data->a.map = NULL;
+
+                /* Add the data to the stepper's stack */
+                if (add_data(stepper, data, "geodetic") !=
+                    TURTLE_RETURN_SUCCESS) {
+                        return TURTLE_ERROR_MEMORY();
+                }
+        }
+
+        /* Add the meta data to the current layer */
+        if (add_meta(stepper, data, offset) != TURTLE_RETURN_SUCCESS) {
                 return TURTLE_ERROR_MEMORY();
         } else {
                 return TURTLE_RETURN_SUCCESS;
@@ -405,11 +539,16 @@ enum turtle_return turtle_stepper_create(struct turtle_stepper ** stepper_)
         if (stepper == NULL) return TURTLE_ERROR_MEMORY();
         *stepper_ = stepper;
         memset(&stepper->data, 0x0, sizeof(stepper->data));
-        memset(&stepper->transforms, 0x0, sizeof(stepper->data));
+        memset(&stepper->transforms, 0x0, sizeof(stepper->transforms));
+        memset(&stepper->layers, 0x0, sizeof(stepper->layers));
         stepper->geoid = NULL;
         stepper->local_range = 1.;
         stepper->slope_factor = 0.4;
         stepper->resolution_factor = 1E-02;
+        stepper->last.index[0] = -1;
+        stepper->last.index[1] = -1;
+        stepper->last.elevation[0] = 0;
+        stepper->last.elevation[1] = 0;
         stepper->last.position[0] = DBL_MAX;
         stepper->last.position[1] = DBL_MAX;
         stepper->last.position[2] = DBL_MAX;
@@ -432,7 +571,14 @@ enum turtle_return turtle_stepper_destroy(struct turtle_stepper ** stepper)
                 }
                 free(data);
         }
+
         turtle_list_clear_(&(*stepper)->transforms);
+
+        struct turtle_stepper_layer * layer;
+        while ((layer = turtle_list_pop_(&(*stepper)->layers)) != NULL) {
+                turtle_list_clear_(&layer->meta);
+                free(layer);
+        }
 
         free(*stepper);
         *stepper = NULL;
@@ -506,12 +652,38 @@ void turtle_stepper_resolution_set(
         stepper->resolution_factor = resolution;
 }
 
-static void reset_transforms(struct turtle_stepper * stepper)
+static void reset_data_and_transforms(struct turtle_stepper * stepper)
 {
         struct turtle_stepper_transform * transform;
         for (transform = stepper->transforms.head; transform != NULL;
             transform = transform->element.next)
-                transform->updated = 0;
+                transform->history.updated = 0;
+
+        struct turtle_stepper_data * data;
+        for (data = stepper->data.head; data != NULL;
+            data = data->element.next)
+                data->history.updated = 0;
+}
+
+static int check_layer(struct turtle_stepper * stepper,
+    struct turtle_stepper_sample * sample, int index[2], double elevation)
+{
+        if (stepper->layers.size == 1) {
+                sample->index[0] = index[1];
+                sample->elevation[0] =
+                    elevation;
+                return EXIT_SUCCESS;
+        } else {
+                if (elevation >= sample->geographic[2]) {
+                        sample->index[0] = index[0];
+                        sample->index[1] = index[1];
+                        sample->elevation[1] = elevation;
+                        return EXIT_SUCCESS;
+                } else {
+                        sample->elevation[0] = elevation;
+                        return EXIT_FAILURE;
+                }
+        }
 }
 
 static enum turtle_return stepper_sample(struct turtle_stepper * stepper,
@@ -523,26 +695,37 @@ static enum turtle_return stepper_sample(struct turtle_stepper * stepper,
             (position[1] != stepper->last.position[1]) ||
             (position[2] != stepper->last.position[2])) {
                 /* Loop over data and locate the proper data */
-                reset_transforms(stepper);
-                sample->data = -1;
-                int depth, has_geodetic = 0;
-                struct turtle_stepper_data * data;
-                for (data = stepper->data.tail, depth = 0; data != NULL;
-                    data = data->element.previous, depth++) {
-                        int inside;
-                        enum turtle_return rc = data->step(stepper, data,
-                            position, has_geodetic, sample->geographic,
-                            &sample->ground_elevation, &inside);
-                        if (sample == &stepper->last) {
-                                memcpy(stepper->last.position, position,
-                                    sizeof(stepper->last.position));
+                reset_data_and_transforms(stepper);
+                sample->index[0] = -1;
+                sample->index[1] = -1;
+                sample->elevation[0] = -DBL_MAX;
+                sample->elevation[1] = DBL_MAX;
+                int index[2], has_geodetic = 0;
+                struct turtle_stepper_layer * layer;
+                for (layer = stepper->layers.head, index[0] = 0; layer != NULL;
+                    layer = layer->element.next, index[0]++) {
+                        struct turtle_stepper_meta * meta;
+                        for (meta = layer->meta.tail, index[1] = 0;
+                            meta != NULL; meta = meta->element.previous,
+                            index[1]++) {
+                                int inside;
+                                double elevation;
+                                enum turtle_return rc = stepper_step(
+                                    stepper, meta->data, position, has_geodetic,
+                                    sample->geographic, &elevation, &inside);
+                                if (sample == &stepper->last) {
+                                        memcpy(stepper->last.position, position,
+                                            sizeof(stepper->last.position));
+                                }
+                                if (rc != TURTLE_RETURN_SUCCESS) return rc;
+                                if (inside) {
+                                        elevation += meta->offset;
+                                        if (check_layer(stepper, sample, index,
+                                            elevation) == EXIT_SUCCESS)
+                                                return TURTLE_RETURN_SUCCESS;
+                                }
+                                has_geodetic = 1;
                         }
-                        if (rc != TURTLE_RETURN_SUCCESS) return rc;
-                        if (inside) {
-                                sample->data = depth;
-                                return TURTLE_RETURN_SUCCESS;
-                        }
-                        has_geodetic = 1;
                 }
         } else {
                 if (sample != &stepper->last)
@@ -550,7 +733,7 @@ static enum turtle_return stepper_sample(struct turtle_stepper * stepper,
                 return TURTLE_RETURN_SUCCESS;
         }
 
-        if ((sample->data < 0) && !check_bounds) {
+        if ((sample->index[0] < 0) && !check_bounds) {
                 return TURTLE_ERROR_REGISTER(
                     TURTLE_RETURN_DOMAIN_ERROR, "no valid data");
         }
@@ -558,35 +741,52 @@ static enum turtle_return stepper_sample(struct turtle_stepper * stepper,
 }
 
 static void sample_publish(struct turtle_stepper * stepper, double * latitude,
-    double * longitude, double * altitude, double * ground_elevation,
-    int * data_depth)
+    double * longitude, double * altitude, double * elevation,
+    int * index)
 {
         if (latitude != NULL) *latitude = stepper->last.geographic[0];
         if (longitude != NULL) *longitude = stepper->last.geographic[1];
         if (altitude != NULL) *altitude = stepper->last.geographic[2];
-        if (ground_elevation != NULL) {
-                if (stepper->last.data >= 0)
-                        *ground_elevation = stepper->last.ground_elevation;
-                else
-                        *ground_elevation = 0.;
+        if (stepper->layers.size <= 1) {
+                if (elevation != NULL) {
+                        if (stepper->last.index[0] >= 0)
+                                *elevation = stepper->last.elevation[0];
+                        else
+                                *elevation = 0.;
+                }
+                if (index != NULL)
+                        *index = stepper->last.index[0];
+        } else {
+                if (elevation != NULL) {
+                        if (stepper->last.index[0] >= 0) {
+                                elevation[0] = stepper->last.elevation[0];
+                                elevation[1] = stepper->last.elevation[1];
+                        } else {
+                                elevation[0] = 0.;
+                                elevation[1] = 0.;
+                        }
+                }
+                if (index != NULL) {
+                        index[0] = stepper->last.index[0];
+                        index[1] = stepper->last.index[1];
+                }
         }
-        if (data_depth != NULL) *data_depth = stepper->last.data;
 }
 
 enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
     double * position, const double * direction, double * latitude,
-    double * longitude, double * altitude, double * ground_elevation,
-    double * step_length, int * data_depth)
+    double * longitude, double * altitude, double * elevation,
+    double * step_length, int * index)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stepper_step);
 
         /* Compute the initial geodetic coordinates, or fetch the last ones */
-        if (stepper_sample(stepper, position, &stepper->last,
-            data_depth != NULL, error_) != TURTLE_RETURN_SUCCESS)
+        if (stepper_sample(stepper, position, &stepper->last, index
+            != NULL, error_) != TURTLE_RETURN_SUCCESS)
                 return TURTLE_ERROR_RAISE();
-        if (stepper->last.data < 0) {
+        if (stepper->last.index[0] < 0) {
                 sample_publish(stepper, latitude, longitude, altitude,
-                    ground_elevation, data_depth);
+                    elevation, index);
                 if (step_length != NULL) *step_length = 0;
                 return TURTLE_RETURN_SUCCESS;
         }
@@ -594,13 +794,13 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         /* Compute the step length */
         double ds;
         ds = stepper->slope_factor * fabs(stepper->last.geographic[2] -
-            stepper->last.ground_elevation);
+            stepper->last.elevation[0]);
         if (ds < stepper->resolution_factor) ds = stepper->resolution_factor;
 
         /* Return the results if no stepping is requested */
         if (direction == NULL) {
                 sample_publish(stepper, latitude, longitude, altitude,
-                    ground_elevation, data_depth);
+                    elevation, index);
                 if (step_length != NULL) *step_length = ds;
                 return TURTLE_RETURN_SUCCESS;
         }
@@ -610,15 +810,15 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         for (i = 0; i < 3; i++) position[i] += direction[i] * ds;
 
         const int inside0 = stepper->last.geographic[2] <
-            stepper->last.ground_elevation;
+            stepper->last.elevation[0];
         if (stepper_sample(stepper, position, &stepper->last, 1, error_) !=
             TURTLE_RETURN_SUCCESS)
                 return TURTLE_ERROR_RAISE();
-        const int inside1 = (stepper->last.data >= 0) ?
-            (stepper->last.geographic[2] < stepper->last.ground_elevation) :
+        const int inside1 = (stepper->last.index[0] >= 0) ?
+            (stepper->last.geographic[2] < stepper->last.elevation[0]) :
             inside0;
 
-        if ((inside0 != inside1) || (stepper->last.data < 0)) {
+        if ((inside0 != inside1) || (stepper->last.index[0] < 0)) {
                 /* A change of medium occured. Let us locate the
                  * change of medium by dichotomy.
                  */
@@ -634,10 +834,10 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
                         if (stepper_sample(stepper, position2, &sample2, 1,
                             error_) != TURTLE_RETURN_SUCCESS)
                                 return TURTLE_ERROR_RAISE();
-                        const int inside2 = (sample2.data >= 0) ?
+                        const int inside2 = (sample2.index[0] >= 0) ?
                             (sample2.geographic[2] <
-                             sample2.ground_elevation) : inside0;
-                        if ((inside2 == inside1) || (sample2.data < 0)) {
+                             sample2.elevation[0]) : inside0;
+                        if ((inside2 == inside1) || (sample2.index[0] < 0)) {
                                 ds1 = ds2;
                                 memcpy(sample2.position, position2,
                                     sizeof(sample2.position));
@@ -652,10 +852,10 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         }
 
         sample_publish(stepper, latitude, longitude, altitude,
-            ground_elevation, data_depth);
+            elevation, index);
         if (step_length != NULL) *step_length = ds;
 
-        if ((stepper->last.data < 0) && (data_depth == NULL)) {
+        if ((stepper->last.index[0] < 0) && (index == NULL)) {
                 return TURTLE_ERROR_REGISTER(
                     TURTLE_RETURN_DOMAIN_ERROR, "no valid data");
         }
@@ -663,22 +863,33 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
 }
 
 enum turtle_return turtle_stepper_position(struct turtle_stepper * stepper,
-    double latitude, double longitude, double height, double * position,
-    int * data_depth)
+    double latitude, double longitude, double height, int layer_index,
+    double * position, int * data_index)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stepper_position);
 
+        if ((layer_index < 0) || (layer_index >= stepper->layers.size)) {
+                return TURTLE_ERROR_MESSAGE(
+                    TURTLE_RETURN_DOMAIN_ERROR, "no valid data");
+        }
+
+        struct turtle_stepper_layer * layer;
+        for (layer = stepper->layers.head; layer_index > 0; layer_index--,
+            layer = layer->element.next) ;
+
         /* Loop over data and locate the proper set */
-        reset_transforms(stepper);
-        int depth;
-        struct turtle_stepper_data * data;
-        double ground = 0.;
-        for (data = stepper->data.tail, depth = 0; data != NULL;
-             data = data->element.previous, depth++) {
+        reset_data_and_transforms(stepper);
+        int index;
+        double elevation = 0.;
+        struct turtle_stepper_meta * meta;
+        for (meta = layer->meta.tail, index = 0; meta != NULL;
+            meta = meta->element.previous, index++) {
                 int inside;
-                data->elevation(
-                    stepper, data, latitude, longitude, &ground, &inside);
+                stepper_elevation(stepper, meta->data, latitude, longitude,
+                    &elevation, &inside);
                 if (inside) {
+                        elevation += meta->offset;
+
                         if (stepper->geoid != NULL) {
                                 /* Correct from the geoid */
                                 int inside_;
@@ -687,19 +898,19 @@ enum turtle_return turtle_stepper_position(struct turtle_stepper * stepper,
                                     longitude : longitude + 360.;
                                 turtle_map_elevation(stepper->geoid, lo,
                                     latitude, &undulation, &inside_);
-                                if (inside_) ground += undulation;
+                                if (inside_) elevation += undulation;
                         }
 
                         /* Compute the ECEF position */
                         turtle_ecef_from_geodetic(
-                            latitude, longitude, ground + height, position);
-                        if (data_depth != NULL) *data_depth = depth;
+                            latitude, longitude, elevation + height, position);
+                        if (data_index != NULL) *data_index = index;
                         return TURTLE_RETURN_SUCCESS;
                 }
         }
 
-        if (data_depth != NULL) {
-                *data_depth = -1;
+        if (data_index != NULL) {
+                *data_index = -1;
                 return TURTLE_RETURN_SUCCESS;
         } else {
                 return TURTLE_ERROR_MESSAGE(

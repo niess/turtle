@@ -72,7 +72,7 @@ enum turtle_return turtle_error_format_(struct turtle_error_context * error_,
         if ((_handler == NULL) || (rc == TURTLE_RETURN_SUCCESS)) return rc;
         error_->file = file;
         error_->line = line;
-        
+
         /* Compute the length of the error message, in order to store it
          * on the heap
          */
@@ -117,20 +117,20 @@ enum turtle_return turtle_error_raise_(struct turtle_error_context * error_)
             turtle_error_function(error_->function), error_->code, error_->file,
             error_->line);
         const int n = strlen(error_->message);
-        
+
         /* Format the erreor message on the stack */
         char message[m + n + 1];
         sprintf(message, "{ %s [#%d], %s:%d } ",
             turtle_error_function(error_->function), error_->code, error_->file,
             error_->line);
         memcpy(message + m, error_->message, n + 1);
-        
+
         /* Free any dynamic memory */
         if (error_->dynamic) {
                 free(error_->message);
                 error_->dynamic = 0;
         }
-        
+
         /* Call the library error handler */
         _handler(error_->code, error_->function, message);
 
@@ -181,6 +181,7 @@ const char * turtle_error_function(turtle_function_t * caller)
         TOSTRING(turtle_stack_load);
 
         TOSTRING(turtle_stepper_add_flat);
+        TOSTRING(turtle_stepper_add_layer);
         TOSTRING(turtle_stepper_add_map);
         TOSTRING(turtle_stepper_add_stack);
         TOSTRING(turtle_stepper_create);
