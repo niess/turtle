@@ -72,36 +72,39 @@ struct turtle_error_context {
         TURTLE_ERROR_MESSAGE(                                                  \
             TURTLE_RETURN_UNLOCK_ERROR, "could not release the lock")
 
+#define TURTLE_ERROR_REGISTER_MISSING_DATA(stack)                              \
+        TURTLE_ERROR_VREGISTER(TURTLE_RETURN_PATH_ERROR,                       \
+            "missing elevation data in `%s'", stack->root)
+
 #define TURTLE_ERROR_MISSING_DATA(stack)                                       \
-        TURTLE_ERROR_FORMAT(TURTLE_RETURN_PATH_ERROR,                          \
-            "missing elevation data in `%s`", stack->root);
+        TURTLE_ERROR_REGISTER_MISSING_DATA(stack), turtle_error_raise_(error_)
 
 #define TURTLE_ERROR_MEMORY()                                                  \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_MEMORY_ERROR, "could not allocate memory");
+            TURTLE_RETURN_MEMORY_ERROR, "could not allocate memory")
 
 #define TURTLE_ERROR_EXTENSION(extension)                                      \
         TURTLE_ERROR_FORMAT(TURTLE_RETURN_BAD_EXTENSION,                       \
-            "unsuported file format `%s`", extension);
+            "unsuported file format `%s'", extension)
 
 #define TURTLE_ERROR_NO_EXTENSION()                                            \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_BAD_EXTENSION, "missing file extension");
+            TURTLE_RETURN_BAD_EXTENSION, "missing file extension")
 
 #define TURTLE_ERROR_PATH(path)                                                \
         TURTLE_ERROR_FORMAT(                                                   \
-            TURTLE_RETURN_PATH_ERROR, "could not find file `%s`", path);
+            TURTLE_RETURN_PATH_ERROR, "could not find file `%s'", path)
 
 #define TURTLE_ERROR_BOX()                                                     \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_DOMAIN_ERROR, "invalid bounding box");
+            TURTLE_RETURN_DOMAIN_ERROR, "invalid bounding box")
 
 #define TURTLE_ERROR_OUTSIDE_MAP()                                             \
         TURTLE_ERROR_MESSAGE(                                                  \
-            TURTLE_RETURN_DOMAIN_ERROR, "point is outside of map");
+            TURTLE_RETURN_DOMAIN_ERROR, "point is outside of map")
 
 #define TURTLE_ERROR_UNEXPECTED(rc)                                            \
-        TURTLE_ERROR_MESSAGE(rc, "an unexpected error occured");
+        TURTLE_ERROR_MESSAGE(rc, "an unexpected error occured")
 
 /* Generic function for setting a static error message */
 enum turtle_return turtle_error_message_(struct turtle_error_context * error_,

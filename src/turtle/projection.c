@@ -137,7 +137,7 @@ enum turtle_return turtle_projection_configure_(
                 if (sscanf(p, "%d%c", &zone, &hemisphere) != 2) {
                         return TURTLE_ERROR_VREGISTER(
                             TURTLE_RETURN_BAD_PROJECTION,
-                            "invalid UTM specifier `%s`", p);
+                            "invalid UTM specifier `%s'", p);
                 }
                 if (hemisphere == '.') {
                         double longitude_0;
@@ -145,7 +145,7 @@ enum turtle_return turtle_projection_configure_(
                             2) {
                                 return TURTLE_ERROR_VREGISTER(
                                     TURTLE_RETURN_BAD_PROJECTION,
-                                    "invalid extended UTM specifier `%s`", p);
+                                    "invalid extended UTM specifier `%s'", p);
                         }
                         projection->settings.utm.longitude_0 = longitude_0;
                 } else
@@ -157,14 +157,14 @@ enum turtle_return turtle_projection_configure_(
                 else {
                         return TURTLE_ERROR_VREGISTER(
                             TURTLE_RETURN_BAD_PROJECTION,
-                            "invalid UTM hemisphere `%c`", hemisphere);
+                            "invalid UTM hemisphere `%c'", hemisphere);
                 }
                 goto exit;
         }
 
         /* The projection tag is not valid */
         return TURTLE_ERROR_VREGISTER(
-            TURTLE_RETURN_BAD_PROJECTION, "invalid projection `%s`", p);
+            TURTLE_RETURN_BAD_PROJECTION, "invalid projection `%s'", p);
 exit:
         /* Copy the tag and return */
         strcpy(projection->tag, name);

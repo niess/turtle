@@ -93,5 +93,5 @@ enum turtle_return turtle_io_create_(struct turtle_io ** io, const char * path,
         }
 error:
         return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_EXTENSION,
-            "no valid format for file `%s` ", path);
+            "no valid format for file `%s'", path);
 }

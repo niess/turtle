@@ -44,7 +44,7 @@ else
 endif
 
 # Available builds
-.PHONY: lib clean examples test
+.PHONY: lib clean check examples test
 
 # Rules for building the library
 lib: lib/libturtle.so
@@ -99,15 +99,27 @@ test: bin/test-turtle
 	@rm -rf tests/*.png tests/*.grd tests/*.hgt tests/*.tif                \
 		tests/topography/*
 	@mv *.gcda tests/.
-	@gcov -o tests $(SOURCES)
+	@gcov -o tests $(SOURCES) | tail -1
 	@rm -rf tinydir.h.gcov tests/test-turtle.gcno tests/test-turtle.gcda
 	@mv *.gcov tests/.
 
-bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
+bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES) | check
 	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) -O0 -g -ftest-coverage -fprofile-arcs $(INCLUDES) \
-		$^ $(LIBS)
+		-Ishare/check/include $^ $(LIBS) -Lshare/check/lib -lcheck -lrt
 	@mv *.gcno tests/.
+
+check: share/check
+
+share/check:
+	@mkdir -p $@
+	@git clone https://github.com/libcheck/check.git $@/src
+	@mkdir -p $@/build
+	@cd $@/build && cmake -DCMAKE_INSTALL_PREFIX=$(PWD)/$@                 \
+		-DCHECK_ENABLE_TESTS=off ../src
+
+	@cd $@/build && make install
+
 
 # Clean-up rule
 clean:

@@ -373,7 +373,8 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
                 if (inside != NULL) {                                          \
                         return TURTLE_RETURN_SUCCESS;                          \
                 } else {                                                       \
-                        return TURTLE_ERROR_MISSING_DATA(stack);               \
+                        TURTLE_ERROR_REGISTER_MISSING_DATA(stack);             \
+                        return error_->code;                                   \
                 }                                                              \
         }
 
