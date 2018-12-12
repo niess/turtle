@@ -23,7 +23,7 @@
  */
 
 /* C89 standard library */
-#include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -47,6 +47,13 @@
 #include "../src/turtle/stepper.h"
 
 
+/* Shortcut(s) for checking internal type(s) */
+#define CHECK_LIST_INIT(L)                                                     \
+        ck_assert_int_eq(L.size, 0);                                           \
+        ck_assert_ptr_eq(L.head, NULL);                                        \
+        ck_assert_ptr_eq(L.tail, NULL)
+
+
 /* Buffer for redirecting error messages */
 static char error_buffer[2048];
 
@@ -54,6 +61,112 @@ static void catch_error(enum turtle_return code, turtle_function_t * function,
     const char * message)
 {
         sprintf(error_buffer, "%s\n", message);
+}
+
+
+static void setup_map_data(void)
+{
+        /* Create a new map with a UTM projection */
+#define DEFINE_MAP_META()                                                      \
+        const double x0 = 496000, y0 = 5067000, z0 = 0., z1 = 1000;            \
+        const int nx = 201, ny = 201
+
+        DEFINE_MAP_META();
+        struct turtle_map * map;
+        struct turtle_map_info info = { nx, ny, { x0 - 1000, x0 + 1000 },
+                { y0 - 1000, y0 + 1000 }, { z0, z1 } };
+        turtle_map_create(&map, &info, "UTM 31N");
+
+        /* Fill the map with some dummy data */
+        int i, k;
+        for (i = 0, k = 0; i < nx; i++) {
+                int j;
+                for (j = 0; j < ny; j++, k++) {
+                        const double z = ((k % 2) == 0) ? z0 : z1;
+                        turtle_map_fill(map, i, j, z);
+                }
+        }
+
+        /* Dump the map to disk and destroy it in memory */
+#define MAP_PATH "tests/map.png"
+        const char * path = MAP_PATH;
+        turtle_map_dump(map, path);
+        turtle_map_destroy(&map);
+}
+
+
+static void setup_stack_data(void)
+{
+#define STACK_PATH "tests/topography"
+
+        /* Create some data tiles for the global stack */
+        int k;
+        for (k = 0; k < 4; k++) {
+                const int nx = 1201, ny = 1201;
+                double latitude0, latitude1;
+                if ((k % 2) == 0) {
+                        latitude0 = 45;
+                        latitude1 = 46;
+                } else {
+                        latitude0 = 46;
+                        latitude1 = 47;
+                }
+                double longitude0, longitude1;
+                if ((k / 2) == 0) {
+                        longitude0 = 2;
+                        longitude1 = 3;
+                } else {
+                        longitude0 = 3;
+                        longitude1 = 4;
+                }
+                struct turtle_map * map;
+                struct turtle_map_info info = { nx, ny,
+                        { longitude0, longitude1 }, { latitude0, latitude1 },
+                        { 0, 1 } };
+                turtle_map_create(&map, &info, NULL);
+                int i;
+                for (i = 0; i < nx; i++) {
+                        int j;
+                        for (j = 0; j < ny; j++) turtle_map_fill(map, i, j, 0);
+                }
+                if (k == 0)
+                        turtle_map_dump(map, STACK_PATH "/45N_002E.png");
+                else if (k == 1)
+                        turtle_map_dump(map, STACK_PATH "/46N_002E.png");
+                else if (k == 2)
+                        turtle_map_dump(map, STACK_PATH "/45N_003E.png");
+                else
+                        turtle_map_dump(map, STACK_PATH "/46N_003E.png");
+                turtle_map_destroy(&map);
+        }
+}
+
+
+static void setup_geoid_data(void)
+{
+#define GEOID_PATH "tests/geoid.png"
+
+        /* Create the geoid data */
+        const int nx = 361, ny = 181;
+        struct turtle_map * geoid;
+        struct turtle_map_info info = { nx, ny, { -180, 180 }, { -90, 90 },
+                { -1, 1 } };
+        turtle_map_create(&geoid, &info, NULL);
+        int i;
+        for (i = 0; i < nx; i++) {
+                int j;
+                for (j = 0; j < ny; j++) turtle_map_fill(geoid, i, j, -1);
+        }
+        turtle_map_dump(geoid, GEOID_PATH);
+        turtle_map_destroy(&geoid);
+}
+
+
+static void setup_data(void)
+{
+        setup_map_data();
+        setup_stack_data();
+        setup_geoid_data();
 }
 
 
@@ -139,37 +252,181 @@ START_TEST (test_list)
 END_TEST
 
 
-START_TEST (test_map)
+START_TEST (test_stepper_layer)
 {
-        /* Create a new map with a UTM projection */
-        const double x0 = 496000, y0 = 5067000, z0 = 0., z1 = 1000;
-        const int nx = 201, ny = 201;
+        struct turtle_map * map, * geoid;
+        struct turtle_stack * stack;
+        struct turtle_stepper * stepper;
 
-        struct turtle_map * map;
-        struct turtle_map_info info = { nx, ny, { x0 - 1000, x0 + 1000 },
-                { y0 - 1000, y0 + 1000 }, { z0, z1 } };
-        turtle_map_create(&map, &info, "UTM 31N");
+        turtle_map_load(&map, MAP_PATH);
+        turtle_map_load(&geoid, GEOID_PATH);
+        turtle_stack_create(&stack, STACK_PATH, 0, NULL, NULL);
 
-        /* Fill the map with some dummy data */
-        int i, k;
-        for (i = 0, k = 0; i < nx; i++) {
-                int j;
-                for (j = 0; j < ny; j++, k++) {
-                        const double z = ((k % 2) == 0) ? z0 : z1;
-                        turtle_map_fill(map, i, j, z);
+        /* Check the initialisation */
+        turtle_stepper_create(&stepper);
+        CHECK_LIST_INIT(stepper->data);
+        CHECK_LIST_INIT(stepper->transforms);
+        CHECK_LIST_INIT(stepper->layers);
+
+        /* Check the building of geometry layers */
+        const double latitude0 = 45.756546; 
+        const double longitude0 = 2.9485671;
+        const double offset[2] = { -0.5, 0. };
+        double values[3][2];
+        int i;
+        for (i = 0; i < 2; i++) {
+                turtle_stepper_add_layer(stepper);
+                turtle_stepper_add_flat(stepper, offset[i]);
+                turtle_stepper_add_stack(stepper, stack, offset[i]);
+                turtle_stepper_add_map(stepper, map, offset[i]);
+
+                struct turtle_stepper_layer * layer = stepper->layers.tail;
+                ck_assert_int_eq(layer->meta.size, 3);
+
+                double position[3], altitude;
+                int index[2];
+                turtle_stepper_position(stepper, latitude0, longitude0, -0.25,
+                    i, position, index);
+                ck_assert_int_eq(index[0], 0);
+
+                turtle_stepper_step(stepper, position, NULL, NULL, NULL,
+                    &altitude, NULL, NULL, index);
+                if (i) {
+                        ck_assert_int_eq(index[0], i);
+                        ck_assert_int_eq(index[1], 0);
+                } else {
+                        ck_assert_int_eq(index[0], 0);
                 }
+                values[0][i] = altitude;
+
+                turtle_stepper_position(stepper, 45.5, 2.5, -0.25, i,
+                    position, index);
+                ck_assert_int_eq(index[0], 1);
+
+                turtle_stepper_step(stepper, position, NULL, NULL, NULL,
+                    &altitude, NULL, NULL, index);
+                if (i) {
+                        ck_assert_int_eq(index[0], i);
+                        ck_assert_int_eq(index[1], 1);
+                } else {
+                        ck_assert_int_eq(index[0], 1);
+                }
+                values[1][i] = altitude;
+
+                turtle_stepper_position(stepper, 40., 10., -0.25, i,
+                    position, index);
+                ck_assert_int_eq(index[0], 2);
+
+                turtle_stepper_step(stepper, position, NULL, NULL, NULL,
+                    &altitude, NULL, NULL, index);
+                if (i) {
+                        ck_assert_int_eq(index[0], i);
+                        ck_assert_int_eq(index[1], 2);
+                } else {
+                        ck_assert_int_eq(index[0], 2);
+                }
+                values[2][i] = altitude;
+        }
+        ck_assert_int_eq(stepper->data.size, 3);
+        ck_assert_int_eq(stepper->transforms.size, 2);
+        ck_assert_int_eq(stepper->layers.size, 2);
+
+        /* Check that the elevation values are consistent */
+        for (i = 0; i < 3; i++) {
+                ck_assert_double_eq_tol(values[i][0] - offset[0],
+                    values[i][1] - offset[1], FLT_EPSILON);
         }
 
-        /* Dump the map to disk and destroy it in memory */
-        const char * path = "tests/map.png";
-        turtle_map_dump(map, path);
-        turtle_map_destroy(&map);
+        /* Check the initial stepping for a top position */
+        const double slope = turtle_stepper_slope_get(stepper); 
+        double position[3], altitude, elevation[2], step;
+        int index[2];
+        turtle_stepper_position(stepper, latitude0, longitude0, 0.5, 1,
+            position, index);
+        ck_assert_int_eq(index[0], 0);
+        turtle_stepper_step(stepper, position, NULL, NULL, NULL,
+                &altitude, elevation, &step, index);
+        ck_assert_int_eq(index[0], 2);
+        ck_assert_double_eq_tol(
+            altitude - 0.5, values[0][1] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq_tol(
+            elevation[0], values[0][1] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq(elevation[1], DBL_MAX);
+        ck_assert_double_eq_tol(step, 0.5 * slope, FLT_EPSILON);
 
-        /* Reload the map */
-        turtle_map_load(&map, path);
+        /* Check the initial stepping for a middle position */
+        turtle_stepper_position(stepper, latitude0, longitude0, -0.1, 1,
+            position, index);
+        ck_assert_int_eq(index[0], 0);
+        turtle_stepper_step(stepper, position, NULL, NULL, NULL,
+                &altitude, elevation, &step, index);
+        ck_assert_int_eq(index[0], 1);
+        ck_assert_int_eq(index[1], 0);
+        ck_assert_double_eq_tol(
+            altitude + 0.1, values[0][1] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq_tol(
+            elevation[0], values[0][0] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq_tol(
+            elevation[1], values[0][1] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq_tol(step, 0.1 * slope, FLT_EPSILON);
+
+        /* Check the initial stepping for a bottom position */
+        turtle_stepper_position(stepper, latitude0, longitude0, -0.5, 0,
+            position, index);
+        ck_assert_int_eq(index[0], 0);
+        turtle_stepper_step(stepper, position, NULL, NULL, NULL,
+                &altitude, elevation, &step, index);
+        ck_assert_int_eq(index[0], 0);
+        ck_assert_int_eq(index[1], 0);
+        ck_assert_double_eq_tol(
+            altitude + 0.5, values[0][0] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq_tol(
+            elevation[1], values[0][0] + 0.25, FLT_EPSILON);
+        ck_assert_double_eq(elevation[0], -DBL_MAX);
+        ck_assert_double_eq_tol(step, 0.5 * slope, FLT_EPSILON);
+
+        /* Check the stepping when intersecting a layer */
+        double direction[3];
+        turtle_stepper_position(stepper, latitude0, longitude0, -0.1, 1,
+            position, index);
+        turtle_ecef_from_horizontal(latitude0, longitude0, 0., 90., direction);
+        turtle_stepper_slope_set(stepper, 2.);
+        turtle_stepper_step(stepper, position, direction, NULL, NULL,
+                &altitude, elevation, &step, index);
+        ck_assert_int_eq(index[0], 2);
+        ck_assert_int_eq(index[1], 0);
+        ck_assert_double_eq_tol(altitude, values[0][1] + 0.25, 1E-05);
+        ck_assert_double_eq_tol(step, 0.1, 1E-05);
+
+        /* Check the stepping from the boundary */
+        const double resolution = turtle_stepper_resolution_get(stepper);
+        turtle_stepper_step(stepper, position, direction, NULL, NULL,
+                &altitude, elevation, &step, index);
+        ck_assert_int_eq(index[0], 2);
+        ck_assert_int_eq(index[1], 0);
+        ck_assert_double_eq_tol(
+            altitude - resolution, values[0][1] + 0.25, 1E-05);
+        ck_assert_double_eq_tol(step, resolution, 1E-05);
+
+        /* Clean and exit */
+        turtle_stepper_destroy(&stepper);
+        turtle_stack_destroy(&stack);
+        turtle_map_destroy(&geoid);
+        turtle_map_destroy(&map);
+}
+END_TEST
+
+
+START_TEST (test_map)
+{
+        DEFINE_MAP_META();
+
+        /* Load the map */
+        struct turtle_map * map;
+        turtle_map_load(&map, MAP_PATH);
 
         /* Check the map meta data */
-        memset(&info, 0x0, sizeof(info));
+        struct turtle_map_info info = { 0 };
         const char * projection;
         turtle_map_meta(map, &info, &projection);
 
@@ -185,6 +442,7 @@ START_TEST (test_map)
 
         /* Check the access to the map data */
         double z;
+        int i, k;
         for (i = 0, k = 0; i < nx; i++) {
                 int j;
                 for (j = 0; j < ny; j++, k++) {
@@ -218,9 +476,6 @@ START_TEST (test_map)
                         turtle_map_fill(map, ix, iy, z);
                 }
         }
-
-        /* Dump the map and destroy it in memory */
-        turtle_map_dump(map, path);
         turtle_map_destroy(&map);
 
         /* Catch errors and try loading some wrong maps */
@@ -235,6 +490,7 @@ START_TEST (test_map)
         regcomp(&regex, "{ turtle_map_load \\[#[0-9]*\\], "
             "src/turtle/io.c:[0-9]* } no valid format for file `nothing'", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0);
+        regfree(&regex);
 
         rc = turtle_map_load(&map, "nothing.png");
         ck_assert_int_eq(rc, TURTLE_RETURN_PATH_ERROR);
@@ -242,12 +498,14 @@ START_TEST (test_map)
             "src/turtle/io/png16.c:[0-9]* } could not open file `nothing.png'",
             0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0); 
+        regfree(&regex);
 
         rc = turtle_map_create(&map, &info, "nothing");
         ck_assert_int_eq(rc, TURTLE_RETURN_BAD_PROJECTION);
         regcomp(&regex, "{ turtle_map_create \\[#[0-9]*\\], "
             "src/turtle/projection.c:[0-9]* } invalid projection `nothing'", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0); 
+        regfree(&regex);
 
         info.nx = 0;
         rc = turtle_map_create(&map, &info, projection);
@@ -255,6 +513,7 @@ START_TEST (test_map)
         regcomp(&regex, "{ turtle_map_create \\[#[0-9]*\\], "
             "src/turtle/map.c:[0-9]* } invalid input parameter(s)", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0); 
+        regfree(&regex);
 
         /* Restore the error handler */
         turtle_error_handler_set(handler);
@@ -270,11 +529,11 @@ START_TEST (test_projection)
                 { -1, 1 } };
         turtle_map_create(&map, &info, NULL);
         ck_assert_ptr_eq(turtle_map_projection(map), NULL);
+        turtle_map_destroy(&map);
 
         /* Load the UTM projection from the map */
         turtle_map_destroy(&map);
-        const char * path = "tests/map.png";
-        turtle_map_load(&map, path);
+        turtle_map_load(&map, MAP_PATH);
         const struct turtle_projection * utm = turtle_map_projection(map);
         ck_assert_str_eq(turtle_projection_name(utm), "UTM 31N");
 
@@ -300,8 +559,8 @@ START_TEST (test_projection)
                 turtle_projection_project(
                     projection, latitude, longitude, &x, &y);
                 turtle_projection_unproject(projection, x, y, &la, &lo);
-                ck_assert_double_le(fabs(la - latitude), 1E-08);
-                ck_assert_double_le(fabs(lo - longitude), 1E-08);
+                ck_assert_double_eq_tol(la, latitude, 1E-08);
+                ck_assert_double_eq_tol(lo, longitude, 1E-08);
         }
 
         /* Clean the memory */
@@ -320,6 +579,7 @@ START_TEST (test_projection)
             "\\[#[0-9]*\\], src/turtle/projection.c:[0-9]* } "
             "invalid projection `nothing'", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0);
+        regfree(&regex);
 
         /* Restore the error handler */
         turtle_error_handler_set(handler);
@@ -336,9 +596,9 @@ START_TEST (test_ecef)
 
         double lla[3];
         turtle_ecef_to_geodetic(position, lla, lla + 1, lla + 2);
-        ck_assert_double_le(fabs(lla[0] - latitude), 1E-08);
-        ck_assert_double_le(fabs(lla[1] - longitude), 1E-08);
-        ck_assert_double_le(fabs(lla[2] - altitude), 1E-08);
+        ck_assert_double_eq_tol(lla[0], latitude, 1E-08);
+        ck_assert_double_eq_tol(lla[1], longitude, 1E-08);
+        ck_assert_double_eq_tol(lla[2], altitude, 1E-08);
 
         /* Convert a direction for and back */
         const double azimuth = 60., elevation = 30.;
@@ -348,8 +608,8 @@ START_TEST (test_ecef)
         double angle[2];
         turtle_ecef_to_horizontal(
             latitude, longitude, direction, angle, angle + 1);
-        ck_assert_double_le(fabs(angle[0] - azimuth), 1E-08);
-        ck_assert_double_le(fabs(angle[1] - elevation), 1E-08);
+        ck_assert_double_eq_tol(angle[0], azimuth, 1E-08);
+        ck_assert_double_eq_tol(angle[1], elevation, 1E-08);
 
         /* Check the boundary cases */
         turtle_ecef_from_geodetic(90, 0, altitude, position);
@@ -375,50 +635,9 @@ END_TEST
 
 START_TEST (test_stack)
 {
-        /* Create some data tiles for the global stack */
-        int k;
-        for (k = 0; k < 4; k++) {
-                const int nx = 1201, ny = 1201;
-                double latitude0, latitude1;
-                if ((k % 2) == 0) {
-                        latitude0 = 45;
-                        latitude1 = 46;
-                } else {
-                        latitude0 = 46;
-                        latitude1 = 47;
-                }
-                double longitude0, longitude1;
-                if ((k / 2) == 0) {
-                        longitude0 = 2;
-                        longitude1 = 3;
-                } else {
-                        longitude0 = 3;
-                        longitude1 = 4;
-                }
-                struct turtle_map * map;
-                struct turtle_map_info info = { nx, ny,
-                        { longitude0, longitude1 }, { latitude0, latitude1 },
-                        { 0, 1 } };
-                turtle_map_create(&map, &info, NULL);
-                int i;
-                for (i = 0; i < nx; i++) {
-                        int j;
-                        for (j = 0; j < ny; j++) turtle_map_fill(map, i, j, 0);
-                }
-                if (k == 0)
-                        turtle_map_dump(map, "tests/topography/45N_002E.png");
-                else if (k == 1)
-                        turtle_map_dump(map, "tests/topography/46N_002E.png");
-                else if (k == 2)
-                        turtle_map_dump(map, "tests/topography/45N_003E.png");
-                else
-                        turtle_map_dump(map, "tests/topography/46N_003E.png");
-                turtle_map_destroy(&map);
-        }
-
         /* Create the stack */
         struct turtle_stack * stack;
-        turtle_stack_create(&stack, "tests/topography", 3, NULL, NULL);
+        turtle_stack_create(&stack, STACK_PATH, 3, NULL, NULL);
         ck_assert_int_eq(stack->size, 0);
 
         /* Check some elevation values */
@@ -461,7 +680,7 @@ START_TEST (test_stack)
         ck_assert_int_eq(stack->size, 3);
 
         turtle_stack_destroy(&stack);
-        turtle_stack_create(&stack, "tests/topography", 0, NULL, NULL);
+        turtle_stack_create(&stack, STACK_PATH, 0, NULL, NULL);
         turtle_stack_load(stack);
         ck_assert_int_eq(stack->size, 4);
 
@@ -479,7 +698,7 @@ START_TEST (test_client)
 {
         /* Create a stack and its client */
         struct turtle_stack * stack;
-        turtle_stack_create(&stack, "tests/topography", 1, &nothing, &nothing);
+        turtle_stack_create(&stack, STACK_PATH, 1, &nothing, &nothing);
 
         struct turtle_client * client;
         turtle_client_create(&client, stack);
@@ -527,56 +746,44 @@ START_TEST (test_client)
         regcomp(&regex, "{ turtle_client_create \\[#[0-9]*\\], "
             "src/turtle/client.c:[0-9]* } invalid null stack", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0);
+        regfree(&regex);
 
-        turtle_stack_create(&stack, "tests/topography", 0, NULL, NULL);
+        turtle_stack_create(&stack, STACK_PATH, 0, NULL, NULL);
         rc = turtle_client_create(&client, stack);
         ck_assert_int_eq(rc, TURTLE_RETURN_BAD_ADDRESS);
         regcomp(&regex, "{ turtle_client_create \\[#[0-9]*\\], "
             "src/turtle/client.c:[0-9]* } stack has no lock", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0);
-
+        regfree(&regex);
         turtle_stack_destroy(&stack);
-        turtle_stack_create(&stack, "tests/topography", 1, &nothing, &nothing);
+
+        turtle_stack_create(&stack, STACK_PATH, 1, &nothing, &nothing);
         turtle_client_create(&client, stack);
         rc = turtle_client_elevation(client, 45.5, 4.5, &z, NULL);
         ck_assert_int_eq(rc, TURTLE_RETURN_PATH_ERROR);
         regcomp(&regex, "{ turtle_client_elevation \\[#[0-9]*\\], "
             "src/turtle/stack.c:[0-9]* } missing elevation data in "
-            "`tests/topography'", 0);
+            "`" STACK_PATH  "'", 0);
         ck_assert_int_eq(regexec(&regex, error_buffer, 0, NULL, 0), 0);
+        regfree(&regex);
+        turtle_client_destroy(&client);
+        turtle_stack_destroy(&stack);
 
         /* Restore the error handler */
         turtle_error_handler_set(handler);
-
-        /* Clean the memory */
-        turtle_client_destroy(&client);
-        turtle_stack_destroy(&stack);
 }
 END_TEST
 
 
 START_TEST (test_stepper)
 {
-        /* Create the geoid data */
-        const int nx = 361, ny = 181;
-        struct turtle_map * geoid;
-        struct turtle_map_info info = { nx, ny, { -180, 180 }, { -90, 90 },
-                { -1, 1 } };
-        turtle_map_create(&geoid, &info, NULL);
-        int i;
-        for (i = 0; i < nx; i++) {
-                int j;
-                for (j = 0; j < ny; j++) turtle_map_fill(geoid, i, j, -1);
-        }
-        turtle_map_dump(geoid, "tests/geoid.png");
-        turtle_map_destroy(&geoid);
-
         /* Create the stepper */
         struct turtle_stack * stack;
-        turtle_stack_create(&stack, "tests/topography", 0, NULL, NULL);
+        turtle_stack_create(&stack, STACK_PATH, 0, NULL, NULL);
         struct turtle_map * map;
-        turtle_map_load(&map, "tests/map.png");
-        turtle_map_load(&geoid, "tests/geoid.png");
+        turtle_map_load(&map, MAP_PATH);
+        struct turtle_map * geoid;
+        turtle_map_load(&geoid, GEOID_PATH);
         struct turtle_stepper * stepper;
         turtle_stepper_create(&stepper);
 
@@ -593,6 +800,7 @@ START_TEST (test_stepper)
         ck_assert_int_eq(current_layer->meta.size, 5);
         ck_assert_int_eq(stepper->transforms.size, 2);
 
+        int i;
         for (i = 0; i < 2; i++) {
                 /* Set the approximation range */
                 if (i) turtle_stepper_range_set(stepper, 100);
@@ -663,7 +871,7 @@ START_TEST (test_stepper)
         double altitude, ground_elevation, la, lo;
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
             &ground_elevation, NULL, &layer);
-        ck_assert_double_le(fabs(ground_elevation + height - altitude), 1E-08);
+        ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
 
         turtle_stepper_destroy(&stepper);
         turtle_stepper_create(&stepper);
@@ -671,7 +879,7 @@ START_TEST (test_stepper)
         turtle_stepper_geoid_set(stepper, geoid);
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
             &ground_elevation, NULL, &layer);
-        ck_assert_double_le(fabs(ground_elevation + height - altitude), 1E-08);
+        ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
 
         double direction[3];
         turtle_ecef_from_horizontal(latitude, longitude, 0, 0, direction);
@@ -686,7 +894,7 @@ START_TEST (test_stepper)
         /* Check the client layer */
         turtle_stepper_destroy(&stepper);
         turtle_stack_destroy(&stack);
-        turtle_stack_create(&stack, "tests/topography", 1, &nothing, &nothing);
+        turtle_stack_create(&stack, STACK_PATH, 1, &nothing, &nothing);
         turtle_stepper_create(&stepper);
         turtle_stepper_add_stack(stepper, stack, 0.);
         turtle_stepper_range_set(stepper, 100);
@@ -695,7 +903,7 @@ START_TEST (test_stepper)
             stepper, latitude, longitude, height, 0, position, &layer);
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
             &ground_elevation, NULL, &layer);
-        ck_assert_double_le(fabs(ground_elevation + height - altitude), 1E-08);
+        ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
 
         double altitude1, ground_elevation1, la1, lo1;
         int layer1;
@@ -772,8 +980,7 @@ START_TEST (test_io_grd)
                         double undulation1;
                         turtle_map_elevation(
                             geoid, longitude, latitude, &undulation1, NULL);
-                        ck_assert_double_le(
-                            fabs(undulation1 - undulation), 1E-02);
+                        ck_assert_double_eq_tol(undulation1, undulation, 1E-02);
                 }
         }
 
@@ -781,7 +988,7 @@ START_TEST (test_io_grd)
         turtle_map_fill(geoid, 0, 0, 1);
         double undulation;
         turtle_map_elevation(geoid, 0, -90, &undulation, NULL);
-        ck_assert_double_le(fabs(undulation - 1), 1E-02);
+        ck_assert_double_eq_tol(undulation, 1, 1E-02);
 
         /* Clean the memory */
         turtle_map_destroy(&geoid);
@@ -817,7 +1024,7 @@ START_TEST (test_io_hgt)
                         turtle_map_node(map, j, i, &x, &y, &z);
                         if (((k % 100) == 0) || ((k % 101) == 0)) {
                                 const double z1 = ((k % 2) == 0) ? -1 : 1;
-                                ck_assert_double_le(fabs(z - z1), 1E-02);
+                                ck_assert_double_eq_tol(z, z1, 1E-02);
                         }
                 }
         }
@@ -826,7 +1033,7 @@ START_TEST (test_io_hgt)
         turtle_map_fill(map, 0, 0, 10);
         double z;
         turtle_map_elevation(map, 3, 45, &z, NULL);
-        ck_assert_double_le(fabs(z - 10), 1E-02);
+        ck_assert_double_eq_tol(z, 10, 1E-02);
 
         /* Clean the memory */
         turtle_map_destroy(&map);
@@ -871,7 +1078,7 @@ START_TEST (test_io_tiff)
                         turtle_map_node(map, j, i, &x, &y, &z);
                         if (((k % 10) == 0) || ((k % 11) == 0)) {
                                 const double z1 = ((k % 2) == 0) ? -1 : 1;
-                                ck_assert_double_le(z, z1);
+                                ck_assert_double_eq(z, z1);
                         }
                 }
         }
@@ -880,7 +1087,7 @@ START_TEST (test_io_tiff)
         turtle_map_fill(map, 0, 0, 10);
         double z;
         turtle_map_elevation(map, 3, 45, &z, NULL);
-        ck_assert_double_le(fabs(z - 10.), 1E-02);
+        ck_assert_double_eq_tol(z, 10., 1E-02);
 
         /* Clean the memory */
         turtle_map_destroy(&map);
@@ -955,36 +1162,53 @@ END_TEST
 
 Suite * basic_suite(void)
 {
+        const int timeout = 60;
+
+        /* The test suite */
         Suite * suite = suite_create("Turtle");
 
-        /* Core test case */
-        TCase * tc_core = tcase_create("Core");
-        tcase_set_timeout(tc_core, 60);
-        tcase_add_test(tc_core, test_list);
-        tcase_add_test(tc_core, test_map);
-        tcase_add_test(tc_core, test_projection);
-        tcase_add_test(tc_core, test_ecef);
-        tcase_add_test(tc_core, test_stack);
-        tcase_add_test(tc_core, test_client);
-        tcase_add_test(tc_core, test_stepper);
+        /* The internals test case */
+        TCase * tc_internals = tcase_create("Internals");
+        suite_add_tcase(suite, tc_internals);
+        tcase_set_timeout(tc_internals, timeout);
+        tcase_add_test(tc_internals, test_list);
+        tcase_add_test(tc_internals, test_stepper_layer);
+
+        /* The API test case */
+        TCase * tc_api = tcase_create("API");
+        suite_add_tcase(suite, tc_api);
+        tcase_set_timeout(tc_api, timeout);
+        tcase_add_test(tc_api, test_map);
+        tcase_add_test(tc_api, test_projection);
+        tcase_add_test(tc_api, test_ecef);
+        tcase_add_test(tc_api, test_stack);
+        tcase_add_test(tc_api, test_client);
+        tcase_add_test(tc_api, test_stepper);
+        tcase_add_test(tc_api, test_strfunc); 
+
+        /* The I/O test case */
+        TCase * tc_io = tcase_create("I/O");
+        suite_add_tcase(suite, tc_io);
+        tcase_set_timeout(tc_io, timeout);
 #ifndef TURTLE_NO_GRD
-        tcase_add_test(tc_core, test_io_grd);
+        tcase_add_test(tc_io, test_io_grd);
 #endif
 #ifndef TURTLE_NO_HGT
-        tcase_add_test(tc_core, test_io_hgt);
+        tcase_add_test(tc_io, test_io_hgt);
 #endif
 #ifndef TURTLE_NO_TIFF
-        tcase_add_test(tc_core, test_io_tiff);
+        tcase_add_test(tc_io, test_io_tiff);
 #endif
-        tcase_add_test(tc_core, test_strfunc);
 
-        suite_add_tcase(suite, tc_core);
         return suite;
 }
 
 
 int main(void)
 {
+        /* Create the dummy test data */
+        setup_data();
+
         /* Run the tests */
         int number_failed;
         Suite * suite;
