@@ -34,6 +34,7 @@
 #include "turtle.h"
 #include "turtle/error.h"
 #include "turtle/io.h"
+#include "turtle/list.h"
 #include "turtle/stack.h"
 
 #ifndef M_PI
@@ -142,8 +143,7 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
         if (*stack == NULL) return TURTLE_ERROR_MEMORY();
 
         /* Initialise the handle */
-        (*stack)->head = NULL;
-        (*stack)->size = 0;
+        memset(&(*stack)->tiles, 0x0, sizeof((*stack)->tiles));
         (*stack)->max_size = (size > 0) ? size : INT_MAX;
         (*stack)->lock = lock;
         (*stack)->unlock = unlock;
@@ -200,12 +200,12 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
 /* Low level routine for cleaning the stack */
 static void stack_clear(struct turtle_stack * stack, int force)
 {
-        struct turtle_map * map = stack->head;
+        struct turtle_map * map = stack->tiles.head;
         while (map != NULL) {
-                struct turtle_map * current = map;
-                map = map->prev;
-                if ((force != 0) || (current->clients == 0))
-                        turtle_map_destroy(&current);
+                struct turtle_map * next = map->element.next;
+                if ((force != 0) || (map->clients == 0))
+                        turtle_map_destroy(&map);
+                map = next;
         }
 }
 
@@ -247,8 +247,8 @@ enum turtle_return turtle_stack_load(struct turtle_stack * stack)
 
         double x = stack->longitude_0 + 0.5 * stack->longitude_delta;
         double y = stack->latitude_0 + 0.5 * stack->latitude_delta;
-        struct turtle_map * head = stack->head;
-        while (stack->size < stack->max_size) {
+        struct turtle_map * head = stack->tiles.head;
+        while (stack->tiles.size < stack->max_size) {
                 /* First, let us check the initial stack */
                 int load = 1;
                 struct turtle_map * map = head;
@@ -261,7 +261,7 @@ enum turtle_return turtle_stack_load(struct turtle_stack * stack)
                                 load = 0;
                                 break;
                         }
-                        map = map->prev;
+                        map = map->element.next;
                 }
 
                 if (load) {
@@ -299,9 +299,9 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
         /* Get the proper map */
         double hx, hy;
         int load = 1;
-        if (stack->head != NULL) {
+        if (stack->tiles.head != NULL) {
                 /* First let's check the top of the stack */
-                struct turtle_map * head = stack->head;
+                struct turtle_map * head = stack->tiles.head;
                 hx = (longitude - head->meta.x0) / head->meta.dx;
                 hy = (latitude - head->meta.y0) / head->meta.dy;
 
@@ -309,7 +309,7 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                     (hy >= head->meta.ny - 1)) {
                         /* The requested coordinates are not in the top
                          * maps. Let's check the full stack */
-                        struct turtle_map * map = head->prev;
+                        struct turtle_map * map = head->element.next;
                         while (map != NULL) {
                                 hx = (longitude - map->meta.x0) / map->meta.dx;
                                 hy = (latitude - map->meta.y0) / map->meta.dy;
@@ -324,7 +324,7 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                                         load = 0;
                                         break;
                                 }
-                                map = map->prev;
+                                map = map->element.next;
                         }
                 } else
                         load = 0;
@@ -340,27 +340,22 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                         return TURTLE_ERROR_RAISE();
                 }
 
-                struct turtle_map * head = stack->head;
+                struct turtle_map * head = stack->tiles.head;
                 hx = (longitude - head->meta.x0) / head->meta.dx;
                 hy = (latitude - head->meta.y0) / head->meta.dy;
         }
 
         /* Interpolate the elevation */
         return turtle_map_elevation_(
-            stack->head, longitude, latitude, elevation, inside, error_);
+            stack->tiles.head, longitude, latitude, elevation, inside, error_);
 }
 
 /* Move a map to the top of the stack */
 void turtle_stack_touch_(struct turtle_stack * stack, struct turtle_map * map)
 {
-        if (map->next == NULL) return; /* Already on top */
-        struct turtle_map * prev = map->prev;
-        map->next->prev = prev;
-        if (prev != NULL) prev->next = map->next;
-        stack->head->next = map;
-        map->prev = stack->head;
-        map->next = NULL;
-        stack->head = map;
+        if (map->element.previous == NULL) return; /* Already on top */
+        turtle_list_remove_(&stack->tiles, map);
+        turtle_list_insert_(&stack->tiles, map, 0);
 }
 
 /* Load a new map and manage the stack */
@@ -399,22 +394,19 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
                 return error_->code;
 
         /* Make room for the new map, if needed */
-        if (stack->size >= stack->max_size) {
-                struct turtle_map * last = stack->head;
-                while (last->prev != NULL) last = last->prev;
-                while ((last != NULL) && (stack->size >= stack->max_size)) {
-                        struct turtle_map * current = last;
-                        last = last->next;
-                        if (current->clients == 0) turtle_map_destroy(&current);
+        if (stack->tiles.size >= stack->max_size) {
+                struct turtle_map * m = stack->tiles.tail;
+                while ((m != NULL) && (stack->tiles.size >= stack->max_size)) {
+                        struct turtle_map * previous = m->element.previous;
+                        if (m->clients == 0)
+                                turtle_map_destroy(&m);
+                        m = previous;
                 }
         }
 
-        /* Append the new map on top of the stack */
+        /* Append the new map at the head of the stack */
         map->stack = stack;
-        map->prev = stack->head;
-        if (stack->head != NULL) stack->head->next = map;
-        stack->head = map;
-        stack->size++;
+        turtle_list_insert_(&stack->tiles, map, 0);
 
         if (inside != NULL) *inside = 1;
         return TURTLE_RETURN_SUCCESS;

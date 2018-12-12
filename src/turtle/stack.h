@@ -25,13 +25,14 @@
 #define TURTLE_STACK_H
 
 #include "turtle.h"
+#include "turtle/list.h"
 #include "turtle/map.h"
 
 /* Container for a stack of global topography data */
 struct turtle_stack {
         /* The stack of loaded tiles */
-        struct turtle_map * head;
-        int size, max_size;
+        struct turtle_list tiles;
+        int max_size;
 
         /* Callbacks for managing concurent accesses to the stack */
         turtle_stack_locker_t * lock;

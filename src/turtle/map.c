@@ -32,6 +32,7 @@
 #include "turtle.h"
 #include "turtle/error.h"
 #include "turtle/io.h"
+#include "turtle/list.h"
 #include "turtle/map.h"
 #include "turtle/projection.h"
 #include "turtle/stack.h"
@@ -91,7 +92,7 @@ enum turtle_return turtle_map_create(struct turtle_map ** map,
         strcpy((*map)->meta.encoding, "none");
 
         (*map)->stack = NULL;
-        (*map)->prev = (*map)->next = NULL;
+        memset(&(*map)->element, 0x0, sizeof((*map)->element));
         (*map)->clients = 0;
 
         return TURTLE_RETURN_SUCCESS;
@@ -104,14 +105,7 @@ void turtle_map_destroy(struct turtle_map ** map)
 
         if ((*map)->stack != NULL) {
                 /* Update the stack */
-                struct turtle_map * prev = (*map)->prev;
-                struct turtle_map * next = (*map)->next;
-                if (prev != NULL) prev->next = next;
-                if (next != NULL)
-                        next->prev = prev;
-                else
-                        (*map)->stack->head = prev;
-                (*map)->stack->size--;
+                turtle_list_remove_(&(*map)->stack->tiles, *map);
         }
 
         free(*map);
@@ -143,7 +137,7 @@ enum turtle_return turtle_map_load_(struct turtle_map ** map, const char * path,
         /* Initialise the map data */
         memcpy(&(*map)->meta, &io->meta, sizeof((*map)->meta));
         (*map)->stack = NULL;
-        (*map)->prev = (*map)->next = NULL;
+        memset(&(*map)->element, 0x0, sizeof((*map)->element));
         (*map)->clients = 0;
 
         /* Load the topography data */

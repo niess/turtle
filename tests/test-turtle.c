@@ -638,51 +638,59 @@ START_TEST (test_stack)
         /* Create the stack */
         struct turtle_stack * stack;
         turtle_stack_create(&stack, STACK_PATH, 3, NULL, NULL);
-        ck_assert_int_eq(stack->size, 0);
+        ck_assert_int_eq(stack->tiles.size, 0);
 
         /* Check some elevation values */
         double z;
         turtle_stack_elevation(stack, 45.5, 3.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 1);
         turtle_stack_elevation(stack, 45.0, 3.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 1);
         turtle_stack_elevation(stack, 46.5, 3.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 2);
         turtle_stack_elevation(stack, 45.0, 3.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 2);
 
         int inside;
         turtle_stack_elevation(stack, 45.5, 4.5, &z, &inside);
         ck_assert_int_eq(inside, 0);
+        ck_assert_int_eq(stack->tiles.size, 2);
 
         turtle_stack_elevation(stack, 45.5, 2.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 3);
         turtle_stack_elevation(stack, 46.5, 2.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 3);
 
         /* Check the clear and load functions */
         turtle_stack_clear(stack);
-        ck_assert_int_eq(stack->size, 0);
+        ck_assert_int_eq(stack->tiles.size, 0);
 
         turtle_stack_elevation(stack, 45.5, 2.5, &z, NULL);
         ck_assert_double_eq(z, 0);
+        ck_assert_int_eq(stack->tiles.size, 1);
 
         turtle_stack_load(stack);
-        ck_assert_int_eq(stack->size, 3);
+        ck_assert_int_eq(stack->tiles.size, 3);
 
         turtle_stack_clear(stack);
-        ck_assert_int_eq(stack->size, 0);
+        ck_assert_int_eq(stack->tiles.size, 0);
 
         turtle_stack_load(stack);
-        ck_assert_int_eq(stack->size, 3);
+        ck_assert_int_eq(stack->tiles.size, 3);
 
         turtle_stack_load(stack);
-        ck_assert_int_eq(stack->size, 3);
+        ck_assert_int_eq(stack->tiles.size, 3);
 
         turtle_stack_destroy(&stack);
         turtle_stack_create(&stack, STACK_PATH, 0, NULL, NULL);
         turtle_stack_load(stack);
-        ck_assert_int_eq(stack->size, 4);
+        ck_assert_int_eq(stack->tiles.size, 4);
 
         /* Clean the memory */
         turtle_stack_destroy(&stack);

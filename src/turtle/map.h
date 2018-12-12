@@ -27,7 +27,8 @@
 /* C89 standard library */
 #include <stdint.h>
 /* Turtle library */
-#include "projection.h"
+#include "turtle/list.h"
+#include "turtle/projection.h"
 
 /* Callbacks for getting and setting elevation data */
 struct turtle_map;
@@ -56,12 +57,12 @@ struct turtle_map_meta {
 
 /* Container for a map */
 struct turtle_map {
+        struct turtle_list_element element;
+
         /* Meta data */
         struct turtle_map_meta meta;
 
         /* Stack data */
-        struct turtle_map * prev;
-        struct turtle_map * next;
         struct turtle_stack * stack;
         int clients;
 

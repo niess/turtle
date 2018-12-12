@@ -131,10 +131,10 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
         /* The requested coordinates are not in the current map. Let's check
          * the full stack
          */
-        current = stack->head;
+        current = stack->tiles.head;
         while (current != NULL) {
                 if (current == client->map) {
-                        current = current->prev;
+                        current = current->element.next;
                         continue;
                 }
                 hx = (longitude - current->meta.x0) / current->meta.dx;
@@ -145,7 +145,7 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                         if (inside != NULL) *inside = 1;
                         goto update;
                 }
-                current = current->prev;
+                current = current->element.next;
         }
 
         /* No valid map was found. Let's try to load it */
@@ -158,7 +158,7 @@ enum turtle_return turtle_client_elevation(struct turtle_client * client,
                 client->index_lo = (int)longitude;
                 goto unlock;
         }
-        current = stack->head;
+        current = stack->tiles.head;
         hx = (longitude - current->meta.x0) / current->meta.dx;
         hy = (latitude - current->meta.y0) / current->meta.dy;
 
@@ -211,7 +211,7 @@ static enum turtle_return client_release(struct turtle_client * client,
         }
 
         /* Remove the map if it is unused and if there is a stack overflow */
-        if ((map->clients == 0) && (stack->size > stack->max_size))
+        if ((map->clients == 0) && (stack->tiles.size > stack->max_size))
                 turtle_map_destroy(&map);
 
 /* Unlock and return */
