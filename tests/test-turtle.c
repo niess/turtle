@@ -1168,7 +1168,7 @@ START_TEST (test_strfunc)
 END_TEST
 
 
-Suite * basic_suite(void)
+Suite * create_suite(void)
 {
         const int timeout = 60;
 
@@ -1217,19 +1217,17 @@ int main(void)
         /* Create the dummy test data */
         setup_data();
 
+        /* Configure the tests amd the runner */
+        Suite * suite = create_suite();
+        SRunner * runner = srunner_create(suite);
+        srunner_set_fork_status(runner, CK_NOFORK);
+
         /* Run the tests */
-        int number_failed;
-        Suite * suite;
-        SRunner * runner;
-
-        suite = basic_suite();
-        runner = srunner_create(suite);
-
         srunner_run_all(runner, CK_NORMAL);
-        number_failed = srunner_ntests_failed(runner);
+        const int status = srunner_ntests_failed(runner) ?
+            EXIT_FAILURE : EXIT_SUCCESS;
         srunner_free(runner);
 
-        /* Exit to the OS */
-        int rc = (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-        exit(rc);
+        /* Return the test status to the OS */
+        exit(status);
 }

@@ -4,9 +4,11 @@ os:
 
 language: c
 
+install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then make libcheck ; fi
+
 script:
   - make && make examples
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then make check ; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then make test ; fi
 
 after_success:

@@ -43,8 +43,10 @@ else
 	CFLAGS += -DTURTLE_NO_PNG
 endif
 
+
 # Available builds
-.PHONY: lib clean check examples test
+.PHONY: lib clean libcheck examples test
+
 
 # Rules for building the library
 lib: lib/libturtle.so
@@ -86,6 +88,24 @@ bin/example-%: examples/example-%.c lib/libturtle.so
 	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib -Wl,-rpath $(PWD)/lib -lturtle
 
+
+# Rules for installing `libcheck` locally
+CHECK_INSTALL_DIR := share/check
+
+libcheck: $(CHECK_INSTALL_DIR)
+
+$(CHECK_INSTALL_DIR):
+	@echo "Installing libcheck to $@"
+	@mkdir -p $@
+	@git clone https://github.com/libcheck/check.git $@/src
+	@mkdir -p $@/build
+	@cd $@/build && cmake -DCMAKE_INSTALL_PREFIX=$(PWD)/$@                 \
+		-DCHECK_ENABLE_TESTS=off ../src
+
+	@cd $@/build && make install
+	@echo "libcheck has been installed to $@"
+
+
 # Rules for building the tests binaries
 SOURCES := src/turtle/client.c src/turtle/ecef.c src/turtle/error.c            \
 	src/turtle/io.c src/turtle/list.c src/turtle/map.c                     \
@@ -103,22 +123,15 @@ test: bin/test-turtle
 	@rm -rf tinydir.h.gcov tests/test-turtle.gcno tests/test-turtle.gcda
 	@mv *.gcov tests/.
 
-bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES) | check
+ifneq ("$(wildcard $(CHECK_INSTALL_DIR))","")
+bin/test-%: LIBS += -L$(CHECK_INSTALL_DIR)/lib
+bin/test-%: INCLUDES += -I$(CHECK_INSTALL_DIR)/include
+endif
+bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
 	@mkdir -p bin
 	@gcc -o $@ $(CFLAGS) -O0 -g -ftest-coverage -fprofile-arcs $(INCLUDES) \
-		-Ishare/check/include $^ $(LIBS) -Lshare/check/lib -lcheck -lrt
+		$^ $(LIBS) -lcheck -lrt
 	@mv *.gcno tests/.
-
-check: share/check
-
-share/check:
-	@mkdir -p $@
-	@git clone https://github.com/libcheck/check.git $@/src
-	@mkdir -p $@/build
-	@cd $@/build && cmake -DCMAKE_INSTALL_PREFIX=$(PWD)/$@                 \
-		-DCHECK_ENABLE_TESTS=off ../src
-
-	@cd $@/build && make install
 
 
 # Clean-up rule
