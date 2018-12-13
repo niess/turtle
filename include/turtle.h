@@ -912,19 +912,24 @@ TURTLE_API void turtle_stepper_resolution_set(
     struct turtle_stepper * stepper, double resolution);
 
 /**
- * Add a new geometry layer for the stepper
+ * Add a new topography layer for the stepper
  *
  * @param stepper   The stepper object
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Add a new geometry layer. Data can be further added to the layer using the
+ * Add a new topography layer. Data can be further added to the layer using the
  * `turtle_stepper_add_*` functions. If the current layer is empty, no new layer
- * is added. At creation, the stepper geometry is initialised with a single
+ * is added. At creation, the stepper topography is initialised with a single
  * empty layer.
+ * 
+ * Complex topographies can be described by using multiple layers. For example,
+ * water can be added on top of the ground, a soil below, a canopy above, etc.
+ * The stepper inspects the topography starting with the bottom layer and going
+ * up, until it finds a layer lying above the current position.
  *
- * **Note** that the added registered layer is the top one. But, the lower a
- * layer the higher its priority.
+ * **Note** that the last added layer is the top one. But, the lower a layer the
+ * higher its priority. This is the opposite behaviour than data within a layer.
  *
  * __Error codes__
  *
@@ -934,7 +939,7 @@ TURTLE_API enum turtle_return turtle_stepper_add_layer(
     struct turtle_stepper * stepper);
 
 /**
- * Add a `turtle_stack` data resource to the current geometry layer
+ * Add a `turtle_stack` data resource to the current topography layer
  *
  * @param stepper   The stepper object
  * @param stack     The stack to access
@@ -942,7 +947,7 @@ TURTLE_API enum turtle_return turtle_stepper_add_layer(
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Register a `turtle_stack` data resource for the current geometry layer of
+ * Register a `turtle_stack` data resource for the current topography layer of
  * the stepper. An offset to the native elevation data can be specified as well.
  * Note that if the stack supports multi-threading, i.e. if it has a registered
  * lock, then a `turtle_client` is automatically created in order to access the
@@ -962,7 +967,7 @@ TURTLE_API enum turtle_return turtle_stepper_add_stack(
     double offset);
 
 /**
- * Add a `turtle_map` data resource to the current geometry layer
+ * Add a `turtle_map` data resource to the current topography layer
  *
  * @param stepper   The stepper object
  * @param map       The map to access
@@ -970,7 +975,7 @@ TURTLE_API enum turtle_return turtle_stepper_add_stack(
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Register a `turtle_map` data resource for the current geometry layer of
+ * Register a `turtle_map` data resource for the current topography layer of
  * the stepper. An offset to the native elevation data can be specified as well.
  *
  * **Note** that the last registered data within the current layer is the top
@@ -984,14 +989,14 @@ TURTLE_API enum turtle_return turtle_stepper_add_map(
     struct turtle_stepper * stepper, struct turtle_map * map, double offset);
 
 /**
- * Add a flat data resource to the current geometry layer
+ * Add a flat data resource to the current topography layer
  *
  * @param stepper   The stepper object
  * @param offset    Any offset to the elevation data
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
- * Register a `flat` (zero elevation) data resource for the current geometry
+ * Register a `flat` (zero elevation) data resource for the current topography
  * layer of the stepper. An offset can be specified as well.
  *
  * **Note** that the last registered data within the current layer is the top
@@ -1015,32 +1020,33 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * @param altitude             The (final) geodetic altitude
  * @param elevation            The (final) topography elevation(s)
  * @param step_length          The step length
- * @param index                The (final) geometry and/or meta-data indices
+ * @param index                The (final) topography and/or meta-data indices
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
  * If *direction* is `NULL`, sample the geography data at the given ECEF
  * position and compute a tentative *step length*. The top most valid data in
- * the stepper's stack are returned. If no valid layer was found a negative
- * *layer* value is returned, or an error is raised if *layer* points to `NULL`.
+ * the stepper's stack are returned. If no valid topography layer was found a
+ * negative *layer* value is returned, or an error is raised if *index* points
+ * to `NULL`.
  *
  * If a *direction* is provided, do a single step through the topography along
  * the given direction, using the tentative *step length*. If a change of medium
  * occurs, the boundary is located using a binary search. At exit the ECEF
- * position is updated. If the step exit the topography area and if *layer* is
- * non `NULL`, then a negative layer value is returned. Otherwise an error is
- * raised.
+ * position is updated. If the step exit the topography area and if *index* is
+ * non `NULL`, then a negative value is filled to `index[0]`. Otherwise an
+ * error is raised.
+ *
+ * If the stepper has a single topography layer, the matching meta data
+ * elevation value and the corresponding index are returned. Else, if non
+ * `NULL`,`*elevation* and *index* must be size 2 arrays. Then, the elevation
+ * values of the lower (`elevation[0]`) and upper (`elevation[1]`) bounding
+ * layers are returned. The index array is filled with the containing topography
+ * layer (`index[0]`) and the matching meta-data inside the layer (`index[1]`).
  *
  * Note that any of the output data can point to `NULL` if it is of no interest.
  * Note also that depending of the set local *range*, an approximation might be
  * used for computing geographic coordinates.
- *
- * If the stepper has a single geometry layer, the matching meta data elevation
- * value and index are returned. Else, if non `NULL`,`*elevation* and *index*
- * must be size 2 arrays. Then, the elevation values of the lower (elevation[0])
- * and upper (elevation[1]) bounding layers are returned. The index array is
- * filled with the containing geometry layer (index[0]) and the matching
- * meta-data inside the layer (index[1]).
  *
  * __Error codes__
  *
