@@ -64,7 +64,8 @@ PNG or TIFF formats, and their dependencies, if not needed.
 ## Documentation
 
 The API documentation can be found [here](http://niess.github.io/turtle-docs).
-You might directly check the [examples](examples) as well.
+You might directly check the [examples](examples) as well. A summary of the
+relevant package files is provided in [CONTENT.md](CONTENT.md).
 
 ## License
 
