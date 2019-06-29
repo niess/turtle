@@ -182,7 +182,7 @@ enum turtle_return turtle_projection_configure(
 /* Get the name tag corresponding to the projection */
 const char * turtle_projection_name(const struct turtle_projection * projection)
 {
-        if (projection->type == PROJECTION_NONE)
+        if ((projection == NULL) || (projection->type == PROJECTION_NONE))
                 return NULL;
         else
                 return projection->tag;

@@ -481,7 +481,8 @@ enum turtle_return turtle_stepper_add_map(struct turtle_stepper * stepper,
                 /* Add the data to the stepper's stack */
                 const struct turtle_projection * projection =
                     turtle_map_projection(map);
-                const char * name = turtle_projection_name(projection);
+                const char * name = (projection == NULL) ?
+                    "geodetic" : turtle_projection_name(projection);
                 if (add_data(stepper, data, name) != TURTLE_RETURN_SUCCESS) {
                         return TURTLE_ERROR_MEMORY();
                 }
