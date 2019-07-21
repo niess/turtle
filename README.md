@@ -32,7 +32,7 @@ geodetic coordinates and Cartesian **E**arth-**C**entered, **E**arth-**F**ixed
 optimised for transport problems. It allows to balance execution speed, I/Os and
 memory usage.
 
-Note that TURTLE is not an ~image library~ neither a ~~Monte-Carlo transport
+Note that TURTLE is nor an ~image library~ neither a ~~Monte-Carlo transport
 engine~~. It can only load a few commonly used data formats for geographic
 maps, i.e: **GEOTIFF**, **GRD** and **HGT**. Binary data formats must be 16b
 and grayscale. In addition, maps can be loaded and dumped in **PNG**, enriched
@@ -41,9 +41,10 @@ with a custom header (as a `tEXt` chunk).
 ## Installation
 
 The TURTLE library should be straightforward to compile on Linux and OSX. It
-wasn't tested on Windows however. An example of [`Makefile`](Makefile) is
-shipped with the sources. It allows to build TURTLE (as a shared library:
-`libturtle.so`) and the examples, e.g. as:
+wasn't tested on Windows however. It can be built and installed using
+[CMake](https://cmake.org/). Alternatively,  an example of
+[`Makefile`](Makefile) is provided with the sources as well. It allows to build
+TURTLE (as a shared library: `libturtle.so`) and the examples, e.g. as:
 ```bash
 make && make examples
 ```
@@ -58,8 +59,8 @@ you might also need the following external libraries:
   [GEBCO](http://www.gebco.net/).
 
 Those are rather standard though and might already be installed on your system.
-In addition, build options in the Makefile allow to disable either or both of
-PNG or TIFF formats, and their dependencies, if not needed.
+In addition, build options allow to disable either or both of PNG or TIFF
+formats, and their dependencies, if not needed.
 
 ## Documentation
 
