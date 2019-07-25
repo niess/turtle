@@ -1039,7 +1039,7 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  *
  * If the stepper has a single topography layer, the matching meta data
  * elevation value and the corresponding index are returned. Else, if non
- * `NULL`,`*elevation* and *index* must be size 2 arrays. Then, the elevation
+ * `NULL`, *elevation* and *index* must be size 2 arrays. Then, the elevation
  * values of the lower (`elevation[0]`) and upper (`elevation[1]`) bounding
  * layers are returned. The index array is filled with the containing topography
  * layer (`index[0]`) and the matching meta-data inside the layer (`index[1]`).
