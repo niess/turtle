@@ -778,15 +778,13 @@ static void sample_publish(struct turtle_stepper * stepper, double * latitude,
 }
 
 static int get_medium(struct turtle_stepper * stepper,
-    struct turtle_stepper_sample * sample, int default_medium)
+    struct turtle_stepper_sample * sample)
 {
         if (stepper->layers.size <= 1) {
                 return (sample->index[0] >= 0) ?
-                    sample->geographic[2] < sample->elevation[0] :
-                    default_medium;
+                    sample->geographic[2] < sample->elevation[0] : -1;
         } else {
-                return (sample->index[0] >= 0) ?
-                    sample->index[0] : default_medium;
+                return sample->index[0];
         }
 }
 
@@ -840,13 +838,13 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         /* Do the tentative step */
         for (i = 0; i < 3; i++) position[i] += direction[i] * ds;
 
-        const int medium0 = get_medium(stepper, &stepper->last, -1);
+        const int medium0 = get_medium(stepper, &stepper->last);
         if (stepper_sample(stepper, position, &stepper->last, 1, error_) !=
             TURTLE_RETURN_SUCCESS)
                 return TURTLE_ERROR_RAISE();
-        const int medium1 = get_medium(stepper, &stepper->last, medium0);
+        int medium1 = get_medium(stepper, &stepper->last);
 
-        if ((medium0 != medium1) || (stepper->last.index[0] < 0)) {
+        if (medium0 != medium1) {
                 /* A change of medium occured. Let us locate the
                  * change of medium by dichotomy.
                  */
@@ -862,17 +860,19 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
                         if (stepper_sample(stepper, position2, &sample2, 1,
                             error_) != TURTLE_RETURN_SUCCESS)
                                 return TURTLE_ERROR_RAISE();
-                        const int medium2 =
-                            get_medium(stepper, &sample2, medium0);
-                        if ((medium2 == medium1) || (sample2.index[0] < 0)) {
+                        const int medium2 = get_medium(stepper, &sample2);
+                        if (medium2 == medium0) {
+                                ds0 = ds2;
+                        } else {
+                                medium1 = medium2; /* In case that a 3rd medium
+                                                      was hit in between */
                                 ds1 = ds2;
                                 memcpy(sample2.position, position2,
                                     sizeof(sample2.position));
                                 memcpy(&stepper->last, &sample2,
                                     sizeof(stepper->last));
-                        } else
-                                ds0 = ds2;
                         }
+                }
                 ds += ds1;
                 for (i = 0; i < 3; i++)
                         position[i] += direction[i] * ds1;

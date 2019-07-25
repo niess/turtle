@@ -852,6 +852,44 @@ START_TEST (test_stepper)
                 }
         }
 
+        /* Check the case of an outside initial position */
+        turtle_stepper_destroy(&stepper);
+        turtle_stepper_create(&stepper);
+        turtle_stepper_add_map(stepper, map, 0);
+
+        double position[3] = { 1., 2., 3. };
+        int layer;
+        turtle_stepper_position(stepper, 45., 90., 0., 0, position, &layer);
+        ck_assert_double_eq(position[0], 1.);
+        ck_assert_double_eq(position[1], 2.);
+        ck_assert_double_eq(position[2], 3.);
+        ck_assert_int_eq(layer, -1);
+
+        /* Check the case of a single data layer */
+        turtle_stepper_destroy(&stepper);
+        turtle_stepper_create(&stepper);
+        turtle_stepper_add_stack(stepper, stack, 0);
+
+        const double latitude = 45.5, longitude = 2.5, height = -0.5;
+        double direction[3];
+        turtle_stepper_position(
+            stepper, latitude, longitude, height, 0, position, &layer);
+        turtle_ecef_from_horizontal(
+            latitude, longitude, 0, 0, direction);
+
+        /* Step out of the map */
+        const int nmax = 100000;
+        for (i = 0; i < nmax; i++) {
+                double altitude, ground_elevation, la, lo;
+                double step_length;
+                int layer;
+
+                turtle_stepper_step(stepper, position, direction, &la,
+                    &lo, &altitude, &ground_elevation, &step_length, &layer);
+                if (layer < 0) break;
+        }
+        ck_assert_int_lt(i, nmax);
+
         /* Check other geometries */
         turtle_stepper_destroy(&stepper);
         turtle_stepper_create(&stepper);
@@ -870,9 +908,6 @@ START_TEST (test_stepper)
         turtle_stepper_resolution_set(stepper, 1E-03);
         ck_assert_double_eq(turtle_stepper_resolution_get(stepper), 1E-03);
 
-        const double latitude = 45.5, longitude = 2.5, height = 0.5;
-        double position[3];
-        int layer;
         turtle_stepper_position(
             stepper, latitude, longitude, height, 0, position, &layer);
 
@@ -889,7 +924,6 @@ START_TEST (test_stepper)
             &ground_elevation, NULL, &layer);
         ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
 
-        double direction[3];
         turtle_ecef_from_horizontal(latitude, longitude, 0, 0, direction);
         for (i = 0; i < 3; i++) position[i] += direction[i] * 1E+06;
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
