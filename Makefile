@@ -43,6 +43,14 @@ else
 	CFLAGS += -DTURTLE_NO_PNG
 endif
 
+# Flag for ASC files
+TURTLE_USE_ASC := 1
+ifeq ($(TURTLE_USE_ASC), 1)
+	OBJS += build/asc.o
+else
+	CFLAGS += -DTURTLE_NO_ASC
+endif
+
 
 # Available builds
 .PHONY: lib clean libcheck examples test
@@ -111,12 +119,12 @@ SOURCES := src/turtle/client.c src/turtle/ecef.c src/turtle/error.c            \
 	src/turtle/io.c src/turtle/list.c src/turtle/map.c                     \
 	src/turtle/projection.c src/turtle/stack.c src/turtle/stepper.c        \
 	src/turtle/io/geotiff16.c src/turtle/io/grd.c src/turtle/io/hgt.c      \
-	src/turtle/io/png16.c
+	src/turtle/io/png16.c src/turtle/io/asc.c
 
 test: bin/test-turtle
 	@mkdir -p tests/topography
 	@./bin/test-turtle
-	@rm -rf tests/*.png tests/*.grd tests/*.hgt tests/*.tif                \
+	@rm -rf tests/*.png tests/*.grd tests/*.hgt tests/*.tif tests/*.asc    \
 		tests/topography/*
 	@mv *.gcda tests/.
 	@gcov -o tests $(SOURCES) | tail -1
@@ -124,7 +132,7 @@ test: bin/test-turtle
 	@mv *.gcov tests/.
 
 ifneq ("$(wildcard $(CHECK_INSTALL_DIR))","")
-bin/test-%: LIBS += -L$(CHECK_INSTALL_DIR)/lib
+bin/test-%: LIBS += -L$(CHECK_INSTALL_DIR)/lib -Wl,-rpath,$(CHECK_INSTALL_DIR)/lib
 bin/test-%: INCLUDES += -I$(CHECK_INSTALL_DIR)/include
 endif
 bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
@@ -138,4 +146,4 @@ bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
 clean:
 	@rm -rf bin lib build tests/*.gcno tests/*.gcda tests/*.gcov *.gcov    \
 		*.gcno *.gcda tests/*.png tests/*.grd tests/*.hgt tests/*.tif  \
-		tests/topography
+		tests/*.asc tests/topography

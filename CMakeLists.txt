@@ -20,6 +20,7 @@ option (TURTLE_USE_GEOTIFF "Enable loading GeoTIFF files" ON)
 option (TURTLE_USE_GRD "Enable loading GRD files" ON)
 option (TURTLE_USE_HGT "Enable loading HGT files" ON)
 option (TURTLE_USE_PNG "Enable dumping and loadind PNG files" ON)
+option (TURTLE_USE_ASC "Enable dumping and loadind ASC files" ON)
 
 
 # Build and install rules for the TURTLE library
@@ -66,6 +67,12 @@ if (${TURTLE_USE_PNG})
     target_link_libraries (turtle png)
 else ()
     target_compile_definitions (turtle PRIVATE -DTURTLE_NO_PNG)
+endif ()
+
+if (${TURTLE_USE_ASC})
+    target_sources (turtle PRIVATE src/turtle/io/asc.c)
+else ()
+        target_compile_definitions (turtle PRIVATE -DTURTLE_NO_ASC)
 endif ()
 
 install (TARGETS turtle DESTINATION lib)

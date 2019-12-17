@@ -1002,7 +1002,7 @@ START_TEST (test_io_grd)
                         if ((k % 8) == 0) fputs(" ", fid);
                         fprintf(fid, " %8.3f", undulation);
                         if ((k % 8) == 7) fputs("\n", fid);
-                        if ((k % 160) == 159) fputs("\n", fid);
+                        if ((k % 170) == 169) fputs("\n", fid);
                 }
         }
         fclose(fid);
@@ -1138,6 +1138,75 @@ END_TEST
 #endif
 
 
+#ifndef TURTLE_NO_ASC
+START_TEST (test_io_asc)
+{
+        /* Generate bathymetry data in .asc format, e.g. as used by GEBCO */
+        FILE * fid = fopen("tests/bathymetry.asc", "w+");
+        fprintf(fid,
+            "ncols        10\n"
+            "nrows        10\n"
+            "xllcorner    142.000000000000\n"
+            "yllcorner    35.000000000000\n"
+            "cellsize     0.1\n"
+            "NODATA_value  9.9692099683868690468e+36\n");
+
+#ifndef M_PI
+        /* Define pi, if unknown. */
+#define M_PI 3.14159265358979323846
+#endif
+        const double deg = M_PI / 180.;
+
+        int i, k;
+        for (i = 0, k = 0; i < 10; i++) {
+                const double latitude = 35.05 + i * 0.1;
+                const double c = cos(latitude * deg);
+                int j;
+                for (j = 0; j < 10; j++, k++) {
+                        const double longitude = 142.05 + j * 0.1;
+                        const double depth =
+                            -100 * fabs(c * cos(longitude * deg));
+                        if ((k % 8) == 0) fputs(" ", fid);
+                        fprintf(fid, " %8.3f", depth);
+                        if ((k % 8) == 7) fputs("\n", fid);
+                }
+        }
+        fclose(fid);
+
+        /* Read back the depth using TURTLE */
+        struct turtle_map * bathymetry;
+        turtle_map_load(&bathymetry, "tests/bathymetry.asc");
+
+        for (i = 0; i < 10; i++) {
+                const double latitude = 35.05 + i * 0.1;
+                const double c = cos(latitude * deg);
+                int j;
+                for (j = 0; j < 10; j++) {
+                        const double longitude = 142.05 + j * 0.1;
+                        const double depth =
+                            -100 * fabs(c * cos(longitude * deg));
+                        double depth1;
+                        int inside;
+                        turtle_map_elevation(
+                            bathymetry, longitude, latitude, &depth1, &inside);
+                        if (inside)
+                                ck_assert_double_eq_tol(depth1, depth, 1E-02);
+                }
+        }
+
+        /* Check the writing to an ASC map */
+        turtle_map_fill(bathymetry, 0, 0, -64);
+        double depth;
+        turtle_map_elevation(bathymetry, 142.05, 35.05, &depth, NULL);
+        ck_assert_double_eq_tol(depth, -64, 1E-02);
+
+        /* Clean the memory */
+        turtle_map_destroy(&bathymetry);
+}
+END_TEST
+#endif
+
+
 START_TEST (test_strfunc)
 {
 #define CHECK_API(FUNCTION)                                                    \
@@ -1240,6 +1309,9 @@ Suite * create_suite(void)
 #endif
 #ifndef TURTLE_NO_TIFF
         tcase_add_test(tc_io, test_io_tiff);
+#endif
+#ifndef TURTLE_NO_ASC
+        tcase_add_test(tc_io, test_io_asc);
 #endif
 
         return suite;

@@ -52,6 +52,10 @@ extern enum turtle_return turtle_io_hgt_create_(
 extern enum turtle_return turtle_io_png16_create_(
     struct turtle_io ** io, struct turtle_error_context * error_);
 #endif
+#ifndef TURTLE_NO_ASC
+extern enum turtle_return turtle_io_asc_create_(
+    struct turtle_io ** io, struct turtle_error_context * error_);
+#endif
 
 static struct io_info info[] = {
 #ifndef TURTLE_NO_TIFF
@@ -65,6 +69,9 @@ static struct io_info info[] = {
 #endif
 #ifndef TURTLE_NO_PNG
         { "png", &turtle_io_png16_create_ },
+#endif
+#ifndef TURTLE_NO_ASC
+        { "asc", &turtle_io_asc_create_ },
 #endif
 };
 

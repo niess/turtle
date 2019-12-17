@@ -19,7 +19,7 @@
  */
 
 /*
- * I/O's for grd files providing a reader for text grids, e.g. EGM96 geoid
+ * I/O's for asc files providing a reader for text grids, e.g. GEBCO bathymetry
  */
 
 /* C89 standard library */
@@ -28,13 +28,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-/* Endianess utilities */
-#include <arpa/inet.h>
 /* TURTLE library */
 #include "turtle/io.h"
 
-/* Data for accessing a grd file */
-struct grd_io {
+/* Data for accessing a asc file */
+struct asc_io {
         /* Base io object */
         struct turtle_io base;
 
@@ -43,11 +41,11 @@ struct grd_io {
         const char * path;
 };
 
-static enum turtle_return grd_open(struct turtle_io * io, const char * path,
+static enum turtle_return asc_open(struct turtle_io * io, const char * path,
     const char * mode, struct turtle_error_context * error_)
 {
-        struct grd_io * grd = (struct grd_io *)io;
-        if (grd->fid != NULL) io->close(io);
+        struct asc_io * asc = (struct asc_io *)io;
+        if (asc->fid != NULL) io->close(io);
 
         if (mode[0] != 'r') {
                 /* Write mode is not yet implemented */
@@ -60,65 +58,68 @@ static enum turtle_return grd_open(struct turtle_io * io, const char * path,
         io->meta.x0 = io->meta.y0 = io->meta.z0 = 0.;
         io->meta.dx = io->meta.dy = io->meta.dz = 0.;
         io->meta.projection.type = PROJECTION_NONE;
-        grd->path = NULL;
+        asc->path = NULL;
 
         /* Open the file */
-        grd->fid = fopen(path, "r");
-        if (grd->fid == NULL) {
+        asc->fid = fopen(path, "r");
+        if (asc->fid == NULL) {
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_PATH_ERROR, "could not open file `%s'", path);
         }
-        grd->path = path;
+        asc->path = path;
 
         /* Parse the meta data from the header */
-        double h[6];
-        if (fscanf(grd->fid, "%lf %lf %lf %lf %lf %lf", h, h + 1, h + 2, h + 3,
-                h + 4, h + 5) != 6) {
+        double nodata;
+        if ((fscanf(asc->fid, "%*s %d",  &io->meta.nx) != 1) ||
+            (fscanf(asc->fid, "%*s %d",  &io->meta.ny) != 1) ||
+            (fscanf(asc->fid, "%*s %lf", &io->meta.x0) != 1) ||
+            (fscanf(asc->fid, "%*s %lf", &io->meta.y0) != 1) ||
+            (fscanf(asc->fid, "%*s %lf", &io->meta.dx) != 1) ||
+            (fscanf(asc->fid, "%*s %lf", &nodata) != 1)) {
                 io->close(io);
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "could not read the header of file `%s'", path);
         }
-        io->meta.x0 = h[2];
-        io->meta.dx = h[5];
-        io->meta.y0 = h[0];
-        io->meta.dy = h[4];
-        io->meta.nx = (int)round((h[3] - h[2]) / h[5]) + 1;
-        io->meta.ny = (int)round((h[1] - h[0]) / h[4]) + 1;
+        io->meta.dy = io->meta.dx;
+        io->meta.x0 += 0.5 * io->meta.dx;
+        io->meta.y0 += 0.5 * io->meta.dy;
 
         /* Check the min and max z values */
-        const long offset = ftell(grd->fid);
+        const long offset = ftell(asc->fid);
         int i;
         double zmin = DBL_MAX, zmax = -DBL_MIN;
         for (i = 0; i < io->meta.ny; i++) {
                 int j;
                 for (j = 0; j < io->meta.nx; j++) {
                         double d;
-                        if (fscanf(grd->fid, "%lf", &d) != 1) {
+                        if (fscanf(asc->fid, "%lf", &d) != 1) {
                                 io->close(io);
                                 return TURTLE_ERROR_VREGISTER(
                                     TURTLE_RETURN_BAD_FORMAT,
                                     "inconsistent data in file `%s'", path);
                         }
-                        if (d < zmin)
+                        if (d == nodata)
+                                continue;
+                        else if (d < zmin)
                                 zmin = d;
                         else if (d > zmax)
                                 zmax = d;
                 }
         }
-        fseek(grd->fid, offset, SEEK_SET);
+        fseek(asc->fid, offset, SEEK_SET);
         io->meta.z0 = zmin;
         io->meta.dz = (zmax - zmin) / 65535;
 
         return TURTLE_RETURN_SUCCESS;
 }
 
-static void grd_close(struct turtle_io * io)
+static void asc_close(struct turtle_io * io)
 {
-        struct grd_io * grd = (struct grd_io *)io;
-        if (grd->fid != NULL) {
-                fclose(grd->fid);
-                grd->fid = NULL;
-                grd->path = NULL;
+        struct asc_io * asc = (struct asc_io *)io;
+        if (asc->fid != NULL) {
+                fclose(asc->fid);
+                asc->fid = NULL;
+                asc->path = NULL;
         }
 }
 
@@ -134,52 +135,45 @@ static void set_z(struct turtle_map * map, int ix, int iy, double z)
         map->data[iy * map->meta.nx + ix] = (uint16_t)d;
 }
 
-static enum turtle_return grd_read(struct turtle_io * io,
+static enum turtle_return asc_read(struct turtle_io * io,
     struct turtle_map * map, struct turtle_error_context * error_)
 {
-        struct grd_io * grd = (struct grd_io *)io;
-
-        int i = 0;
-        char buffer[128];
-        while (fgets(buffer, sizeof(buffer), grd->fid) != NULL) {
-                char *start = buffer, *end;
-                for (;; i++) {
-                        const double d = strtod(start, &end);
-                        if (start == end) break;
-                        start = end;
-                        int ix = i % io->meta.nx;
-                        int iy = i / io->meta.nx;
-                        set_z(map, ix, iy, d);
-                }
+        struct asc_io * asc = (struct asc_io *)io;
+        int ix, iy;
+        for (iy = 0; iy < io->meta.ny; iy++)
+            for (ix = 0; ix < io->meta.nx; ix++) {
+                double d;
+                fscanf(asc->fid, "%lf", &d);
+                set_z(map, ix, iy, d);
         }
 
         return TURTLE_RETURN_SUCCESS;
 }
 
-enum turtle_return turtle_io_grd_create_(
+enum turtle_return turtle_io_asc_create_(
     struct turtle_io ** io_p, struct turtle_error_context * error_)
 {
-        /* Allocate the grd io manager */
-        struct grd_io * grd = malloc(sizeof(*grd));
-        if (grd == NULL) {
+        /* Allocate the asc io manager */
+        struct asc_io * asc = malloc(sizeof(*asc));
+        if (asc == NULL) {
                 return TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
-                    "could not allocate memory for grd format");
+                    "could not allocate memory for asc format");
         }
-        *io_p = &grd->base;
+        *io_p = &asc->base;
 
         /* Initialise the io object */
-        memset(grd, 0x0, sizeof(*grd));
-        grd->fid = NULL;
-        grd->path = NULL;
-        grd->base.meta.projection.type = PROJECTION_NONE;
+        memset(asc, 0x0, sizeof(*asc));
+        asc->fid = NULL;
+        asc->path = NULL;
+        asc->base.meta.projection.type = PROJECTION_NONE;
 
-        grd->base.open = &grd_open;
-        grd->base.close = &grd_close;
-        grd->base.read = &grd_read;
-        grd->base.write = NULL;
+        asc->base.open = &asc_open;
+        asc->base.close = &asc_close;
+        asc->base.read = &asc_read;
+        asc->base.write = NULL;
 
-        grd->base.meta.get_z = &get_z;
-        grd->base.meta.set_z = &set_z;
+        asc->base.meta.get_z = &get_z;
+        asc->base.meta.set_z = &set_z;
 
         return TURTLE_RETURN_SUCCESS;
 }
