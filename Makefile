@@ -35,9 +35,7 @@ endif
 # Flag for PNG files
 TURTLE_USE_PNG := 1
 ifeq ($(TURTLE_USE_PNG), 1)
-	PACKAGE := libpng
-	CFLAGS += $(shell pkg-config --cflags $(PACKAGE))
-	LIBS += $(shell pkg-config --libs $(PACKAGE))
+	LIBS += -lpng16
 	OBJS += build/jsmn.o build/png16.o
 else
 	CFLAGS += -DTURTLE_NO_PNG
