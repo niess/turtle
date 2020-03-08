@@ -1,5 +1,5 @@
+![Tests](https://github.com/niess/turtle/workflows/Tests/badge.svg)
 [![codecov](https://codecov.io/gh/niess/turtle/branch/master/graph/badge.svg)](https://codecov.io/gh/niess/turtle)
-[![Build Status](https://travis-ci.com/niess/turtle.svg?branch=master)](https://travis-ci.com/niess/turtle)
 
 # TURTLE
 ( **T**opographic **U**tilities for t**R**ansporting par**T**icules over
@@ -34,9 +34,9 @@ memory usage.
 
 Note that TURTLE is nor an ~image library~ neither a ~~Monte-Carlo transport
 engine~~. It can only load a few commonly used data formats for geographic
-maps, i.e: **GEOTIFF**, **GRD** and **HGT**. Binary data formats must be 16b
-and grayscale. In addition, maps can be loaded and dumped in **PNG**, enriched
-with a custom header (as a `tEXt` chunk).
+maps, i.e: **ASC**, **GEOTIFF**, **GRD** and **HGT**. Binary data formats must
+be 16b and grayscale. In addition, maps can be loaded and dumped in **PNG**,
+enriched with a custom header (as a `tEXt` chunk).
 
 ## Installation
 

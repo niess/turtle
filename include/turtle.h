@@ -381,8 +381,7 @@ TURTLE_API void turtle_map_destroy(struct turtle_map ** map);
  * code is returned as detailed below
  *
  * Load a map from a file. The file format is guessed from the filename
- * extension. Currently only `.png` and `.grd` (e.g. EGM96) formats are
- * supported.
+ * extension.
  *
  * __Error codes__
  *
