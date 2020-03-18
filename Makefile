@@ -1,5 +1,5 @@
 # Default compilation flags
-CFLAGS := -O3 -std=c99 -pedantic -Wall -fPIC
+CFLAGS := -O3 -std=c99 -pedantic -Wall
 LIBS := -lm
 INCLUDES := -Iinclude -Isrc
 
@@ -59,27 +59,27 @@ lib: lib/libturtle.so
 
 lib/libturtle.so: $(OBJS)
 	@mkdir -p lib
-	@gcc -o $@ $(CFLAGS) -shared $(INCLUDES) $(OBJS) $(LIBS)
+	@gcc -o $@ $(LDFLAGS) -shared $(INCLUDES) $(OBJS) $(LIBS)
 
 build/%.o: src/turtle/%.c src/turtle/%.h
 	@mkdir -p build
-	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
+	@gcc $(CFLAGS) -fPIC $(INCLUDES) -o $@ -c $<
 
 build/%.o: src/turtle/%.c
 	@mkdir -p build
-	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
+	@gcc $(CFLAGS) -fPIC $(INCLUDES) -o $@ -c $<
 
 build/%.o: src/turtle/io/%.c
 	@mkdir -p build
-	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
+	@gcc $(CFLAGS) -fPIC $(INCLUDES) -o $@ -c $<
 
 build/%.o: src/%.c include/%.h
 	@mkdir -p build
-	@gcc $(CFLAGS) $(INCLUDES) -o $@ -c $<
+	@gcc $(CFLAGS) -fPIC $(INCLUDES) -o $@ -c $<
 
 build/%.o: src/deps/%.c src/deps/%.h
 	@mkdir -p build
-	@gcc $(CFLAGS) -o $@ -c $<
+	@gcc $(CFLAGS) -fPIC -o $@ -c $<
 
 # Rules for building the examples
 examples: bin/example-demo bin/example-projection bin/example-pthread          \
