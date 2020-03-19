@@ -1,11 +1,17 @@
 # Default compilation flags
-CFLAGS := -O3 -std=c99 -pedantic -Wall
-LIBS := -lm
-INCLUDES := -Iinclude -Isrc
+CFLAGS   = -O3 -std=c99 -pedantic -Wall
+LIBS     = -lm
+INCLUDES = -Iinclude -Isrc
 
-OBJS := build/client.o build/ecef.o build/error.o build/io.o build/list.o      \
+OBJS  = build/client.o build/ecef.o build/error.o build/io.o build/list.o      \
 	build/map.o build/projection.o build/stack.o build/stepper.o           \
 	build/tinydir.o
+
+SOEXT = so
+SYS   = $(shell uname -s)
+ifeq ($(SYS), Darwin)
+	SOEXT = dylib
+endif
 
 # Flag for GEOTIFF files
 TURTLE_USE_TIFF := 1
@@ -55,11 +61,18 @@ endif
 
 
 # Rules for building the library
-lib: lib/libturtle.so
+lib: lib/libturtle.$(SOEXT)
 
-lib/libturtle.so: $(OBJS)
+SHARED = -shared
+RPATH  = '-Wl,-rpath,$$ORIGIN/../lib'
+ifeq ($(SYS), Darwin)
+	SHARED = -dynamiclib -Wl,-install_name,@rpath/libturtle.$(SOEXT)
+	RPATH  = -Wl,-rpath,@loader_path/../lib
+endif
+
+lib/libturtle.$(SOEXT): $(OBJS)
 	@mkdir -p lib
-	@gcc -o $@ $(LDFLAGS) -shared $(INCLUDES) $(OBJS) $(LIBS)
+	@gcc -o $@ $(LDFLAGS) $(SHARED) $(INCLUDES) $(OBJS) $(LIBS)
 
 build/%.o: src/turtle/%.c src/turtle/%.h
 	@mkdir -p build
@@ -85,14 +98,14 @@ build/%.o: src/deps/%.c src/deps/%.h
 examples: bin/example-demo bin/example-projection bin/example-pthread          \
           bin/example-stepper
 
-bin/example-pthread: examples/example-pthread.c lib/libturtle.so
+bin/example-pthread: examples/example-pthread.c lib/libturtle.$(SOEXT)
 	@mkdir -p bin
-	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib -Wl,-rpath $(PWD)/lib -lturtle \
+	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib $(RPATH) -lturtle \
              -lpthread
 
-bin/example-%: examples/example-%.c lib/libturtle.so
+bin/example-%: examples/example-%.c lib/libturtle.$(SOEXT)
 	@mkdir -p bin
-	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib -Wl,-rpath $(PWD)/lib -lturtle
+	@gcc -o $@ $(CFLAGS) -Iinclude $< -Llib $(RPATH) -lturtle
 
 
 # Rules for installing `libcheck` locally
