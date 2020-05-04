@@ -242,12 +242,16 @@ enum turtle_return turtle_stack_clear(struct turtle_stack * stack)
 enum turtle_return turtle_stack_load(struct turtle_stack * stack)
 {
         TURTLE_ERROR_INITIALISE(&turtle_stack_load);
+        if ((stack->latitude_n == 0) || (stack->longitude_n == 0))
+                return TURTLE_RETURN_SUCCESS;
+
         if ((stack->lock != NULL) && (stack->lock() != 0))
                 return TURTLE_ERROR_LOCK();
 
         double x = stack->longitude_0 + 0.5 * stack->longitude_delta;
         double y = stack->latitude_0 + 0.5 * stack->latitude_delta;
         struct turtle_map * head = stack->tiles.head;
+
         while (stack->tiles.size < stack->max_size) {
                 /* First, let us check the initial stack */
                 int load = 1;
