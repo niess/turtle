@@ -34,6 +34,7 @@
 
 /* WGS84 ellipsoid parameters  */
 #define WGS84_A 6378137
+#define WGS84_B 6356752.3142
 #define WGS84_E 0.081819190842622
 
 /* Compute ECEF coordinates from latitude and longitude */
@@ -76,7 +77,9 @@ void turtle_ecef_to_geodetic(const double ecef[3], double * latitude,
         if ((ecef[0] == 0.) && (ecef[1] == 0.)) {
                 if (latitude != NULL) *latitude = (ecef[2] >= 0.) ? 90. : -90.;
                 if (longitude != NULL) *longitude = 0.0;
-                if (altitude != NULL) *altitude = fabs(ecef[2]) - sqrt(a2 * a6);
+                if (altitude != NULL) {
+                        *altitude = fabs(ecef[2]) - WGS84_B;
+                }
                 return;
         }
 
