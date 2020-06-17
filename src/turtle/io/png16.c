@@ -29,6 +29,10 @@
 #include <string.h>
 /* Endianess utilities */
 #include <arpa/inet.h>
+#ifndef TURTLE_NO_LD
+/* Dynamic libraries */
+#include <dlfcn.h>
+#endif
 /* PNG library */
 #include <png.h>
 /* JSON parser */
@@ -47,6 +51,108 @@ struct png16_io {
         png_structp png_ptr;
         png_infop info_ptr;
 };
+
+/* Libpng API */
+static struct {
+        void * lib;
+
+        int (*sig_cmp) (png_bytep, png_size_t, png_size_t);
+        jmp_buf * (*set_longjmp_fn) (png_structp, png_longjmp_ptr, size_t);
+        png_byte (*get_bit_depth) (png_structp, png_infop);
+        png_byte (*get_color_type) (png_structp, png_infop);
+        png_infop (*create_info_struct) (png_structp);
+        png_structp (*create_read_struct) (png_const_charp, png_voidp,
+            png_error_ptr, png_error_ptr);
+        png_structp (*create_write_struct) (png_const_charp, png_voidp,
+            png_error_ptr, png_error_ptr);
+        png_uint_32 (*get_image_height) (png_structp, png_infop);
+        png_uint_32 (*get_image_width) (png_structp, png_infop);
+        png_uint_32 (*get_rowbytes) (png_structp, png_infop);
+        png_uint_32 (*get_text) (png_structp, png_infop, png_textp *, int *);
+        void (*destroy_read_struct) (png_structpp, png_infopp, png_infopp);
+        void (*destroy_write_struct) (png_structpp, png_infopp);
+        void (*init_io) (png_structp, png_FILE_p);
+        void (*read_image) (png_structp, png_bytepp);
+        void (*read_info) (png_structp, png_infop);
+        void (*read_update_info) (png_structp, png_infop);
+        void (*set_IHDR) (png_structp, png_infop, png_uint_32, png_uint_32,
+            int, int, int, int, int);
+        void (*set_sig_bytes) (png_structp, int);
+        void (*set_text) (png_structp, png_infop, png_textp, int);
+        void (*write_end) (png_structp, png_infop);
+        void (*write_image) (png_structp, png_bytepp);
+        void (*write_info) (png_structp, png_infop);
+} api = { NULL };
+
+static enum turtle_return api_initialise(struct turtle_error_context * error_)
+{
+#ifndef TURTLE_NO_LD
+#ifdef __APPLE__
+#define SOEXT "dylib"
+#else
+#define SOEXT "so"
+#endif
+        if (api.lib != NULL)
+                return TURTLE_RETURN_SUCCESS;
+
+        api.lib = dlopen("libpng16." SOEXT, RTLD_LAZY);
+        if (api.lib == NULL) {
+                return TURTLE_ERROR_REGISTER(
+                    TURTLE_RETURN_PATH_ERROR, dlerror());
+        }
+
+#define LINK(NAME)                                                             \
+        if ((api. NAME = dlsym(api.lib, "png_" #NAME)) == NULL)                \
+                goto error
+#else
+        static int initialised = 0;
+        if (initialised) return TURTLE_RETURN_SUCCESS;
+        initialised = 1;
+
+#define LINK(NAME) api. NAME = (void *)&png_ ##NAME
+#endif
+
+        LINK(sig_cmp);
+        LINK(create_read_struct);
+        LINK(create_info_struct);
+        LINK(init_io);
+        LINK(read_info);
+        LINK(set_sig_bytes);
+        LINK(get_color_type);
+        LINK(get_bit_depth);
+        LINK(get_image_width);
+        LINK(get_image_height);
+        LINK(read_update_info);
+        LINK(get_text);
+        LINK(destroy_read_struct);
+        LINK(destroy_write_struct);
+        LINK(get_rowbytes);
+        LINK(read_image);
+        LINK(create_write_struct);
+        LINK(set_IHDR);
+        LINK(set_text);
+        LINK(write_info);
+        LINK(write_image);
+        LINK(write_end);
+        LINK(set_longjmp_fn);
+
+        return TURTLE_RETURN_SUCCESS;
+
+#ifndef TURTLE_NO_LD
+error:
+        dlclose(api.lib);
+        api.lib = NULL;
+        return TURTLE_ERROR_REGISTER(TURTLE_RETURN_BAD_FORMAT, dlerror());
+
+#undef LINK
+#undef SOEXT
+#endif
+}
+
+static jmp_buf * get_jmpbuf(png_structp png_ptr)
+{
+        return api.set_longjmp_fn(png_ptr, longjmp, sizeof (jmp_buf));
+}
 
 static int json_strcmp(
     const char * json, jsmntok_t * token, const char * string)
@@ -86,56 +192,56 @@ static enum turtle_return png16_open(struct turtle_io * io, const char * path,
 
         char header[8];
         if ((fread(header, 1, 8, png16->fid) != 8) ||
-            (png_sig_cmp((png_bytep)header, 0, 8) != 0)) {
+            (api.sig_cmp((png_bytep)header, 0, 8) != 0)) {
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "invalid header for png `%s'", path);
         }
 
         /* initialize libpng containers */
         png16->png_ptr =
-            png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+            api.create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
         if (png16->png_ptr == NULL) {
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "could not create png proxy for file `%s'", path);
         }
-        png16->info_ptr = png_create_info_struct(png16->png_ptr);
+        png16->info_ptr = api.create_info_struct(png16->png_ptr);
         if (png16->info_ptr == NULL) {
                 TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "could not create png info for file `%s'", path);
                 goto error;
         }
-        if (setjmp(png_jmpbuf(png16->png_ptr))) {
+        if (setjmp(*get_jmpbuf(png16->png_ptr))) {
                 TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "a libpng error occured when loading file `%s'", path);
                 goto error;
         }
-        png_init_io(png16->png_ptr, png16->fid);
-        png_set_sig_bytes(png16->png_ptr, 8);
+        api.init_io(png16->png_ptr, png16->fid);
+        api.set_sig_bytes(png16->png_ptr, 8);
 
         /* Read the header */
-        png_read_info(png16->png_ptr, png16->info_ptr);
-        if (png_get_color_type(png16->png_ptr, png16->info_ptr) !=
+        api.read_info(png16->png_ptr, png16->info_ptr);
+        if (api.get_color_type(png16->png_ptr, png16->info_ptr) !=
             PNG_COLOR_TYPE_GRAY) {
                 TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "invalid color scheme for png file `%s'", path);
                 goto error;
         }
-        png_byte bit_depth = png_get_bit_depth(png16->png_ptr, png16->info_ptr);
+        png_byte bit_depth = api.get_bit_depth(png16->png_ptr, png16->info_ptr);
         if (bit_depth != 16) {
                 TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "invalid bit depth (%d != 16) for file `%s'", bit_depth,
                     path);
                 goto error;
         }
-        io->meta.nx = png_get_image_width(png16->png_ptr, png16->info_ptr);
-        io->meta.ny = png_get_image_height(png16->png_ptr, png16->info_ptr);
-        png_read_update_info(png16->png_ptr, png16->info_ptr);
+        io->meta.nx = api.get_image_width(png16->png_ptr, png16->info_ptr);
+        io->meta.ny = api.get_image_height(png16->png_ptr, png16->info_ptr);
+        api.read_update_info(png16->png_ptr, png16->info_ptr);
 
         /* Parse the JSON meta data */
         png_textp text_ptr;
         int num_text;
         unsigned n_chunks =
-            png_get_text(png16->png_ptr, png16->info_ptr, &text_ptr, &num_text);
+            api.get_text(png16->png_ptr, png16->info_ptr, &text_ptr, &num_text);
         if (n_chunks > 0) {
                 int i = 0;
                 png_text * p = text_ptr;
@@ -273,9 +379,9 @@ static void png16_close(struct turtle_io * io)
                 png_infopp pp_i =
                     (png16->info_ptr != NULL) ? &png16->info_ptr : NULL;
                 if (png16->read)
-                        png_destroy_read_struct(pp_p, pp_i, NULL);
+                        api.destroy_read_struct(pp_p, pp_i, NULL);
                 else
-                        png_destroy_write_struct(pp_p, pp_i);
+                        api.destroy_write_struct(pp_p, pp_i);
                 png16->png_ptr = NULL;
                 png16->info_ptr = NULL;
         }
@@ -309,14 +415,14 @@ static enum turtle_return png16_read(struct turtle_io * io,
         int i = 0;
         for (; i < map->meta.ny; i++) {
                 row_pointers[i] =
-                    malloc(png_get_rowbytes(png16->png_ptr, png16->info_ptr));
+                    malloc(api.get_rowbytes(png16->png_ptr, png16->info_ptr));
                 if (row_pointers[i] == NULL) {
                         TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
                             "could not allocate memory for png row");
                         goto exit;
                 }
         }
-        png_read_image(png16->png_ptr, row_pointers);
+        api.read_image(png16->png_ptr, row_pointers);
 
         /* Copy the data to the map */
         uint16_t * z16 = map->data;
@@ -341,24 +447,24 @@ static enum turtle_return png16_write(struct turtle_io * io,
 
         struct png16_io * png16 = (struct png16_io *)io;
         png16->png_ptr =
-            png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+            api.create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
         if (png16->png_ptr == NULL) {
                 TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
                     "could not allocate memory for png proxy");
                 goto exit;
         }
-        png16->info_ptr = png_create_info_struct(png16->png_ptr);
+        png16->info_ptr = api.create_info_struct(png16->png_ptr);
         if (png16->info_ptr == NULL) {
                 TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
                     "could not allocate memory for png info");
                 goto exit;
         }
-        if (setjmp(png_jmpbuf(png16->png_ptr))) goto exit;
-        png_init_io(png16->png_ptr, png16->fid);
+        if (setjmp(*get_jmpbuf(png16->png_ptr))) goto exit;
+        api.init_io(png16->png_ptr, png16->fid);
 
         /* Write the header */
         const int nx = map->meta.nx, ny = map->meta.ny;
-        png_set_IHDR(png16->png_ptr, png16->info_ptr, nx, ny, 16,
+        api.set_IHDR(png16->png_ptr, png16->info_ptr, nx, ny, 16,
             PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
             PNG_FILTER_TYPE_BASE);
         const char * tmp;
@@ -388,9 +494,9 @@ static enum turtle_return png16_write(struct turtle_io * io,
         }
         png_text text[] = { { PNG_TEXT_COMPRESSION_NONE, "Comment", header,
             strlen(header) } };
-        png_set_text(png16->png_ptr, png16->info_ptr, text,
+        api.set_text(png16->png_ptr, png16->info_ptr, text,
             sizeof(text) / sizeof(text[0]));
-        png_write_info(png16->png_ptr, png16->info_ptr);
+        api.write_info(png16->png_ptr, png16->info_ptr);
         free(header);
         header = NULL;
 
@@ -411,8 +517,8 @@ static enum turtle_return png16_write(struct turtle_io * io,
                         *(ptr++) = (uint16_t)htons(d);
                 }
         }
-        png_write_image(png16->png_ptr, row_pointers);
-        png_write_end(png16->png_ptr, NULL);
+        api.write_image(png16->png_ptr, row_pointers);
+        api.write_end(png16->png_ptr, NULL);
 
 exit:
         /* Clean and return */
@@ -427,6 +533,10 @@ exit:
 enum turtle_return turtle_io_png16_create_(
     struct turtle_io ** io_p, struct turtle_error_context * error_)
 {
+        enum turtle_return rc;
+        if ((rc = api_initialise(error_)) != TURTLE_RETURN_SUCCESS)
+                return rc;
+
         /* Allocate the png16 io manager */
         struct png16_io * png16 = malloc(sizeof(*png16));
         if (png16 == NULL) {

@@ -1,5 +1,5 @@
 # Default compilation flags
-CFLAGS   = -O3 -std=c99 -pedantic -Wall
+CFLAGS   = -O3 -std=c99 -Wall
 LIBS     = -lm
 INCLUDES = -Iinclude -Isrc
 
@@ -13,10 +13,20 @@ ifeq ($(SYS), Darwin)
 	SOEXT = dylib
 endif
 
+# Flag for runtime linking of libraries
+TURTLE_USE_LD := 1
+ifeq ($(TURTLE_USE_LD), 1)
+	LIBS += -ldl
+else
+	CFLAGS += -DTURTLE_NO_LD
+endif
+
 # Flag for GEOTIFF files
 TURTLE_USE_TIFF := 1
 ifeq ($(TURTLE_USE_TIFF), 1)
+ifneq ($(TURTLE_USE_LD), 1)
 	LIBS += -ltiff
+endif
 	OBJS += build/geotiff16.o
 else
 	CFLAGS += -DTURTLE_NO_TIFF
@@ -41,7 +51,9 @@ endif
 # Flag for PNG files
 TURTLE_USE_PNG := 1
 ifeq ($(TURTLE_USE_PNG), 1)
+ifneq ($(TURTLE_USE_LD), 1)
 	LIBS += -lpng16
+endif
 	OBJS += build/jsmn.o build/png16.o
 else
 	CFLAGS += -DTURTLE_NO_PNG
@@ -117,6 +129,7 @@ $(CHECK_INSTALL_DIR):
 	@echo "Installing libcheck to $@"
 	@mkdir -p $@
 	@git clone https://github.com/libcheck/check.git $@/src
+	@cd $@/src && git checkout 6f6910e && cd -
 	@mkdir -p $@/build
 	@cd $@/build && cmake -DCMAKE_INSTALL_PREFIX=$(PWD)/$@                 \
 		-DCHECK_ENABLE_TESTS=off ../src

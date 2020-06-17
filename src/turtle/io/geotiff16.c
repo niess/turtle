@@ -29,6 +29,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef TURTLE_NO_LD
+/* Dynamic libraries */
+#include <dlfcn.h>
+#endif
 /* TIFF library */
 #include <tiffio.h>
 /* TURTLE library */
@@ -65,22 +69,83 @@ static const TIFFFieldInfo field_info[] = { { TIFFTAG_GEOPIXELSCALE, -1, -1,
 /* Extender for GEOTIFF tags */
 static TIFFExtendProc parent_extender = NULL;
 
+/* The TIFF API */
+static struct {
+        void * lib;
+
+        TIFF * (*Open) (const char *, const char *);
+        TIFFErrorHandler (*SetErrorHandler) (TIFFErrorHandler);
+        TIFFExtendProc (*SetTagExtender) (TIFFExtendProc);
+        int (*GetField) (TIFF *, ttag_t, ...);
+        int (*MergeFieldInfo) (TIFF *, const TIFFFieldInfo[], uint32);
+        int (*ReadScanline) (TIFF *, tdata_t, uint32, tsample_t);
+        int (*SetField) (TIFF *, ttag_t, ...);
+        int (*WriteScanline) (TIFF *, tdata_t, uint32, tsample_t);
+        tsize_t (*ScanlineSize) (TIFF *);
+        void (*Close) (TIFF *);
+} api;
+
 static void default_directory(TIFF * tiff)
 {
-        TIFFMergeFieldInfo(
+        api.MergeFieldInfo(
             tiff, field_info, sizeof(field_info) / sizeof(field_info[0]));
         if (parent_extender != NULL) (*parent_extender)(tiff);
 }
 
-/* Register the tag extender to libtiff */
-static void turtle_geotiff16_register(void)
+static enum turtle_return api_initialise(struct turtle_error_context * error_)
 {
-        static int initialised = 0;
-        if (initialised) return;
+#ifndef TURTLE_NO_LD
+#ifdef __APPLE__
+#define SOEXT "dylib"
+#else
+#define SOEXT "so"
+#endif
+        if (api.lib != NULL)
+                return TURTLE_RETURN_SUCCESS;
 
-        parent_extender = TIFFSetTagExtender(default_directory);
-        TIFFSetErrorHandler(NULL); /* Mute error messages */
+        api.lib = dlopen("libtiff." SOEXT, RTLD_LAZY);
+        if (api.lib == NULL) {
+                return TURTLE_ERROR_REGISTER(
+                    TURTLE_RETURN_PATH_ERROR, dlerror());
+        }
+
+#define LINK(NAME)                                                             \
+        if ((api. NAME = dlsym(api.lib, "TIFF" #NAME)) == NULL)                \
+                goto error
+#else
+        static int initialised = 0;
+        if (initialised) return TURTLE_RETURN_SUCCESS;
         initialised = 1;
+
+#define LINK(NAME) api. NAME = (void *)&TIFF ##NAME
+#endif
+
+        LINK(Open);
+        LINK(SetErrorHandler);
+        LINK(SetTagExtender);
+        LINK(GetField);
+        LINK(MergeFieldInfo);
+        LINK(ReadScanline);
+        LINK(SetField);
+        LINK(WriteScanline);
+        LINK(ScanlineSize);
+        LINK(Close);
+
+        /* Register the tag extender to libtiff */
+        parent_extender = api.SetTagExtender(default_directory);
+        api.SetErrorHandler(NULL); /* Mute error messages */
+
+        return TURTLE_RETURN_SUCCESS;
+
+#ifndef TURTLE_NO_LD
+error:
+        dlclose(api.lib);
+        api.lib = NULL;
+        return TURTLE_ERROR_REGISTER(TURTLE_RETURN_BAD_FORMAT, dlerror());
+
+#undef LINK
+#undef SOEXT
+#endif
 }
 
 /* Data for accessing a GEOTIFF file */
@@ -100,7 +165,7 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
         if (geotiff16->tiff == NULL) io->close(io);
 
         if (mode[0] != 'r') {
-                geotiff16->tiff = TIFFOpen(path, mode);
+                geotiff16->tiff = api.Open(path, mode);
                 if (geotiff16->tiff == NULL) {
                         return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_PATH_ERROR,
                             "could not create file `%s'", path);
@@ -119,7 +184,7 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
         io->meta.projection.type = PROJECTION_NONE;
 
         /* Open the TIFF file */
-        geotiff16->tiff = TIFFOpen(path, "r");
+        geotiff16->tiff = api.Open(path, "r");
         if (geotiff16->tiff == NULL) {
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_PATH_ERROR, "could not open file `%s'", path);
@@ -127,18 +192,18 @@ static enum turtle_return geotiff16_open(struct turtle_io * io,
 
         /* Initialise the new io and return */
         uint32_t height;
-        TIFFGetField(geotiff16->tiff, TIFFTAG_IMAGELENGTH, &height);
+        api.GetField(geotiff16->tiff, TIFFTAG_IMAGELENGTH, &height);
         io->meta.ny = height;
-        tsize_t size = TIFFScanlineSize(geotiff16->tiff);
+        tsize_t size = api.ScanlineSize(geotiff16->tiff);
         io->meta.nx = size / sizeof(int16);
         int count = 0;
         double * data = NULL;
-        TIFFGetField(geotiff16->tiff, TIFFTAG_GEOPIXELSCALE, &count, &data);
+        api.GetField(geotiff16->tiff, TIFFTAG_GEOPIXELSCALE, &count, &data);
         if (count == 3) {
                 io->meta.dx = data[0];
                 io->meta.dy = data[1];
         }
-        TIFFGetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);
+        api.GetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, &count, &data);
         if (count == 6) {
                 io->meta.x0 = data[3];
                 io->meta.y0 = data[4] + (1 - io->meta.ny) * io->meta.dy;
@@ -152,7 +217,7 @@ static void geotiff16_close(struct turtle_io * io)
 {
         struct geotiff16_io * geotiff16 = (struct geotiff16_io *)io;
         if (geotiff16->tiff != NULL) {
-                TIFFClose(geotiff16->tiff);
+                api.Close(geotiff16->tiff);
                 geotiff16->tiff = NULL;
                 geotiff16->path = NULL;
         }
@@ -178,7 +243,7 @@ static enum turtle_return geotiff16_read(struct turtle_io * io,
         buffer += io->meta.nx * (io->meta.ny - 1);
         int i;
         for (i = 0; i < io->meta.ny; i++, buffer -= io->meta.nx) {
-                if (TIFFReadScanline(geotiff16->tiff, buffer, i, 0) != 1) {
+                if (api.ReadScanline(geotiff16->tiff, buffer, i, 0) != 1) {
                         return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                             "a libtiff error occured when reading file `%s'",
                             geotiff16->path);
@@ -209,25 +274,25 @@ static enum turtle_return geotiff16_write(struct turtle_io * io,
         }
 
         /* Dump the meta data */
-        TIFFSetField(geotiff16->tiff, TIFFTAG_IMAGEWIDTH, map->meta.nx);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_IMAGELENGTH, map->meta.ny);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_SAMPLESPERPIXEL, 1);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_BITSPERSAMPLE, 16);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-        TIFFSetField(
+        api.SetField(geotiff16->tiff, TIFFTAG_IMAGEWIDTH, map->meta.nx);
+        api.SetField(geotiff16->tiff, TIFFTAG_IMAGELENGTH, map->meta.ny);
+        api.SetField(geotiff16->tiff, TIFFTAG_SAMPLESPERPIXEL, 1);
+        api.SetField(geotiff16->tiff, TIFFTAG_BITSPERSAMPLE, 16);
+        api.SetField(geotiff16->tiff, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+        api.SetField(
             geotiff16->tiff, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_ROWSPERSTRIP, 1);
-        TIFFSetField(
+        api.SetField(geotiff16->tiff, TIFFTAG_ROWSPERSTRIP, 1);
+        api.SetField(
             geotiff16->tiff, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_RESOLUTIONUNIT, RESUNIT_NONE);
-        TIFFSetField(geotiff16->tiff, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+        api.SetField(geotiff16->tiff, TIFFTAG_RESOLUTIONUNIT, RESUNIT_NONE);
+        api.SetField(geotiff16->tiff, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
 
         double scale[3] = { map->meta.dx, map->meta.dy, 0. };
-        TIFFSetField(geotiff16->tiff, TIFFTAG_GEOPIXELSCALE, 3, scale);
+        api.SetField(geotiff16->tiff, TIFFTAG_GEOPIXELSCALE, 3, scale);
 
         double tiepoints[6] = { 0, 0, 0, map->meta.x0,
             map->meta.y0 + (map->meta.ny - 1) * map->meta.dy, 0. };
-        TIFFSetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, 6, tiepoints);
+        api.SetField(geotiff16->tiff, TIFFTAG_GEOTIEPOINTS, 6, tiepoints);
 
         /* Dump the raw data */
         int16_t * data = malloc(map->meta.nx * sizeof(*data));
@@ -244,7 +309,7 @@ static enum turtle_return geotiff16_write(struct turtle_io * io,
                         const double d = round(map->meta.get_z(map, j, i));
                         data[j] = (int16_t)d;
                 }
-                if (TIFFWriteScanline(geotiff16->tiff, data, i, 0) != 1) {
+                if (api.WriteScanline(geotiff16->tiff, data, i, 0) != 1) {
                         free(data);
                         return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                             "a libtiff error occured when writing to file `%s'",
@@ -259,6 +324,10 @@ static enum turtle_return geotiff16_write(struct turtle_io * io,
 enum turtle_return turtle_io_geotiff16_create_(
     struct turtle_io ** io_p, struct turtle_error_context * error_)
 {
+        enum turtle_return rc;
+        if ((rc = api_initialise(error_)) != TURTLE_RETURN_SUCCESS)
+                return rc;
+
         /* Allocate the geotiff16 io manager */
         struct geotiff16_io * geotiff16 = malloc(sizeof(*geotiff16));
         if (geotiff16 == NULL) {
@@ -280,9 +349,6 @@ enum turtle_return turtle_io_geotiff16_create_(
 
         geotiff16->base.meta.get_z = &get_z;
         geotiff16->base.meta.set_z = &set_z;
-
-        /* Register the GeoTIFF tags, if not already done */
-        turtle_geotiff16_register();
 
         return TURTLE_RETURN_SUCCESS;
 }
