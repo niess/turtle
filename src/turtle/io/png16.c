@@ -55,11 +55,13 @@ struct png16_io {
 /* Libpng API */
 static struct {
         void * lib;
+        png_charp version;
 
         int (*sig_cmp) (png_bytep, png_size_t, png_size_t);
         jmp_buf * (*set_longjmp_fn) (png_structp, png_longjmp_ptr, size_t);
         png_byte (*get_bit_depth) (png_structp, png_infop);
         png_byte (*get_color_type) (png_structp, png_infop);
+        png_charp (*get_libpng_ver) (png_structp);
         png_infop (*create_info_struct) (png_structp);
         png_structp (*create_read_struct) (png_const_charp, png_voidp,
             png_error_ptr, png_error_ptr);
@@ -95,7 +97,7 @@ static enum turtle_return api_initialise(struct turtle_error_context * error_)
         if (api.lib != NULL)
                 return TURTLE_RETURN_SUCCESS;
 
-        api.lib = dlopen("libpng16." SOEXT, RTLD_LAZY);
+        api.lib = dlopen("libpng." SOEXT, RTLD_LAZY);
         if (api.lib == NULL) {
                 return TURTLE_ERROR_REGISTER(
                     TURTLE_RETURN_PATH_ERROR, dlerror());
@@ -119,6 +121,7 @@ static enum turtle_return api_initialise(struct turtle_error_context * error_)
         LINK(read_info);
         LINK(set_sig_bytes);
         LINK(get_color_type);
+        LINK(get_libpng_ver);
         LINK(get_bit_depth);
         LINK(get_image_width);
         LINK(get_image_height);
@@ -135,6 +138,14 @@ static enum turtle_return api_initialise(struct turtle_error_context * error_)
         LINK(write_image);
         LINK(write_end);
         LINK(set_longjmp_fn);
+
+        api.version = api.get_libpng_ver(NULL);
+        const char min_version = '4';
+        if ((strlen(api.version) < 3) || (api.version[2] < min_version)) {
+                return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
+                    "bad libpng version (expected >= 1.%c, got %s)",
+                    min_version, api.version);
+        }
 
         return TURTLE_RETURN_SUCCESS;
 
@@ -153,6 +164,9 @@ static jmp_buf * get_jmpbuf(png_structp png_ptr)
 {
         return api.set_longjmp_fn(png_ptr, longjmp, sizeof (jmp_buf));
 }
+
+static void disabled_warning(png_structp png_ptr, png_const_charp warning_msg)
+{}
 
 static int json_strcmp(
     const char * json, jsmntok_t * token, const char * string)
@@ -199,7 +213,7 @@ static enum turtle_return png16_open(struct turtle_io * io, const char * path,
 
         /* initialize libpng containers */
         png16->png_ptr =
-            api.create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+            api.create_read_struct(api.version, NULL, NULL, NULL);
         if (png16->png_ptr == NULL) {
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "could not create png proxy for file `%s'", path);
@@ -447,7 +461,7 @@ static enum turtle_return png16_write(struct turtle_io * io,
 
         struct png16_io * png16 = (struct png16_io *)io;
         png16->png_ptr =
-            api.create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+            api.create_write_struct(api.version, NULL, NULL, NULL);
         if (png16->png_ptr == NULL) {
                 TURTLE_ERROR_REGISTER(TURTLE_RETURN_MEMORY_ERROR,
                     "could not allocate memory for png proxy");
