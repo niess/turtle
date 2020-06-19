@@ -34,7 +34,11 @@
 #include <dlfcn.h>
 #endif
 /* PNG library */
+#ifndef TURTLE_NO_LD
+#include "deps/png.h"
+#else
 #include <png.h>
+#endif
 /* JSON parser */
 #include "deps/jsmn.h"
 /* TURTLE library */
