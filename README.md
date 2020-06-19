@@ -50,17 +50,18 @@ make && make examples
 ```
 
 The TURTLE source code conforms to C99 and has little dependencies except on
-the C89 standard library. Note however that for loading or dumping **DEM**s,
-you might also need the following external libraries:
+the C89 standard library. Note however that for loading or dumping some
+**DEM**s, you might also need the following external libraries:
 
-* **libpng** for custom TURTLE dumps.
+* **libpng** for custom TURTLE dumps (version >= 1.4).
 * **libtiff** for loading GEOTIFF data, e.g.
   [ASTER-GDEM2](https://asterweb.jpl.nasa.gov/gdem.asp) or
   [GEBCO](http://www.gebco.net/).
 
 Those are rather standard though and might already be installed on your system.
 In addition, build options allow to disable either or both of PNG or TIFF
-formats, and their dependencies, if not needed.
+formats if not needed. By default `libturtle` is built with modular linkage to
+`libpng` and `libtiff`, i.e. on demand using dynamic loading.
 
 ## Documentation
 

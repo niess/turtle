@@ -34,7 +34,11 @@
 #include <dlfcn.h>
 #endif
 /* TIFF library */
+#ifndef TURTLE_NO_LD
+#include "deps/tiffio.h"
+#else
 #include <tiffio.h>
+#endif
 /* TURTLE library */
 #include "turtle/io.h"
 
