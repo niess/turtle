@@ -169,9 +169,6 @@ static jmp_buf * get_jmpbuf(png_structp png_ptr)
         return api.set_longjmp_fn(png_ptr, longjmp, sizeof (jmp_buf));
 }
 
-static void disabled_warning(png_structp png_ptr, png_const_charp warning_msg)
-{}
-
 static int json_strcmp(
     const char * json, jsmntok_t * token, const char * string)
 {
