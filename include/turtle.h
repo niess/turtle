@@ -1014,19 +1014,20 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * @param stepper              The stepper object
  * @param position             The initial (final) ECEF position
  * @param direction            The initial direction in ECEF, or `NULL`
- * @param latitude             The (final) geodetic latitude
- * @param longitude            The (final) geodetic longitude
- * @param altitude             The (final) geodetic altitude
- * @param elevation            The (final) topography elevation(s)
+ * @param latitude             The initial (final) geodetic latitude
+ * @param longitude            The initial (final) geodetic longitude
+ * @param altitude             The initial (final) geodetic altitude
+ * @param elevation            The initial (final) topography elevation(s)
  * @param step_length          The step length
- * @param index                The (final) topography and/or meta-data indices
+ * @param index                The initial (final) topography and/or meta-data
+ *                               indices
  * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
  * code is returned as detailed below
  *
  * If *direction* is `NULL`, sample the geography data at the given ECEF
  * position and compute a tentative *step length*. The top most valid data in
  * the stepper's stack are returned. If no valid topography layer was found a
- * negative *layer* value is returned, or an error is raised if *index* points
+ * negative layer index is returned or an error is raised if *index* points
  * to `NULL`.
  *
  * If a *direction* is provided, do a single step through the topography along
@@ -1034,14 +1035,14 @@ TURTLE_API enum turtle_return turtle_stepper_add_flat(
  * occurs, the boundary is located using a binary search. At exit the ECEF
  * position is updated. If the step exit the topography area and if *index* is
  * non `NULL`, then a negative value is filled to `index[0]`. Otherwise an
- * error is raised.
+ * error is raised. **Note** returned values refer to the end step location
+ * in this case.
  *
- * If the stepper has a single topography layer, the matching meta data
- * elevation value and the corresponding index are returned. Else, if non
- * `NULL`, *elevation* and *index* must be size 2 arrays. Then, the elevation
- * values of the lower (`elevation[0]`) and upper (`elevation[1]`) bounding
- * layers are returned. The index array is filled with the containing topography
- * layer (`index[0]`) and the matching meta-data inside the layer (`index[1]`).
+ * If non `NULL`, *elevation* and *index* must be size 2 arrays. Then, the
+ * elevation values of the lower (`elevation[0]`) and upper (`elevation[1]`)
+ * bounding layers are returned. The index array is filled with the containing
+ * topography layer (`index[0]`) and the matching meta-data inside the layer
+ * (`index[1]`).
  *
  * Note that any of the output data can point to `NULL` if it is of no interest.
  * Note also that depending of the set local *range*, an approximation might be

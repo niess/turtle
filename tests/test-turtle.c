@@ -305,12 +305,8 @@ START_TEST (test_stepper_layer)
 
                 turtle_stepper_step(stepper, position, NULL, NULL, NULL,
                     &altitude, NULL, NULL, index);
-                if (i) {
-                        ck_assert_int_eq(index[0], i);
-                        ck_assert_int_eq(index[1], 1);
-                } else {
-                        ck_assert_int_eq(index[0], 1);
-                }
+                ck_assert_int_eq(index[0], i);
+                ck_assert_int_eq(index[1], 1);
                 values[1][i] = altitude;
 
                 turtle_stepper_position(stepper, 40., 10., -0.25, i,
@@ -319,12 +315,8 @@ START_TEST (test_stepper_layer)
 
                 turtle_stepper_step(stepper, position, NULL, NULL, NULL,
                     &altitude, NULL, NULL, index);
-                if (i) {
-                        ck_assert_int_eq(index[0], i);
-                        ck_assert_int_eq(index[1], 2);
-                } else {
-                        ck_assert_int_eq(index[0], 2);
-                }
+                ck_assert_int_eq(index[0], i);
+                ck_assert_int_eq(index[1], 2);
                 values[2][i] = altitude;
         }
         ck_assert_int_eq(stepper->data.size, 3);
@@ -882,11 +874,11 @@ START_TEST (test_stepper)
         for (i = 0; i < nmax; i++) {
                 double altitude, ground_elevation, la, lo;
                 double step_length;
-                int layer;
+                int index[2];
 
                 turtle_stepper_step(stepper, position, direction, &la,
-                    &lo, &altitude, &ground_elevation, &step_length, &layer);
-                if (layer < 0) break;
+                    &lo, &altitude, &ground_elevation, &step_length, index);
+                if (index[0] < 0) break;
         }
         ck_assert_int_lt(i, nmax);
 
@@ -911,24 +903,29 @@ START_TEST (test_stepper)
         turtle_stepper_position(
             stepper, latitude, longitude, height, 0, position, &layer);
 
-        double altitude, ground_elevation, la, lo;
+        double altitude, ground_elevation[2], la, lo;
+        int index[2];
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
-            &ground_elevation, NULL, &layer);
-        ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
+            ground_elevation, NULL, index);
+        ck_assert_double_eq(ground_elevation[0], -DBL_MAX);
+        ck_assert_double_eq_tol(ground_elevation[1] + height, altitude, 1E-08);
+        ck_assert_int_eq(index[0], 0);
+        ck_assert_int_eq(index[1], 0);
 
         turtle_stepper_destroy(&stepper);
         turtle_stepper_create(&stepper);
         turtle_stepper_add_stack(stepper, stack, 0.);
         turtle_stepper_geoid_set(stepper, geoid);
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
-            &ground_elevation, NULL, &layer);
-        ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
+            ground_elevation, NULL, index);
+        ck_assert_double_eq_tol(ground_elevation[1] + height, altitude, 1E-08);
 
         turtle_ecef_from_horizontal(latitude, longitude, 0, 0, direction);
         for (i = 0; i < 3; i++) position[i] += direction[i] * 1E+06;
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
-            &ground_elevation, NULL, &layer);
-        ck_assert_int_eq(layer, -1);
+            ground_elevation, NULL, index);
+        ck_assert_int_eq(index[0], -1);
+        ck_assert_int_eq(index[1], -1);
 
         turtle_stepper_position(stepper, 80, 0, height, 0, position, &layer);
         ck_assert_int_eq(layer, -1);
@@ -944,28 +941,37 @@ START_TEST (test_stepper)
         turtle_stepper_position(
             stepper, latitude, longitude, height, 0, position, &layer);
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
-            &ground_elevation, NULL, &layer);
-        ck_assert_double_eq_tol(ground_elevation + height, altitude, 1E-08);
+            ground_elevation, NULL, index);
+        ck_assert_double_eq(ground_elevation[0], -DBL_MAX);
+        ck_assert_double_eq_tol(ground_elevation[1] + height, altitude, 1E-08);
 
-        double altitude1, ground_elevation1, la1, lo1;
-        int layer1;
+        double altitude1, ground_elevation1[2], la1, lo1;
+        int index1[2];
         turtle_stepper_step(stepper, position, NULL, &la1, &lo1, &altitude1,
-            &ground_elevation1, NULL, &layer1);
+            ground_elevation1, NULL, index1);
         ck_assert_double_eq(altitude1, altitude);
-        ck_assert_double_eq(ground_elevation1, ground_elevation);
+        ck_assert_double_eq(ground_elevation1[0], ground_elevation[0]);
+        ck_assert_double_eq(ground_elevation1[1], ground_elevation[1]);
         ck_assert_double_eq(la1, la);
         ck_assert_double_eq(lo1, lo);
-        ck_assert_double_eq(layer1, layer);
+        ck_assert_int_eq(index1[0], index[0]);
+        ck_assert_int_eq(index1[1], index[1]);
 
         for (i = 0; i < 3; i++) position[i] += direction[i] * 10;
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
-            &ground_elevation, NULL, &layer);
-        ck_assert_double_eq(ground_elevation, 0);
+            ground_elevation, NULL, index);
+        ck_assert_double_eq(ground_elevation[0], -DBL_MAX);
+        ck_assert_double_eq(ground_elevation[1], 0);
+        ck_assert_int_eq(index[0], 0);
+        ck_assert_int_eq(index[1], 0);
 
         for (i = 0; i < 3; i++) position[i] += direction[i] * 100;
         turtle_stepper_step(stepper, position, NULL, &la, &lo, &altitude,
-            &ground_elevation, NULL, &layer);
-        ck_assert_double_eq(ground_elevation, 0);
+            ground_elevation, NULL, index);
+        ck_assert_double_eq(ground_elevation[0], -DBL_MAX);
+        ck_assert_double_eq(ground_elevation[1], 0);
+        ck_assert_int_eq(index[0], 0);
+        ck_assert_int_eq(index[1], 0);
 
         /* Clean the memory */
         turtle_stepper_destroy(&stepper);

@@ -118,25 +118,25 @@ int main(int argc, char * argv[])
         turtle_ecef_from_horizontal(latitude, longitude, azimuth, elevation,
             direction);
 
-        double altitude, ground_elevation;
+        double altitude;
+        int index[2];
         turtle_stepper_step(stepper, position, NULL, NULL, NULL, &altitude,
-            &ground_elevation, NULL, NULL);
+            NULL, NULL, index);
 
         /* Do the stepping */
         double rock_length = 0.;
         while (altitude < altitude_max) {
-                /* Check the step position */
-                const int inside = altitude < ground_elevation;
+                const int initial_layer = index[0];
 
                 /* Do the next step */
                 double step;
                 turtle_stepper_step(stepper, position, direction, NULL,
-                        NULL, &altitude, &ground_elevation, &step, NULL);
+                        NULL, &altitude, NULL, &step, index);
 
                 /* Update the rock depth if the step started below the
                  * topography
                  */
-                if (inside) rock_length += step;
+                if (initial_layer == 0) rock_length += step;
         }
 
         /* Log the result and exit */

@@ -669,23 +669,16 @@ static void reset_data_and_transforms(struct turtle_stepper * stepper)
 static int check_layer(struct turtle_stepper * stepper,
     struct turtle_stepper_sample * sample, int index[2], double elevation)
 {
-        if (stepper->layers.size == 1) {
-                sample->index[0] = index[1];
-                sample->elevation[0] =
-                    elevation;
+        if (elevation >= sample->geographic[2]) {
+                sample->index[0] = index[0];
+                sample->index[1] = index[1];
+                sample->elevation[1] = elevation;
                 return EXIT_SUCCESS;
         } else {
-                if (elevation >= sample->geographic[2]) {
-                        sample->index[0] = index[0];
-                        sample->index[1] = index[1];
-                        sample->elevation[1] = elevation;
-                        return EXIT_SUCCESS;
-                } else {
-                        sample->index[0] = index[0] + 1;
-                        sample->index[1] = index[1];
-                        sample->elevation[0] = elevation;
-                        return EXIT_FAILURE;
-                }
+                sample->index[0] = index[0] + 1;
+                sample->index[1] = index[1];
+                sample->elevation[0] = elevation;
+                return EXIT_FAILURE;
         }
 }
 
@@ -751,40 +744,18 @@ static void sample_publish(struct turtle_stepper * stepper, double * latitude,
         if (latitude != NULL) *latitude = stepper->last.geographic[0];
         if (longitude != NULL) *longitude = stepper->last.geographic[1];
         if (altitude != NULL) *altitude = stepper->last.geographic[2];
-        if (stepper->layers.size <= 1) {
-                if (elevation != NULL) {
-                        if (stepper->last.index[0] >= 0)
-                                *elevation = stepper->last.elevation[0];
-                        else
-                                *elevation = 0.;
-                }
-                if (index != NULL)
-                        *index = stepper->last.index[0];
-        } else {
-                if (elevation != NULL) {
-                        if (stepper->last.index[0] >= 0) {
-                                elevation[0] = stepper->last.elevation[0];
-                                elevation[1] = stepper->last.elevation[1];
-                        } else {
-                                elevation[0] = 0.;
-                                elevation[1] = 0.;
-                        }
-                }
-                if (index != NULL) {
-                        index[0] = stepper->last.index[0];
-                        index[1] = stepper->last.index[1];
+        if (elevation != NULL) {
+                if (stepper->last.index[0] >= 0) {
+                        elevation[0] = stepper->last.elevation[0];
+                        elevation[1] = stepper->last.elevation[1];
+                } else {
+                        elevation[0] = 0.;
+                        elevation[1] = 0.;
                 }
         }
-}
-
-static int get_medium(struct turtle_stepper * stepper,
-    struct turtle_stepper_sample * sample)
-{
-        if (stepper->layers.size <= 1) {
-                return (sample->index[0] >= 0) ?
-                    sample->geographic[2] < sample->elevation[0] : -1;
-        } else {
-                return sample->index[0];
+        if (index != NULL) {
+                index[0] = stepper->last.index[0];
+                index[1] = stepper->last.index[1];
         }
 }
 
@@ -810,15 +781,11 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         double ds = 0.;
         int i;
         for (i = 0; i < 2; i++) {
-                if (stepper->layers.size <= 1) {
-                        if (i == 1) break;
-                } else {
-                        if ((stepper->last.index[0] == 0) && (i == 0))
-                                continue;
-                        else if ((stepper->last.index[0] ==
-                            stepper->layers.size) && (i == 1))
-                                break;
-                }
+                if ((stepper->last.index[0] == 0) && (i == 0))
+                        continue;
+                else if ((stepper->last.index[0] ==
+                    stepper->layers.size) && (i == 1))
+                        break;
 
                 const double dsi = fabs(stepper->last.geographic[2] -
                     stepper->last.elevation[i]);
@@ -838,11 +805,11 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
         /* Do the tentative step */
         for (i = 0; i < 3; i++) position[i] += direction[i] * ds;
 
-        const int medium0 = get_medium(stepper, &stepper->last);
+        const int medium0 = stepper->last.index[0];
         if (stepper_sample(stepper, position, &stepper->last, 1, error_) !=
             TURTLE_RETURN_SUCCESS)
                 return TURTLE_ERROR_RAISE();
-        int medium1 = get_medium(stepper, &stepper->last);
+        int medium1 = stepper->last.index[0];
 
         if (medium0 != medium1) {
                 /* A change of medium occured. Let us locate the
@@ -860,7 +827,7 @@ enum turtle_return turtle_stepper_step(struct turtle_stepper * stepper,
                         if (stepper_sample(stepper, position2, &sample2, 1,
                             error_) != TURTLE_RETURN_SUCCESS)
                                 return TURTLE_ERROR_RAISE();
-                        const int medium2 = get_medium(stepper, &sample2);
+                        const int medium2 = sample2.index[0];
                         if (medium2 == medium0) {
                                 ds0 = ds2;
                         } else {
