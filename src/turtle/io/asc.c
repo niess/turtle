@@ -143,7 +143,7 @@ static enum turtle_return asc_read(struct turtle_io * io,
         for (iy = 0; iy < io->meta.ny; iy++)
             for (ix = 0; ix < io->meta.nx; ix++) {
                 double d;
-                fscanf(asc->fid, "%lf", &d);
+                if (fscanf(asc->fid, "%lf", &d) != 1) d = 0.;
                 set_z(map, ix, iy, d);
         }
 

@@ -94,8 +94,6 @@ typedef png_info * png_infop;
 typedef const png_info * png_const_infop;
 typedef png_info * * png_infopp;
 
-typedef void * png_voidp;
-
 typedef struct png_text_struct
 {
    int  compression;       /* compression value:
