@@ -152,7 +152,7 @@ static enum turtle_return get_geographic(struct turtle_stepper * stepper,
                         r[i] += 10.;
                         double geographic1[5];
                         rc = compute_geographic(
-                            stepper, data, r, n0, geographic1);
+                            stepper, data, r, 0, geographic1);
                         if (rc != TURTLE_RETURN_SUCCESS) return rc;
                         int j;
                         for (j = n0; j < n1; j++)
