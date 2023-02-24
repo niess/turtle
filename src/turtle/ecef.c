@@ -194,5 +194,14 @@ void turtle_ecef_to_horizontal(double latitude, double longitude,
         if (r <= FLT_EPSILON) return;
         r = sqrt(r);
         if (azimuth != NULL) *azimuth = atan2(x, y) * 180. / M_PI;
-        if (elevation != NULL) *elevation = asin(z / r) * 180. / M_PI;
+        if (elevation != NULL) {
+                const double arg = z / r;
+                if (arg > 1.) {
+                        *elevation = 90.;
+                } else if (arg < -1.) {
+                        *elevation = -90.;
+                } else {
+                        *elevation = asin(arg) * 180. / M_PI;
+                }
+        }
 }
