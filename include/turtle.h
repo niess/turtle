@@ -490,6 +490,33 @@ TURTLE_API enum turtle_return turtle_map_elevation(
     int * inside);
 
 /**
+ * Get the map gradient at a geographic coordinate
+ *
+ * @param map          The map object
+ * @param x            The geographic X-coordinate
+ * @param y            The geographic Y-coordinate
+ * @param gx           The gradient value along X-coordinate
+ * @param gy           The gradient value along Y-coordinate
+ * @param inside       Flag for bounds check or `NULL`
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below
+ *
+ * Compute an estimate of the map gradient at the given geographic coordinates.
+ * The gradient is estimated by linear interpolation from the finite differences
+ * of nodes that surround the given coordinate. Providing a non `NULL` value for
+ * *inside* allows to check if the provided coordinates are inside the map or
+ * not. **Note** that no bound error is raised in the latter case, when *inside*
+ * is not `NULL`.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_DOMAIN_ERROR    The coordinates are not valid
+ */
+TURTLE_API enum turtle_return turtle_map_gradient(
+    const struct turtle_map * map, double x, double y, double * gx, double * gy,
+    int * inside);
+
+/**
  * Get the map's projection
  *
  * @param map    The map object
@@ -690,6 +717,37 @@ TURTLE_API enum turtle_return turtle_stack_load(struct turtle_stack * stack);
 TURTLE_API enum turtle_return turtle_stack_elevation(
     struct turtle_stack * stack, double latitude, double longitude,
     double * elevation, int * inside);
+
+/**
+ * Get the gradient at geodetic coordinates
+ *
+ * @param stack        The stack object
+ * @param latitude     The geodetic latitude
+ * @param longitude    The geodetic longitude
+ * @param glat         The estimated gradient along latitude
+ * @param glon         The estimated gradient along longitude
+ * @param inside       Flag for bounds check or `NULL`
+ * @return On success `TURTLE_RETURN_SUCCESS` is returned otherwise an error
+ * code is returned as detailed below
+ *
+ * Compute an estimate of the gradient at the given geodetic coordinates. The
+ * gradient is linearly interpolated from the finite differences of nodes that
+ * surround the given coordinate. Providing a non `NULL` value for *inside*
+ * allows to check if the provided coordinates are inside the stack tiles or
+ * not. **Note** that no bound error is raised in the latter case, when *inside*
+ * is not `NULL`.
+ *
+ * __Warnings__ this function is not thread safe. A `turtle_client` must be
+ * used instead for concurrent accesses to the stack data.
+ *
+ * __Error codes__
+ *
+ *    TURTLE_RETURN_BAD_PATH    The required elevation data are not in the
+ * stack path.
+ */
+TURTLE_API enum turtle_return turtle_stack_gradient(
+    struct turtle_stack * stack, double latitude, double longitude,
+    double * glat, double * glon, int * inside);
 
 /**
  * Create a new client to a stack of global topography data

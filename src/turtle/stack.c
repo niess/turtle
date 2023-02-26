@@ -293,21 +293,16 @@ enum turtle_return turtle_stack_load(struct turtle_stack * stack)
                 return TURTLE_ERROR_RAISE();
 }
 
-/* Get the elevation at the given geodetic coordinates */
-enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
-    double latitude, double longitude, double * elevation, int * inside)
+/* Get the proper map for given coordinates */
+static int stack_get_map(
+    struct turtle_stack * stack, double latitude, double longitude)
 {
-        TURTLE_ERROR_INITIALISE(&turtle_stack_elevation);
-        if (inside != NULL) *inside = 0;
-
-        /* Get the proper map */
-        double hx, hy;
         int load = 1;
         if (stack->tiles.head != NULL) {
                 /* First let's check the top of the stack */
                 struct turtle_map * head = stack->tiles.head;
-                hx = (longitude - head->meta.x0) / head->meta.dx;
-                hy = (latitude - head->meta.y0) / head->meta.dy;
+                double hx = (longitude - head->meta.x0) / head->meta.dx;
+                double hy = (latitude - head->meta.y0) / head->meta.dy;
 
                 if ((hx < 0.) || (hx >= head->meta.nx - 1) || (hy < 0.) ||
                     (hy >= head->meta.ny - 1)) {
@@ -333,6 +328,18 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                 } else
                         load = 0;
         }
+        return load;
+}
+
+/* Get the elevation at the given geodetic coordinates */
+enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
+    double latitude, double longitude, double * elevation, int * inside)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_stack_elevation);
+        if (inside != NULL) *inside = 0;
+
+        /* Get the proper map */
+        const int load = stack_get_map(stack, latitude, longitude);
 
         if (load) {
                 /* No valid map was found. Let's try to load it */
@@ -343,15 +350,38 @@ enum turtle_return turtle_stack_elevation(struct turtle_stack * stack,
                         *elevation = 0.;
                         return TURTLE_ERROR_RAISE();
                 }
-
-                struct turtle_map * head = stack->tiles.head;
-                hx = (longitude - head->meta.x0) / head->meta.dx;
-                hy = (latitude - head->meta.y0) / head->meta.dy;
         }
 
         /* Interpolate the elevation */
         return turtle_map_elevation_(
             stack->tiles.head, longitude, latitude, elevation, inside, error_);
+}
+
+/* Get the gradient at the given geodetic coordinates */
+enum turtle_return turtle_stack_gradient(struct turtle_stack * stack,
+    double latitude, double longitude, double * glat, double * glon,
+    int * inside)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_stack_elevation);
+        if (inside != NULL) *inside = 0;
+
+        /* Get the proper map */
+        const int load = stack_get_map(stack, latitude, longitude);
+
+        if (load) {
+                /* No valid map was found. Let's try to load it */
+                enum turtle_return rc = turtle_stack_load_(
+                    stack, latitude, longitude, inside, error_);
+                if ((rc != TURTLE_RETURN_SUCCESS) ||
+                    ((inside != NULL) && (*inside == 0))) {
+                        *glat = *glon = 0.;
+                        return TURTLE_ERROR_RAISE();
+                }
+        }
+
+        /* Interpolate the elevation */
+        return turtle_map_gradient_(
+            stack->tiles.head, longitude, latitude, glon, glat, inside, error_);
 }
 
 /* Move a map to the top of the stack */

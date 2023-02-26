@@ -267,11 +267,110 @@ enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
         return TURTLE_RETURN_SUCCESS;
 }
 
+/* Compute the gradient at a given location */
+enum turtle_return turtle_map_gradient_(const struct turtle_map * map,
+    double x, double y, double * gx, double * gy, int * inside,
+    struct turtle_error_context * error_)
+{
+        double hx = (x - map->meta.x0) / map->meta.dx;
+        double hy = (y - map->meta.y0) / map->meta.dy;
+        int ix = (int)hx;
+        int iy = (int)hy;
+
+        if ((hx > map->meta.nx - 1) || (hx < 0) ||
+            (hy > map->meta.ny - 1) || (hy < 0)) {
+                if (inside != NULL) {
+                        *inside = 0;
+                        return TURTLE_RETURN_SUCCESS;
+                } else {
+                        return TURTLE_ERROR_OUTSIDE_MAP();
+                }
+        }
+        if (ix == map->meta.nx - 1) {
+                ix--;
+                hx = 1.;
+        } else
+                hx -= ix;
+        if (iy == map->meta.ny - 1) {
+                iy--;
+                hy = 1.;
+        } else
+                hy -= iy;
+
+        turtle_map_getter_t * get_z = map->meta.get_z;
+        const double z00 = get_z(map, ix, iy);
+        const double z10 = get_z(map, ix + 1, iy);
+        const double z01 = get_z(map, ix, iy + 1);
+        const double z11 = get_z(map, ix + 1, iy + 1);
+
+        if (hx <= 0.5) {
+                const double gx1 = (z10 - z00) * (1. - hy) + (z11 - z01) * hy;
+                if (ix == 0) {
+                        *gx = gx1;
+                } else {
+                        const double z_10 = get_z(map, ix - 1, iy);
+                        const double z_11 = get_z(map, ix - 1, iy + 1);
+                        const double gx0 = (z00 - z_10) * (1. - hy) +
+                            (z01 - z_11) * hy;
+                        const double ax = hx + 0.5;
+                        *gx = gx0 * (1. - ax) + gx1 * ax;
+                }
+        } else {
+                const double gx0 = (z10 - z00) * (1. - hy) + (z11 - z01) * hy;
+                if (ix == map->meta.nx - 2) {
+                        *gx = gx0;
+                } else {
+                        const double z20 = get_z(map, ix + 2, iy);
+                        const double z21 = get_z(map, ix + 2, iy + 1);
+                        const double gx1 = (z20 - z10) * (1. - hy) +
+                            (z21 - z11) * hy;
+                        const double ax = hx - 0.5;
+                        *gx = gx0 * (1. - ax) + gx1 * ax;
+                }
+        }
+
+        if (hy <= 0.5) {
+                const double gy1 = (z01 - z00) * (1. - hx) + (z11 - z10) * hx;
+                if (iy == 0) {
+                        *gx = gy1;
+                } else {
+                        const double z0_1 = get_z(map, ix, iy - 1);
+                        const double z1_1 = get_z(map, ix + 1, iy - 1);
+                        const double gy0 = (z00 - z0_1) * (1. - hx) +
+                            (z10 - z1_1) * hx;
+                        const double ay = hy + 0.5;
+                        *gy = gy0 * (1. - ay) + gy1 * ay;
+                }
+        } else {
+                const double gy0 = (z01 - z00) * (1. - hx) + (z11 - z10) * hx;
+                if (iy == map->meta.ny - 2) {
+                        *gy = gy0;
+                } else {
+                        const double z02 = get_z(map, ix, iy + 2);
+                        const double z12 = get_z(map, ix + 1, iy + 2);
+                        const double gy1 = (z02 - z01) * (1. - hx) +
+                            (z12 - z11) * hx;
+                        const double ay = hy - 0.5;
+                        *gy = gy0 * (1. - ay) + gy1 * ay;
+                }
+        }
+
+        if (inside != NULL) *inside = 1;
+        return TURTLE_RETURN_SUCCESS;
+}
+
 enum turtle_return turtle_map_elevation(
     const struct turtle_map * map, double x, double y, double * z, int * inside)
 {
         TURTLE_ERROR_INITIALISE(&turtle_map_elevation);
         return turtle_map_elevation_(map, x, y, z, inside, error_);
+}
+
+enum turtle_return turtle_map_gradient(const struct turtle_map * map,
+    double x, double y, double * gx, double * gy, int * inside)
+{
+        TURTLE_ERROR_INITIALISE(&turtle_map_elevation);
+        return turtle_map_gradient_(map, x, y, gx, gy, inside, error_);
 }
 
 const struct turtle_projection * turtle_map_projection(

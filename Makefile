@@ -82,7 +82,7 @@ ifeq ($(SYS), Darwin)
 	RPATH  = -Wl,-rpath,@loader_path/../lib
 endif
 
-lib/libturtle.$(SOEXT): $(OBJS)
+lib/libturtle.$(SOEXT): $(OBJS) include/turtle.h
 	@mkdir -p lib
 	@gcc -o $@ $(LDFLAGS) $(SHARED) $(INCLUDES) $(OBJS) $(LIBS)
 
