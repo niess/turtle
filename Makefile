@@ -150,10 +150,12 @@ test: bin/test-turtle
 	@./bin/test-turtle
 	@rm -rf tests/*.png tests/*.grd tests/*.hgt tests/*.tif tests/*.asc    \
 		tests/topography/*
-	@mv *.gcda tests/.
+	@mv *.gcda tests/. 2> /dev/null || true
+	@mv bin/*.gcda tests/. 2> /dev/null || true
 	@gcov -o tests $(SOURCES) | tail -1
 	@rm -rf tinydir.h.gcov tests/test-turtle.gcno tests/test-turtle.gcda
-	@mv *.gcov tests/.
+	@mv *.gcov tests/. 2> /dev/null || true
+	@mv bin/*.gcov tests/. 2> /dev/null || true
 
 ifneq ("$(wildcard $(CHECK_INSTALL_DIR))","")
 bin/test-%: LIBS += -L$(CHECK_INSTALL_DIR)/lib -Wl,-rpath,$(CHECK_INSTALL_DIR)/lib
@@ -161,9 +163,10 @@ bin/test-%: INCLUDES += -I$(CHECK_INSTALL_DIR)/include
 endif
 bin/test-%: tests/test-%.c build/jsmn.o build/tinydir.o $(SOURCES)
 	@mkdir -p bin
-	@gcc -o $@ $(CFLAGS) -O0 -g -ftest-coverage -fprofile-arcs $(INCLUDES) \
+	@gcc -o $@ $(CFLAGS) -O0 -g --coverage -dumpbase '' $(INCLUDES) \
 		$^ $(LIBS) -lcheck -lrt
-	@mv *.gcno tests/.
+	@mv *.gcno tests/. 2> /dev/null || true
+	@mv bin/*.gcno tests/. 2> /dev/null || true
 
 
 # Clean-up rule
