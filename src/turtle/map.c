@@ -230,6 +230,15 @@ enum turtle_return turtle_map_elevation_(const struct turtle_map * map,
     double x, double y, double * z, int * inside,
     struct turtle_error_context * error_)
 {
+        if (isnan(x) || isnan(y)) {
+                if (inside != NULL) {
+                        *inside = 0;
+                        return TURTLE_RETURN_SUCCESS;
+                } else {
+                        return TURTLE_ERROR_OUTSIDE_MAP();
+                }
+        }
+
         double hx = (x - map->meta.x0) / map->meta.dx;
         double hy = (y - map->meta.y0) / map->meta.dy;
         int ix = (int)hx;
@@ -272,6 +281,15 @@ enum turtle_return turtle_map_gradient_(const struct turtle_map * map,
     double x, double y, double * gx, double * gy, int * inside,
     struct turtle_error_context * error_)
 {
+        if (isnan(x) || isnan(y)) {
+                if (inside != NULL) {
+                        *inside = 0;
+                        return TURTLE_RETURN_SUCCESS;
+                } else {
+                        return TURTLE_ERROR_OUTSIDE_MAP();
+                }
+        }
+
         double hx = (x - map->meta.x0) / map->meta.dx;
         double hy = (y - map->meta.y0) / map->meta.dy;
         int ix = (int)hx;
