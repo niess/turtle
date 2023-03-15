@@ -1165,7 +1165,7 @@ START_TEST (test_io_asc)
 
         int i, k;
         for (i = 0, k = 0; i < 10; i++) {
-                const double latitude = 35.05 + i * 0.1;
+                const double latitude = 35.05 + (9 - i) * 0.1;
                 const double c = cos(latitude * deg);
                 int j;
                 for (j = 0; j < 10; j++, k++) {

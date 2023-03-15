@@ -140,7 +140,7 @@ static enum turtle_return asc_read(struct turtle_io * io,
 {
         struct asc_io * asc = (struct asc_io *)io;
         int ix, iy;
-        for (iy = 0; iy < io->meta.ny; iy++)
+        for (iy = io->meta.ny - 1; iy >= 0; iy--) /* data in reading order */
             for (ix = 0; ix < io->meta.nx; ix++) {
                 double d;
                 if (fscanf(asc->fid, "%lf", &d) != 1) d = 0.;
