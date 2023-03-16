@@ -177,7 +177,7 @@ static int json_strcmp(
 
 static int json_sscanf(const char * json, jsmntok_t * token, double * value)
 {
-        return sscanf(json + token->start, "%lf", value);
+        return sscanf(json + token->start, "%la", value);
 }
 
 static enum turtle_return png16_open(struct turtle_io * io, const char * path,
@@ -499,9 +499,9 @@ static enum turtle_return png16_write(struct turtle_io * io,
                     map->meta.y0 + map->meta.dy * (map->meta.ny - 1);
                 const double z1 = map->meta.z0 + map->meta.dz * 65535;
                 if (snprintf(header, header_size,
-                        "{\"topography\" : {\"x0\" : %.5lf, \"y0\" : %.5lf, "
-                        "\"z0\" : %.5lf, \"x1\" : %.5lf, \"y1\" : %.5lf, "
-                        "\"z1\" : %.5lf, \"projection\" : \"%s\"}}",
+                        "{\"topography\" : {\"x0\" : %a, \"y0\" : %a, "
+                        "\"z0\" : %a, \"x1\" : %a, \"y1\" : %a, "
+                        "\"z1\" : %a, \"projection\" : \"%s\"}}",
                         map->meta.x0, map->meta.y0, map->meta.z0, x1, y1, z1,
                         tmp) < header_size)
                         break;
