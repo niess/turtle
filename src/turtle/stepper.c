@@ -229,12 +229,24 @@ static enum turtle_return stepper_step_map(struct turtle_stepper * stepper,
     int has_geodetic, double * geographic, double * elevation, int * inside)
 {
         *inside = 0;
-        const int n0 = has_geodetic ? 3 : 0;
-        enum turtle_return rc = get_geographic(
-            stepper, data, position, n0, 5, &compute_geomap, geographic);
-        if (rc != TURTLE_RETURN_SUCCESS) return rc;
-        return turtle_map_elevation(data->a.map, geographic[3], geographic[4],
-            elevation, inside);
+        const struct turtle_projection * projection =
+            turtle_map_projection(data->a.map);
+        if (projection == NULL) {
+                if (!has_geodetic) {
+                        enum turtle_return rc = get_geographic(stepper, data,
+                            position, 0, 3, &compute_geodetic, geographic);
+                        if (rc != TURTLE_RETURN_SUCCESS) return rc;
+                }
+                return turtle_map_elevation(data->a.map, geographic[1],
+                    geographic[0], elevation, inside);
+        } else {
+                const int n0 = has_geodetic ? 3 : 0;
+                enum turtle_return rc = get_geographic(stepper, data, position,
+                    n0, 5, &compute_geomap, geographic);
+                if (rc != TURTLE_RETURN_SUCCESS) return rc;
+                return turtle_map_elevation(data->a.map, geographic[3],
+                    geographic[4], elevation, inside);
+        }
 }
 
 static enum turtle_return stepper_step_flat(struct turtle_stepper * stepper,
