@@ -904,6 +904,18 @@ TURTLE_API struct turtle_map * turtle_stepper_geoid_get(
     const struct turtle_stepper * stepper);
 
 /**
+ * Reset the stepper internal history
+ *
+ * This function allows one to manually reset the internal stepping history, the
+ * like local transforms (see e.g. stepper_range_get). Note that it is usually
+ * not required to this manually, except e.g. in order to get reproducible runs
+ * down to numeric rounding accuracy.
+ *
+ * @param stepper    The stepper object
+ */
+TURTLE_API void turtle_stepper_reset(struct turtle_stepper * stepper);
+
+/**
  * Set the validity range for local approximation to geographic transforms
  *
  * @param stepper    The stepper object

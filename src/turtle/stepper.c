@@ -644,6 +644,12 @@ void turtle_stepper_range_set(struct turtle_stepper * stepper, double range)
         reset_history(stepper);
 }
 
+void turtle_stepper_reset(struct turtle_stepper * stepper)
+{
+        /* Reset the stepping history */
+        reset_history(stepper);
+}
+
 double turtle_stepper_slope_get(const struct turtle_stepper * stepper)
 {
         return stepper->slope_factor;
