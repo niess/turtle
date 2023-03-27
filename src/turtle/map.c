@@ -324,52 +324,52 @@ enum turtle_return turtle_map_gradient_(const struct turtle_map * map,
         if (hx <= 0.5) {
                 const double gx1 = (z10 - z00) * (1. - hy) + (z11 - z01) * hy;
                 if (ix == 0) {
-                        *gx = gx1;
+                        *gx = gx1 / map->meta.dx;
                 } else {
                         const double z_10 = get_z(map, ix - 1, iy);
                         const double z_11 = get_z(map, ix - 1, iy + 1);
                         const double gx0 = (z00 - z_10) * (1. - hy) +
                             (z01 - z_11) * hy;
                         const double ax = hx + 0.5;
-                        *gx = gx0 * (1. - ax) + gx1 * ax;
+                        *gx = (gx0 * (1. - ax) + gx1 * ax) / map->meta.dx;
                 }
         } else {
                 const double gx0 = (z10 - z00) * (1. - hy) + (z11 - z01) * hy;
                 if (ix == map->meta.nx - 2) {
-                        *gx = gx0;
+                        *gx = gx0 / map->meta.dx;
                 } else {
                         const double z20 = get_z(map, ix + 2, iy);
                         const double z21 = get_z(map, ix + 2, iy + 1);
                         const double gx1 = (z20 - z10) * (1. - hy) +
                             (z21 - z11) * hy;
                         const double ax = hx - 0.5;
-                        *gx = gx0 * (1. - ax) + gx1 * ax;
+                        *gx = (gx0 * (1. - ax) + gx1 * ax) / map->meta.dx;
                 }
         }
 
         if (hy <= 0.5) {
                 const double gy1 = (z01 - z00) * (1. - hx) + (z11 - z10) * hx;
                 if (iy == 0) {
-                        *gx = gy1;
+                        *gx = gy1 / map->meta.dy;
                 } else {
                         const double z0_1 = get_z(map, ix, iy - 1);
                         const double z1_1 = get_z(map, ix + 1, iy - 1);
                         const double gy0 = (z00 - z0_1) * (1. - hx) +
                             (z10 - z1_1) * hx;
                         const double ay = hy + 0.5;
-                        *gy = gy0 * (1. - ay) + gy1 * ay;
+                        *gy = (gy0 * (1. - ay) + gy1 * ay) / map->meta.dy;
                 }
         } else {
                 const double gy0 = (z01 - z00) * (1. - hx) + (z11 - z10) * hx;
                 if (iy == map->meta.ny - 2) {
-                        *gy = gy0;
+                        *gy = gy0 / map->meta.dy;
                 } else {
                         const double z02 = get_z(map, ix, iy + 2);
                         const double z12 = get_z(map, ix + 1, iy + 2);
                         const double gy1 = (z02 - z01) * (1. - hx) +
                             (z12 - z11) * hx;
                         const double ay = hy - 0.5;
-                        *gy = gy0 * (1. - ay) + gy1 * ay;
+                        *gy = (gy0 * (1. - ay) + gy1 * ay) / map->meta.dy;
                 }
         }
 
