@@ -62,10 +62,13 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
         double lat_delta = 0., long_delta = 0.;
         int data_size = strlen(path) + 1;
 
-        int rc;
         tinydir_dir dir;
-        for (rc = tinydir_open(&dir, path); (rc == 0) && dir.has_next;
-             tinydir_next(&dir)) {
+        int rc = tinydir_open(&dir, path);
+        if (rc != 0) {
+                return TURTLE_ERROR_FORMAT(
+                    TURTLE_RETURN_PATH_ERROR, "could not access %s", path);
+        }
+        for (; dir.has_next; tinydir_next(&dir)) {
                 tinydir_file file;
                 tinydir_readfile(&dir, &file);
                 if (file.is_dir) continue;
@@ -119,7 +122,7 @@ enum turtle_return turtle_stack_create(struct turtle_stack ** stack,
                 tinydir_close(&dir);
                 return TURTLE_ERROR_RAISE();
         }
-        if (rc == 0) tinydir_close(&dir);
+        tinydir_close(&dir);
 
         /* Check the grid size */
         int lat_n = 0, long_n = 0;
