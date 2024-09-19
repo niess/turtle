@@ -750,6 +750,21 @@ TURTLE_API enum turtle_return turtle_stack_gradient(
     double * glat, double * glon, int * inside);
 
 /**
+ * Get some basic information relative to the stack.
+ *
+ * @param stack      The stack object
+ * @param shape      The stack shape along [longitude, latitude], or `NULL`.
+ * @param latitude   The stack latitude range, or `NULL`.
+ * @param longitude  The stack longitude range, or `NULL`.
+ *
+ * __Warnings__ The shape, latitude and longitude arguments must be size 2-or
+ * more arrays, if not `NULL`.
+ *
+ */
+TURTLE_API void turtle_stack_info(const struct turtle_stack * stack,
+    int * shape, double * latitude, double * longitude);
+
+/**
  * Create a new client to a stack of global topography data
  *
  * @param client    The client object

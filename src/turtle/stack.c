@@ -448,3 +448,23 @@ enum turtle_return turtle_stack_load_(struct turtle_stack * stack,
         if (inside != NULL) *inside = 1;
         return TURTLE_RETURN_SUCCESS;
 }
+
+/* Return some stack info. */
+void turtle_stack_info(const struct turtle_stack * stack, int * shape,
+    double * latitude, double * longitude)
+{
+        if (shape != NULL) {
+                shape[0] = stack->longitude_n;
+                shape[1] = stack->latitude_n;
+        }
+
+        if (latitude != NULL) {
+                latitude[0] = stack->latitude_0;
+                latitude[1] = stack->latitude_0 + stack->latitude_delta;
+        }
+
+        if (longitude != NULL) {
+                longitude[0] = stack->longitude_0;
+                longitude[1] = stack->longitude_0 + stack->longitude_delta;
+        }
+}
