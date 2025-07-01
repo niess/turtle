@@ -28,7 +28,11 @@
 #include <stdlib.h>
 #include <string.h>
 /* Endianess utilities */
+#ifdef _WIN32
+#include <winsock.h>
+#else
 #include <arpa/inet.h>
+#endif
 /* TURTLE library */
 #include "turtle/io.h"
 

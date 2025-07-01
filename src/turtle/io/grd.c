@@ -28,8 +28,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-/* Endianess utilities */
-#include <arpa/inet.h>
 /* TURTLE library */
 #include "turtle/io.h"
 
