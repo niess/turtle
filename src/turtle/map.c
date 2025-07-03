@@ -350,7 +350,7 @@ enum turtle_return turtle_map_gradient_(const struct turtle_map * map,
         if (hy <= 0.5) {
                 const double gy1 = (z01 - z00) * (1. - hx) + (z11 - z10) * hx;
                 if (iy == 0) {
-                        *gx = gy1 / map->meta.dy;
+                        *gy = gy1 / map->meta.dy;
                 } else {
                         const double z0_1 = get_z(map, ix, iy - 1);
                         const double z1_1 = get_z(map, ix + 1, iy - 1);
