@@ -695,7 +695,8 @@ static int check_layer(struct turtle_stepper * stepper,
         } else {
                 sample->index[0] = index[0] + 1;
                 sample->index[1] = index[1];
-                sample->elevation[0] = elevation;
+                if (elevation > sample->elevation[0])
+                        sample->elevation[0] = elevation;
                 return EXIT_FAILURE;
         }
 }
