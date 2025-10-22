@@ -47,7 +47,7 @@ static void upify(char * s)
                 if ((*s >= 'a') && (*s <= 'z')) {
                         *s += 'A' - 'a';
                 }
-                *s++;
+                s++;
         }
 }
 
@@ -79,16 +79,13 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         asc->path = path;
 
         /* Parse the meta data from the header */
-        double nodata_value;
         char ncols[8] = { 0 }, nrows[8] = { 0 };
         char x0entry[16] = { 0 }, y0entry[16] = { 0 }, cellsize[16] = { 0 };
-        char nodata[32] = { 0 };
         if ((fscanf(asc->fid, "%7s %d", ncols, &io->meta.nx) != 2) ||
-            (fscanf(asc->fid, "%7s %d",  nrows, &io->meta.ny) != 2) ||
+            (fscanf(asc->fid, "%7s %d", nrows, &io->meta.ny) != 2) ||
             (fscanf(asc->fid, "%15s %lf", x0entry, &io->meta.x0) != 2) ||
             (fscanf(asc->fid, "%15s %lf", y0entry, &io->meta.y0) != 2) ||
-            (fscanf(asc->fid, "%15s %lf", cellsize, &io->meta.dx) != 2) ||
-            (fscanf(asc->fid, "%31s %lf", nodata, &nodata_value) != 2)) {
+            (fscanf(asc->fid, "%15s %lf", cellsize, &io->meta.dx) != 2)) {
                 io->close(io);
                 return TURTLE_ERROR_VREGISTER(TURTLE_RETURN_BAD_FORMAT,
                     "could not read the header of file `%s'", path);
@@ -96,6 +93,7 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         io->meta.dy = io->meta.dx;
         upify(ncols);
         if (strcmp(ncols, "NCOLS") != 0) {
+                io->close(io);
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_BAD_FORMAT,
                     "%s: expected `NCOLS`, found `%s`",
@@ -105,6 +103,7 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         }
         upify(nrows);
         if (strcmp(nrows, "NROWS") != 0) {
+                io->close(io);
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_BAD_FORMAT,
                     "%s: expected `NROWS`, found `%s`",
@@ -116,6 +115,7 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         if (strcmp(x0entry, "XLLCORNER") == 0) {
                 io->meta.x0 += 0.5 * io->meta.dx;
         } else if (strcmp(x0entry, "XLLCENTER") != 0) {
+                io->close(io);
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_BAD_FORMAT,
                     "%s: expected `XLLCENTER` or `XLLCORNER`, found `%s`",
@@ -127,6 +127,7 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         if (strcmp(y0entry, "YLLCORNER") == 0) {
                 io->meta.y0 += 0.5 * io->meta.dy;
         } else if (strcmp(y0entry, "YLLCENTER") != 0) {
+                io->close(io);
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_BAD_FORMAT,
                     "%s: expected `YLLCENTER` or `YLLCORNER`, found `%s`",
@@ -136,6 +137,7 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         }
         upify(cellsize);
         if (strcmp(cellsize, "CELLSIZE") != 0) {
+                io->close(io);
                 return TURTLE_ERROR_VREGISTER(
                     TURTLE_RETURN_BAD_FORMAT,
                     "%s: expected `CELLSIZE`, found `%s`",
@@ -143,37 +145,72 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
                     cellsize
                 );
         }
-        upify(nodata);
-        if (strcmp(nodata, "NODATA_VALUE") != 0) {
-                return TURTLE_ERROR_VREGISTER(
-                    TURTLE_RETURN_BAD_FORMAT,
-                    "%s: expected `NODATA_VALUE`, found `%s`",
-                    path,
-                    nodata
-                );
-        }
 
-        /* Check the min and max z values */
-        const long offset = ftell(asc->fid);
-        int i;
-        double zmin = DBL_MAX, zmax = -DBL_MIN;
-        for (i = 0; i < io->meta.ny; i++) {
-                int j;
-                for (j = 0; j < io->meta.nx; j++) {
-                        double d;
-                        if (fscanf(asc->fid, "%lf", &d) != 1) {
+        /* Check for any nodata_value */
+        long offset = ftell(asc->fid);
+        double nodata_value = -DBL_MAX;
+        double zmin = DBL_MAX, zmax = -DBL_MAX;
+        int i = 0;
+        {
+                int nread;
+                double d;
+                if ((nread = fscanf(asc->fid, "%lf", &d)) == 0) {
+                        char nodata[32] = { 0 };
+
+                        fseek(asc->fid, offset, SEEK_SET);
+                        if (fscanf(asc->fid, "%31s %lf", nodata,
+                             &nodata_value) != 2) {
                                 io->close(io);
                                 return TURTLE_ERROR_VREGISTER(
                                     TURTLE_RETURN_BAD_FORMAT,
-                                    "inconsistent data in file `%s'", path);
+                                    "could not read the header of file `%s'",
+                                    path
+                                );
                         }
-                        if (d == nodata_value)
-                                continue;
-                        else if (d < zmin)
-                                zmin = d;
-                        else if (d > zmax)
-                                zmax = d;
+                        upify(nodata);
+                        if (strcmp(nodata, "NODATA_VALUE") != 0) {
+                                io->close(io);
+                                return TURTLE_ERROR_VREGISTER(
+                                    TURTLE_RETURN_BAD_FORMAT,
+                                    "%s: expected `NODATA_VALUE`, found `%s`",
+                                    path,
+                                    nodata
+                                );
+                        }
+                        offset = ftell(asc->fid);
+                } else if (nread == 1) {
+                        if (d != nodata_value) {
+                                zmin = zmax = d;
+                        }
+                        i++;
+                } else {
+                        io->close(io);
+                        return TURTLE_ERROR_VREGISTER(
+                            TURTLE_RETURN_BAD_FORMAT,
+                            "inconsistent data in file `%s'",
+                            path
+                        );
                 }
+        }
+
+        /* Check the min and max z values */
+        const int n = io->meta.nx * io->meta.ny;
+        for (; i < n; i++) {
+                double d;
+                if (fscanf(asc->fid, "%lf", &d) != 1) {
+                        io->close(io);
+                        return TURTLE_ERROR_VREGISTER(
+                            TURTLE_RETURN_BAD_FORMAT,
+                            "inconsistent data in file `%s'",
+                            path
+                        );
+                }
+                if (d == nodata_value)
+                        continue;
+                else if (d < zmin)
+                        zmin = d;
+                else if (d > zmax)
+                        zmax = d;
         }
         fseek(asc->fid, offset, SEEK_SET);
         io->meta.z0 = zmin;

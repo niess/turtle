@@ -14,7 +14,9 @@ jobs:
 
     - name: Unit tests
       run: |
-        sudo apt-get install -y gcovr lcov
+        sudo apt-get update
+        sudo apt-get install -y gcovr lcov libpng-dev libtiff-dev
+        ldconfig -p | grep libpng
         make libcheck
         make test
 

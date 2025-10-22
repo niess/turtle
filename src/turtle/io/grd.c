@@ -86,7 +86,7 @@ static enum turtle_return grd_open(struct turtle_io * io, const char * path,
         /* Check the min and max z values */
         const long offset = ftell(grd->fid);
         int i;
-        double zmin = DBL_MAX, zmax = -DBL_MIN;
+        double zmin = DBL_MAX, zmax = -DBL_MAX;
         for (i = 0; i < io->meta.ny; i++) {
                 int j;
                 for (j = 0; j < io->meta.nx; j++) {
