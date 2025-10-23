@@ -101,8 +101,21 @@ static enum turtle_return api_initialise(struct turtle_error_context * error_)
         if (api.lib != NULL)
                 return TURTLE_RETURN_SUCCESS;
 
-        api.lib = dlopen("libpng." SOEXT, RTLD_LAZY);
+        const char libnames[][32] = {
+            "libpng." SOEXT,
+            "libpng16." SOEXT,
+            "libpng15." SOEXT,
+            "libpng14." SOEXT,
+        };
+
+        int i;
+        const int n = sizeof libnames / sizeof libnames[0];
+        for (i = 0; i < n; i++) {
+                api.lib = dlopen(libnames[i], RTLD_LAZY);
+                if (api.lib != NULL) break;
+        }
         if (api.lib == NULL) {
+                api.lib = dlopen(libnames[0], RTLD_LAZY);
                 return TURTLE_ERROR_REGISTER(
                     TURTLE_RETURN_PATH_ERROR, dlerror());
         }
