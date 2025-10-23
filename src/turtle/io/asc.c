@@ -152,11 +152,10 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
         double zmin = DBL_MAX, zmax = -DBL_MAX;
         int i = 0;
         {
-                int nread;
                 double d;
-                if ((nread = fscanf(asc->fid, "%lf", &d)) == 0) {
+                int nread = fscanf(asc->fid, "%lf", &d);
+                if (nread  == 0) {
                         char nodata[32] = { 0 };
-
                         fseek(asc->fid, offset, SEEK_SET);
                         if (fscanf(asc->fid, "%31s %lf", nodata,
                              &nodata_value) != 2) {
@@ -167,6 +166,7 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
                                     path
                                 );
                         }
+                        offset = ftell(asc->fid);
                         upify(nodata);
                         if (strcmp(nodata, "NODATA_VALUE") != 0) {
                                 io->close(io);
@@ -177,7 +177,6 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
                                     nodata
                                 );
                         }
-                        offset = ftell(asc->fid);
                 } else if (nread == 1) {
                         if (d != nodata_value) {
                                 zmin = zmax = d;
@@ -205,12 +204,12 @@ static enum turtle_return asc_open(struct turtle_io * io, const char * path,
                             path
                         );
                 }
-                if (d == nodata_value)
+                if (d == nodata_value) {
                         continue;
-                else if (d < zmin)
-                        zmin = d;
-                else if (d > zmax)
-                        zmax = d;
+                } else {
+                        if (d < zmin) zmin = d;
+                        if (d > zmax) zmax = d;
+                }
         }
         fseek(asc->fid, offset, SEEK_SET);
         io->meta.z0 = zmin;

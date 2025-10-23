@@ -97,10 +97,8 @@ static enum turtle_return grd_open(struct turtle_io * io, const char * path,
                                     TURTLE_RETURN_BAD_FORMAT,
                                     "inconsistent data in file `%s'", path);
                         }
-                        if (d < zmin)
-                                zmin = d;
-                        else if (d > zmax)
-                                zmax = d;
+                        if (d < zmin) zmin = d;
+                        if (d > zmax) zmax = d;
                 }
         }
         fseek(grd->fid, offset, SEEK_SET);
