@@ -144,7 +144,8 @@ static enum turtle_return grd_read(struct turtle_io * io,
                         if (start == end) break;
                         start = end;
                         int ix = i % io->meta.nx;
-                        int iy = i / io->meta.nx;
+                        /* reading order */
+                        int iy = io->meta.ny - 1 - (i / io->meta.nx);
                         set_z(map, ix, iy, d);
                 }
         }
