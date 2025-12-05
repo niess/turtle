@@ -52,7 +52,7 @@ enum turtle_return turtle_error_message_(struct turtle_error_context * error_,
         if ((_handler == NULL) || (rc == TURTLE_RETURN_SUCCESS)) return rc;
         error_->file = file;
         error_->line = line;
-        
+
         if (error_->dynamic && (error_->message != NULL)) {
                 free(error_->message);
                 error_->message = NULL;
@@ -110,7 +110,18 @@ enum turtle_return turtle_error_raise_(struct turtle_error_context * error_)
         if ((_handler == NULL) || (error_->code == TURTLE_RETURN_SUCCESS))
                 return error_->code;
 
-        /* Compute the total of the error message, in order to store it
+#if defined(_WIN32)
+        /* Use a const-sized buffer since MSVC compiler does not support C99
+         * variable-sized arrays.
+         */
+#define MESSAGE_MAX_SIZE 2048
+        char message[MESSAGE_MAX_SIZE] = { 0x0 };
+
+        snprintf(message, MESSAGE_MAX_SIZE - 1, "{ %s [#%d], %s:%d } %s",
+            turtle_error_function(error_->function), error_->code, error_->file,
+            error_->line, error_->message);
+#else
+        /* Compute the total length of the error message, in order to store it
          * back on the stack
          */
         const int m = snprintf(NULL, 0, "{ %s [#%d], %s:%d } ",
@@ -118,12 +129,13 @@ enum turtle_return turtle_error_raise_(struct turtle_error_context * error_)
             error_->line);
         const int n = strlen(error_->message);
 
-        /* Format the erreor message on the stack */
+        /* Format the error message on the stack */
         char message[m + n + 1];
         sprintf(message, "{ %s [#%d], %s:%d } ",
             turtle_error_function(error_->function), error_->code, error_->file,
             error_->line);
         memcpy(message + m, error_->message, n + 1);
+#endif
 
         /* Free any dynamic memory */
         if (error_->dynamic) {
